@@ -1,5 +1,6 @@
 #include "wave.h"
 #include "sensors.h"
+#include <stdlib.h>  // For malloc/free
 
 #define SerialMon Serial
 
@@ -20,16 +21,18 @@ const int SAMPLE_INTERVAL_MS = 1000;
 int getSampleDurationMs() {
   float voltage = readBatteryVoltage();
   int percent = estimateBatteryPercent(voltage);
-  if (percent > 50) return 600000;      // 10 minutes
-  if (percent > 30) return 300000;      // 5 minutes
-  if (percent > 20) return 120000;      // 2 minutes
+  if (percent > 50) return 60000;      // 10 minutes
+  if (percent > 30) return 30000;      // 5 minutes
+  if (percent > 20) return 12000;      // 2 minutes
   return 60000;                         // 1 minute
 }
 
 int sampleCount = 0;
 
 // Add static storage for last collected samples and count
-#define MAX_POSSIBLE_SAMPLES 600
+// Reduced from 600 to 300 to save memory (3.6KB instead of 7.2KB)
+// At >50% battery: 10 minutes = 600 samples, but we'll only keep most recent 300
+#define MAX_POSSIBLE_SAMPLES 300
 static WaveSample lastSamples[MAX_POSSIBLE_SAMPLES];
 static int lastSampleCount = 0;
 
@@ -39,7 +42,13 @@ void recordWaveData() {
 
   int sampleDurationMs = getSampleDurationMs();
   const int maxSamples = sampleDurationMs / SAMPLE_INTERVAL_MS;
-  WaveSample samples[maxSamples];
+  
+  // Allocate on heap to prevent stack overflow
+  WaveSample* samples = (WaveSample*)malloc(maxSamples * sizeof(WaveSample));
+  if (!samples) {
+    SerialMon.println("❌ Failed to allocate memory for wave samples");
+    return;
+  }
 
   unsigned long startTime = millis();
   while (millis() - startTime < sampleDurationMs && sampleCount < maxSamples) {
@@ -55,10 +64,25 @@ void recordWaveData() {
   SerialMon.printf("🌊 Collected %d wave samples\n", sampleCount);
 
   // Store samples for later use by no-argument compute/log functions
-  lastSampleCount = sampleCount > MAX_POSSIBLE_SAMPLES ? MAX_POSSIBLE_SAMPLES : sampleCount;
-  for (int i = 0; i < lastSampleCount; ++i) {
-    lastSamples[i] = samples[i];
+  // If we collected more samples than our storage can hold, keep the most recent ones
+  if (sampleCount <= MAX_POSSIBLE_SAMPLES) {
+    lastSampleCount = sampleCount;
+    for (int i = 0; i < lastSampleCount; ++i) {
+      lastSamples[i] = samples[i];
+    }
+  } else {
+    // Keep the last MAX_POSSIBLE_SAMPLES samples
+    lastSampleCount = MAX_POSSIBLE_SAMPLES;
+    int startIdx = sampleCount - MAX_POSSIBLE_SAMPLES;
+    for (int i = 0; i < MAX_POSSIBLE_SAMPLES; ++i) {
+      lastSamples[i] = samples[startIdx + i];
+    }
+    SerialMon.printf("⚠️  Kept most recent %d of %d samples due to memory constraints\n", 
+                     MAX_POSSIBLE_SAMPLES, sampleCount);
   }
+  
+  // Free the heap memory
+  free(samples);
 }
 
 float computeWaveHeight(WaveSample* samples, int count) {

@@ -205,7 +205,7 @@ void loop() {
   // Try to send any buffered unsent JSON first
   if (hasUnsentJson()) {
     SerialMon.println("Attempting to resend buffered unsent data...");
-    if (connectToNetwork("your.apn.here")) {
+    if (connectToNetwork("telenor.smart")) {
       bool success = sendJsonToServer(
         "playbuoyapi.no",
         443,
@@ -229,7 +229,7 @@ void loop() {
     }
   }
 
-  if (connectToNetwork("your.apn.here")) {
+  if (connectToNetwork("telenor.smart")) {
     bool success = sendJsonToServer(
       "playbuoyapi.no",
       443,
