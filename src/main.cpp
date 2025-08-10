@@ -197,8 +197,8 @@ void setup() {
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
     // Enhanced battery measurement with multiple readings over 1 minute
-  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (1 MINUTE AVERAGE) ===");
-  const int TOTAL_READINGS = 60;  // 60 readings over 1 minute
+  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (15 SECONDS AVERAGE) ===");
+  const int TOTAL_READINGS = 15;  // 15 readings over 15 seconds
   const int READINGS_PER_SECOND = 1;  // 1 reading per second
   float voltageReadings[TOTAL_READINGS];
   int validReadings = 0;
@@ -216,7 +216,7 @@ void setup() {
   }
   
   float stableBatteryVoltage = 0.0f;
-  if (validReadings >= 10) {  // Need at least 10 valid readings
+  if (validReadings >= 5) {  // Need at least 5 valid readings (reduced from 10 for 15-second test)
     // Calculate average
     float totalVoltage = 0.0f;
     for (int i = 0; i < validReadings; i++) {
@@ -252,7 +252,7 @@ void setup() {
      setStableBatteryVoltage(calibratedVoltage);
   } else {
     SerialMon.println("⚠️  Insufficient valid readings for enhanced measurement");
-    SerialMon.printf("Got %d valid readings, need at least 10\n", validReadings);
+    SerialMon.printf("Got %d valid readings, need at least 5\n", validReadings);
     stableBatteryVoltage = 4.0f;  // Safe fallback
     setStableBatteryVoltage(stableBatteryVoltage);
   }

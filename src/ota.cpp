@@ -645,6 +645,102 @@ String testMethod7_DirectGitHubTest(const char* versionUrl) {
   return "";
 }
 
+// Test method 8: Browser-like headers for GitHub
+String testMethod8_BrowserLikeHeaders(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 8: Browser-like Headers (GitHub Compatible)");
+  
+  // Initialize HTTP service
+  SerialMon.println("  → Sending AT+HTTPINIT");
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPINIT failed");
+    return "";
+  }
+  
+  // Set URL (keep HTTPS)
+  SerialMon.printf("  → Setting URL: %s\n", versionUrl);
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + String(versionUrl) + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPPARA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Set browser-like headers that GitHub accepts
+  SerialMon.println("  → Setting browser-like headers...");
+  modem.sendAT("+HTTPPARA=\"USERDATA\",\"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\\r\\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\\r\\nAccept-Language: en-US,en;q=0.5\\r\\nAccept-Encoding: identity\\r\\nConnection: close\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ⚠️ Custom headers not supported");
+  }
+  
+  // Set data size
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPDATA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Execute request
+  SerialMon.println("  → Executing HTTP GET request...");
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(30000L) != 1) {
+    SerialMon.println("  ❌ HTTPACTION failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read response
+  SerialMon.println("  → Reading HTTP response...");
+  modem.sendAT("+HTTPREAD");
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("  ❌ HTTPREAD command failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read content with proper waiting
+  String content = "";
+  unsigned long timeout = millis();
+  
+  // Wait for data to start arriving
+  while (!modem.stream.available() && millis() - timeout < 5000) {
+    delay(10);
+  }
+  
+  // Read all available data
+  while (modem.stream.available() || millis() - timeout < 10000) {
+    if (modem.stream.available()) {
+      char c = modem.stream.read();
+      content += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → Raw content: '%s'\n", content.c_str());
+  SerialMon.printf("  → Content length: %d\n", content.length());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  // Parse content
+  content.trim();
+  if (content.length() > 0 && content.length() < 20) {
+    if (content.indexOf('.') > 0 && content.indexOf('.') < content.length() - 1) {
+      SerialMon.printf("  ✅ Extracted version: %s\n", content.c_str());
+      return content;
+    }
+  }
+  
+  SerialMon.println("  ❌ No valid version in response");
+  return "";
+}
+
 // Helper method for HTTPS after 301 redirect
 String testMethod6_EnhancedAtCommandsHttps(const char* versionUrl) {
   SerialMon.println("  → Following 301 redirect to HTTPS...");
@@ -734,16 +830,24 @@ String getServerFirmwareVersion(const char* versionUrl) {
   SerialMon.printf("Target URL: %s\n", versionUrl);
   SerialMon.println("==========================================");
   
-  // Test the direct GitHub method first (most likely to work)
-  SerialMon.println("🎯 PRIORITY: Testing Direct GitHub Test (Method 7)");
+  // Test the browser-like headers method first (most likely to work with GitHub)
+  SerialMon.println("🎯 PRIORITY: Testing Browser-like Headers (Method 8)");
+  String browserResult = testMethod8_BrowserLikeHeaders(versionUrl);
+  if (browserResult.length() > 0) {
+    SerialMon.printf("✅ Browser-like headers method succeeded: %s\n", browserResult.c_str());
+    return browserResult;
+  }
+  
+  // Test the direct GitHub method second
+  SerialMon.println("🎯 SECONDARY: Testing Direct GitHub Test (Method 7)");
   String directResult = testMethod7_DirectGitHubTest(versionUrl);
   if (directResult.length() > 0) {
     SerialMon.printf("✅ Direct GitHub method succeeded: %s\n", directResult.c_str());
     return directResult;
   }
   
-  // Test the enhanced method second
-  SerialMon.println("🎯 SECONDARY: Testing Enhanced AT Commands (Method 6)");
+  // Test the enhanced method third
+  SerialMon.println("🎯 TERTIARY: Testing Enhanced AT Commands (Method 6)");
   String enhancedResult = testMethod6_EnhancedAtCommands(versionUrl);
   if (enhancedResult.length() > 0) {
     SerialMon.printf("✅ Enhanced method succeeded: %s\n", enhancedResult.c_str());
