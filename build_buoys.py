@@ -2,11 +2,10 @@ Import("env")
 import os
 import shutil
 
-# Define your buoys
+# Define your buoys (matching your exact format)
 BUOYS = [
-    {"id": "vatna", "name": "Vatna", "node_id": "PB001"},
-    {"id": "fjord", "name": "Fjord", "node_id": "PB002"},
-    {"id": "havet", "name": "Havet", "node_id": "PB003"},
+    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy-vatna"},
+    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy-grinde"},
 ]
 
 def build_multiple_buoys(source, target, env):

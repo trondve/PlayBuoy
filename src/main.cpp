@@ -157,7 +157,7 @@ void setup() {
   esp_task_wdt_add(NULL); // Add current thread to WDT
 
   // Initialize RTC with Europe/Oslo timezone (automatic DST)
-  configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "no.pool.ntp.org");
+  configTzTime(TIMEZONE, NTP_SERVER);
   SerialMon.println("RTC initialized with Europe/Oslo timezone (CET/CEST with DST)");
   
   // Set a default time if NTP is not available (August 10, 2025, 10:00:00 CEST)
@@ -229,8 +229,8 @@ void setup() {
     // Device will deep sleep if battery critically low
   }
 
-  // Build dynamic firmware URL based on node ID
-  String firmwareUrl = "http://your-server.com/firmware/playbuoy-" + String(NODE_ID) + ".bin";
+  // Build firmware URL using config values
+  String firmwareUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID) + ".bin";
   SerialMon.printf("Checking for firmware update at: %s\n", firmwareUrl.c_str());
   
   if (checkAndPerformOTA(firmwareUrl.c_str())) {
@@ -341,7 +341,7 @@ void loop() {
   
   if (hasUnsentJson()) {
     SerialMon.println("Attempting to resend buffered unsent data...");
-    networkConnected = connectToNetwork("telenor");
+    networkConnected = connectToNetwork(NETWORK_PROVIDER);
     
     // If regular connection fails, try APN testing
     if (!networkConnected) {
@@ -351,9 +351,9 @@ void loop() {
     
     if (networkConnected) {
       bool success = sendJsonToServer(
-        "playbuoyapi.no",
-        80,
-        "/upload",
+        API_SERVER,
+        API_PORT,
+        API_ENDPOINT,
         getUnsentJson()
       );
       if (success) {
@@ -375,7 +375,7 @@ void loop() {
 
   // Only proceed with new data if buffered data was handled successfully
   if (shouldProceedWithNewData) {
-    networkConnected = connectToNetwork("telenor");
+    networkConnected = connectToNetwork(NETWORK_PROVIDER);
     
     // If regular connection fails, try APN testing
     if (!networkConnected) {
@@ -385,9 +385,9 @@ void loop() {
     
     if (networkConnected) {
       bool success = sendJsonToServer(
-        "playbuoyapi.no",
-        80,
-        "/upload",
+        API_SERVER,
+        API_PORT,
+        API_ENDPOINT,
         json
       );
       if (success) {

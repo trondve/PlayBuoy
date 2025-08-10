@@ -10,11 +10,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-# Define your buoys
+# Define your buoys (matching your exact format)
 BUOYS = [
-    {"id": "vatna", "name": "Vatna", "node_id": "PB001"},
-    {"id": "fjord", "name": "Fjord", "node_id": "PB002"},
-    {"id": "havet", "name": "Havet", "node_id": "PB003"},
+    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy-vatna"},
+    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy-grinde"},
     # Add more buoys as needed
 ]
 
@@ -33,16 +32,28 @@ def restore_config():
         print("✅ Restored src/config.h")
 
 def update_config(buoy):
-    """Update config.h with buoy-specific settings"""
-    config_content = f'''#ifndef CONFIG_H
-#define CONFIG_H
-
+    """Update config.h with buoy-specific settings (matching your exact format)"""
+    config_content = f'''// Configuration - Update these values for your specific setup
 #define NODE_ID "{buoy['node_id']}"
 #define NAME "{buoy['name']}"
 #define FIRMWARE_VERSION "1.0.0"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
-#endif // CONFIG_H
+// API Configuration
+#define API_SERVER "playbuoyapi.no"
+#define API_PORT 80
+#define API_ENDPOINT "/upload"
+
+// OTA Configuration
+#define OTA_SERVER "vladdus.github.io"
+#define OTA_PATH "/PlayBuoy/firmware"
+
+// Network Configuration
+#define NETWORK_PROVIDER "telenor"
+
+// Time Configuration
+#define NTP_SERVER "no.pool.ntp.org"
+#define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 '''
     
     with open("src/config.h", "w") as f:
@@ -58,8 +69,7 @@ def build_firmware(buoy):
         result = subprocess.run([
             "C:\\Users\\trond\\.platformio\\penv\\Scripts\\platformio.exe",
             "run",
-            "--environment", "lilygo-t-sim7000g",
-            "--target", "build"
+            "--environment", "lilygo-t-sim7000g"
         ], capture_output=True, text=True, cwd=".")
         
         if result.returncode == 0:
