@@ -16,6 +16,7 @@ ESP32-based wave monitoring buoy firmware for the LilyGo T-SIM7000G board.
    #define NODE_ID "playbuoy-vatna"        // Your buoy ID
    #define NAME "Vatnakvamsvatnet"         // Your buoy name
    #define API_SERVER "playbuoyapi.no"     // Your API server
+   #define API_KEY "your-api-key"          // Your API key
    #define OTA_SERVER "vladdus.github.io"  // Your OTA server
    #define NETWORK_PROVIDER "telenor"      // Your network provider
    #define NTP_SERVER "no.pool.ntp.org"    // Your NTP server
@@ -39,8 +40,8 @@ This will create firmware files for each buoy in the `firmware/` directory.
 ## OTA Updates
 
 The firmware will automatically check for updates at:
-- `https://vladdus.github.io/PlayBuoy/firmware/playbuoy-vatna.bin`
-- `https://vladdus.github.io/PlayBuoy/firmware/playbuoy-grinde.bin`
+- `https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/playbuoy-vatna.bin`
+- `https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/playbuoy-grinde.bin`
 
 ## Security
 

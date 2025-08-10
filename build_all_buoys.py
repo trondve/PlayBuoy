@@ -43,10 +43,11 @@ def update_config(buoy):
 #define API_SERVER "playbuoyapi.no"
 #define API_PORT 80
 #define API_ENDPOINT "/upload"
+#define API_KEY "super-secret-key-123"
 
 // OTA Configuration
-#define OTA_SERVER "vladdus.github.io"
-#define OTA_PATH "/PlayBuoy/firmware"
+#define OTA_SERVER "raw.githubusercontent.com"
+#define OTA_PATH "/vladdus/PlayBuoy/main/firmware"
 
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"

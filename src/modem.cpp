@@ -1,5 +1,6 @@
 #define TINY_GSM_MODEM_SIM7000
 
+#include "config.h"
 #include "modem.h"
 #include <TinyGsmClient.h>
 #include <IPAddress.h>
@@ -182,7 +183,7 @@ bool sendJsonToServer(const char* server, uint16_t port, const char* endpoint, c
       String("POST ") + endpoint + " HTTP/1.1\r\n" +
       "Host: " + server + "\r\n" +
       "Content-Type: application/json\r\n" +
-      "X-API-Key: super-secret-key-123\r\n" +
+      "X-API-Key: " + String(API_KEY) + "\r\n" +
       "Connection: close\r\n" +
       "Content-Length: " + payload.length() + "\r\n\r\n" +
       payload;
