@@ -62,7 +62,20 @@ String getServerFirmwareVersion(const char* versionUrl) {
   
   TinyGsmClient client(modem);
   
-  if (!client.connect(host.c_str(), 80)) {
+  // Try HTTPS first, fallback to HTTP
+  bool connected = false;
+  if (url.startsWith("https://")) {
+    SerialMon.printf("Attempting HTTPS connection to %s:443\n", host.c_str());
+    connected = client.connect(host.c_str(), 443);
+    if (!connected) {
+      SerialMon.printf("HTTPS failed, trying HTTP\n");
+      connected = client.connect(host.c_str(), 80);
+    }
+  } else {
+    connected = client.connect(host.c_str(), 80);
+  }
+  
+  if (!connected) {
     SerialMon.printf("Failed to connect to %s\n", host.c_str());
     return "";
   }
@@ -92,6 +105,8 @@ String getServerFirmwareVersion(const char* versionUrl) {
     String body = response.substring(bodyStart + 4);
     body.trim();
     
+    SerialMon.printf("Version response body: '%s' (length: %d)\n", body.c_str(), body.length());
+    
     // Try to parse as JSON first
     DynamicJsonDocument doc(512);
     DeserializationError error = deserializeJson(doc, body);
@@ -99,17 +114,32 @@ String getServerFirmwareVersion(const char* versionUrl) {
     if (!error) {
       // JSON format: {"version": "1.0.1", "url": "firmware.bin"}
       if (doc.containsKey("version")) {
-        return doc["version"].as<String>();
+        String version = doc["version"].as<String>();
+        SerialMon.printf("Parsed JSON version: %s\n", version.c_str());
+        return version;
       }
     }
     
     // Fallback: treat as plain text version
     if (body.length() > 0 && body.length() < 20) {
+      SerialMon.printf("Using plain text version: %s\n", body.c_str());
       return body;
+    }
+    
+    // Handle HTML-wrapped content from raw.githubusercontent.com
+    if (body.indexOf("<pre>") >= 0) {
+      int preStart = body.indexOf("<pre>");
+      int preEnd = body.indexOf("</pre>");
+      if (preStart >= 0 && preEnd > preStart) {
+        String version = body.substring(preStart + 5, preEnd);
+        version.trim();
+        SerialMon.printf("Extracted version from HTML: %s\n", version.c_str());
+        return version;
+      }
     }
   }
   
-  SerialMon.println("Invalid version format received");
+  SerialMon.printf("Invalid version format received. Full response: %s\n", response.c_str());
   return "";
 }
 
@@ -167,7 +197,20 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
   
   TinyGsmClient client(modem);
   
-  if (!client.connect(host.c_str(), 80)) {
+  // Try HTTPS first, fallback to HTTP
+  bool connected = false;
+  if (url.startsWith("https://")) {
+    SerialMon.printf("Attempting HTTPS connection to %s:443\n", host.c_str());
+    connected = client.connect(host.c_str(), 443);
+    if (!connected) {
+      SerialMon.printf("HTTPS failed, trying HTTP\n");
+      connected = client.connect(host.c_str(), 80);
+    }
+  } else {
+    connected = client.connect(host.c_str(), 80);
+  }
+  
+  if (!connected) {
     SerialMon.printf("Failed to connect to %s\n", host.c_str());
     return false;
   }

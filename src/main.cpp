@@ -5,6 +5,8 @@
 #include <TinyGsmClient.h>
 #include <time.h>
 #include <esp_system.h>
+#include <math.h>
+#include <algorithm>
 
 // Project modules
 #include "wave.h" // Wave data processing
@@ -194,28 +196,55 @@ void setup() {
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-  // Measure battery voltage BEFORE any power-intensive operations
-  // This ensures we get a stable reading without voltage drops from other processes
-  SerialMon.println("=== BATTERY MEASUREMENT (STABLE STATE) ===");
-  float totalVoltage = 0.0f;
+    // Enhanced battery measurement with multiple readings over 1 minute
+  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (1 MINUTE AVERAGE) ===");
+  const int TOTAL_READINGS = 60;  // 60 readings over 1 minute
+  const int READINGS_PER_SECOND = 1;  // 1 reading per second
+  float voltageReadings[TOTAL_READINGS];
   int validReadings = 0;
-  for (int i = 0; i < 5; i++) {
+  
+  for (int i = 0; i < TOTAL_READINGS; i++) {
     float voltage = readBatteryVoltage();
     if (voltage >= 3.8f && voltage <= 4.3f) {
-      totalVoltage += voltage;
+      voltageReadings[validReadings] = voltage;
       validReadings++;
+      SerialMon.printf("Reading %d: %.3fV\n", i + 1, voltage);
+    } else {
+      SerialMon.printf("Reading %d: %.3fV (invalid, skipping)\n", i + 1, voltage);
     }
-    delay(100);
+    delay(1000 / READINGS_PER_SECOND);  // 1 second delay
   }
   
   float stableBatteryVoltage = 0.0f;
-         if (validReadings > 0) {
-         stableBatteryVoltage = totalVoltage / validReadings;
-         SerialMon.printf("Stable battery voltage: %.2fV (from %d readings)\n", stableBatteryVoltage, validReadings);
-         calibrateBatteryVoltage(4.16f);  // Calibrate against current multimeter reading
-         setStableBatteryVoltage(stableBatteryVoltage);  // Store for use throughout cycle
+  if (validReadings >= 10) {  // Need at least 10 valid readings
+    // Calculate average
+    float totalVoltage = 0.0f;
+    for (int i = 0; i < validReadings; i++) {
+      totalVoltage += voltageReadings[i];
+    }
+    stableBatteryVoltage = totalVoltage / validReadings;
+    
+    // Calculate standard deviation for quality check
+    float variance = 0.0f;
+    for (int i = 0; i < validReadings; i++) {
+      variance += pow(voltageReadings[i] - stableBatteryVoltage, 2);
+    }
+    float stdDev = sqrt(variance / validReadings);
+    
+    SerialMon.printf("Enhanced battery measurement complete:\n");
+    SerialMon.printf("- Valid readings: %d/%d\n", validReadings, TOTAL_READINGS);
+    SerialMon.printf("- Average voltage: %.3fV\n", stableBatteryVoltage);
+    SerialMon.printf("- Standard deviation: %.3fV\n", stdDev);
+    SerialMon.printf("- Min: %.3fV, Max: %.3fV\n", 
+      *std::min_element(voltageReadings, voltageReadings + validReadings),
+      *std::max_element(voltageReadings, voltageReadings + validReadings));
+    
+    // Calibrate against current multimeter reading
+    calibrateBatteryVoltage(4.16f);
+    setStableBatteryVoltage(stableBatteryVoltage);
   } else {
-    SerialMon.println("⚠️  Could not get stable voltage readings for calibration");
+    SerialMon.println("⚠️  Insufficient valid readings for enhanced measurement");
+    SerialMon.printf("Got %d valid readings, need at least 10\n", validReadings);
     stableBatteryVoltage = 4.0f;  // Safe fallback
     setStableBatteryVoltage(stableBatteryVoltage);
   }
@@ -229,13 +258,7 @@ void setup() {
     // Device will deep sleep if battery critically low
   }
 
-  // Build firmware URL using config values
-  String firmwareUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID) + ".bin";
-  SerialMon.printf("Checking for firmware update at: %s\n", firmwareUrl.c_str());
-  
-  if (checkAndPerformOTA(firmwareUrl.c_str())) {
-    // OTA update in progress, will restart on completion
-  }
+  // OTA check will happen in loop() after cellular connection is established
 }
 
 void loop() {
@@ -381,6 +404,16 @@ void loop() {
     if (!networkConnected) {
       SerialMon.println("Regular connection failed, testing multiple APNs...");
       networkConnected = testMultipleAPNs();
+    }
+    
+    // Check for firmware updates if network is connected
+    if (networkConnected) {
+      String firmwareUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID) + ".bin";
+      SerialMon.printf("Checking for firmware update at: %s\n", firmwareUrl.c_str());
+      
+      if (checkAndPerformOTA(firmwareUrl.c_str())) {
+        // OTA update in progress, will restart on completion
+      }
     }
     
     if (networkConnected) {
