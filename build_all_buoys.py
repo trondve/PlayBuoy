@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import json
 from pathlib import Path
 
 # Define your buoys (matching your exact format)
@@ -16,6 +17,9 @@ BUOYS = [
     {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy-grinde"},
     # Add more buoys as needed
 ]
+
+# Current firmware version (update this when you release new firmware)
+CURRENT_VERSION = "1.0.0"
 
 def backup_config():
     """Backup the original config.h"""
@@ -36,7 +40,7 @@ def update_config(buoy):
     config_content = f'''// Configuration - Update these values for your specific setup
 #define NODE_ID "{buoy['node_id']}"
 #define NAME "{buoy['name']}"
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "{CURRENT_VERSION}"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
 // API Configuration
@@ -60,6 +64,31 @@ def update_config(buoy):
     with open("src/config.h", "w") as f:
         f.write(config_content)
     print(f"✅ Updated config.h for {buoy['name']} (ID: {buoy['node_id']})")
+
+def create_version_files():
+    """Create version files for each buoy"""
+    print("📝 Creating version files...")
+    
+    for buoy in BUOYS:
+        # Create JSON version file
+        version_json = {
+            "version": CURRENT_VERSION,
+            "url": f"https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
+            "name": buoy['name'],
+            "node_id": buoy['node_id'],
+            "description": f"Firmware for {buoy['name']} buoy"
+        }
+        
+        json_file = f"firmware/{buoy['node_id']}.version.json"
+        with open(json_file, 'w') as f:
+            json.dump(version_json, f, indent=2)
+        
+        # Create simple text version file (fallback)
+        text_file = f"firmware/{buoy['node_id']}.version"
+        with open(text_file, 'w') as f:
+            f.write(CURRENT_VERSION)
+        
+        print(f"✅ Created version files for {buoy['name']}")
 
 def build_firmware(buoy):
     """Build firmware for a specific buoy"""
@@ -123,6 +152,10 @@ def main():
                 successful_builds += 1
             
             print(f"Progress: {successful_builds}/{total_buoys} buoys built")
+        
+        # Create version files after all builds are complete
+        if successful_builds > 0:
+            create_version_files()
     
     finally:
         # Always restore the original config
@@ -143,11 +176,17 @@ def main():
             if file.endswith('.bin'):
                 size = os.path.getsize(os.path.join(output_dir, file))
                 print(f"  - {file} ({size:,} bytes)")
+        
+        print("\n📋 Version files:")
+        for file in os.listdir(output_dir):
+            if file.endswith('.version') or file.endswith('.version.json'):
+                print(f"  - {file}")
     
     print(f"\n🎯 Next steps:")
     print(f"1. Upload the .bin files to your server")
-    print(f"2. Each buoy will automatically check for its specific firmware")
-    print(f"3. URLs will be: http://your-server.com/firmware/playbuoy-{buoy['id']}.bin")
+    print(f"2. Upload the .version files to your server")
+    print(f"3. Each buoy will check version before downloading firmware")
+    print(f"4. URLs will be: https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/")
 
 if __name__ == "__main__":
     main()

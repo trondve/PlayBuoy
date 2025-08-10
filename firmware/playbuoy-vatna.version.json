@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "url": "https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/playbuoy-vatna.bin",
+  "name": "Vatnakvamsvatnet",
+  "node_id": "playbuoy-vatna",
+  "description": "Firmware for Vatnakvamsvatnet buoy"
+}

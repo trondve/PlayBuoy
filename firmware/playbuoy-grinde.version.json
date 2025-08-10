@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "url": "https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/playbuoy-grinde.bin",
+  "name": "Litla Grindevatnet",
+  "node_id": "playbuoy-grinde",
+  "description": "Firmware for Litla Grindevatnet buoy"
+}
