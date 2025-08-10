@@ -196,27 +196,40 @@ void setup() {
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-    // Enhanced battery measurement with multiple readings over 1 minute
-  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (15 SECONDS AVERAGE) ===");
-  const int TOTAL_READINGS = 15;  // 15 readings over 15 seconds
-  const int READINGS_PER_SECOND = 1;  // 1 reading per second
+    // Enhanced battery measurement with staggered sampling (60 seconds total)
+  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (60 SECONDS STAGGERED) ===");
+  const int TOTAL_READINGS = 12;  // 12 readings over 60 seconds
+  const int DELAY_BETWEEN_READINGS = 5000;  // 5 seconds between readings
   float voltageReadings[TOTAL_READINGS];
   int validReadings = 0;
   
   for (int i = 0; i < TOTAL_READINGS; i++) {
-    float voltage = readBatteryVoltage();
-    if (voltage >= 3.8f && voltage <= 4.3f) {
-      voltageReadings[validReadings] = voltage;
-      validReadings++;
-      SerialMon.printf("Reading %d: %.3fV\n", i + 1, voltage);
-    } else {
-      SerialMon.printf("Reading %d: %.3fV (invalid, skipping)\n", i + 1, voltage);
+    // Take 3 quick readings and average them (reduces noise)
+    float sum = 0.0f;
+    int quickReadings = 0;
+    for (int j = 0; j < 3; j++) {
+      float voltage = readBatteryVoltage();
+      if (voltage >= 3.8f && voltage <= 4.3f) {
+        sum += voltage;
+        quickReadings++;
+      }
+      delay(100); // 100ms between quick readings
     }
-    delay(1000 / READINGS_PER_SECOND);  // 1 second delay
+    
+    if (quickReadings > 0) {
+      float avgVoltage = sum / quickReadings;
+      voltageReadings[validReadings] = avgVoltage;
+      validReadings++;
+      SerialMon.printf("Reading %d: %.3fV (avg of %d quick readings)\n", i + 1, avgVoltage, quickReadings);
+    } else {
+      SerialMon.printf("Reading %d: No valid quick readings\n", i + 1);
+    }
+    
+    delay(DELAY_BETWEEN_READINGS);  // 5 second delay between main readings
   }
   
   float stableBatteryVoltage = 0.0f;
-  if (validReadings >= 5) {  // Need at least 5 valid readings (reduced from 10 for 15-second test)
+  if (validReadings >= 6) {  // Need at least 6 valid readings (half of 12 total readings)
     // Calculate average
     float totalVoltage = 0.0f;
     for (int i = 0; i < validReadings; i++) {
@@ -252,7 +265,7 @@ void setup() {
      setStableBatteryVoltage(calibratedVoltage);
   } else {
     SerialMon.println("⚠️  Insufficient valid readings for enhanced measurement");
-    SerialMon.printf("Got %d valid readings, need at least 5\n", validReadings);
+    SerialMon.printf("Got %d valid readings, need at least 6\n", validReadings);
     stableBatteryVoltage = 4.0f;  // Safe fallback
     setStableBatteryVoltage(stableBatteryVoltage);
   }
@@ -414,15 +427,15 @@ void loop() {
       networkConnected = testMultipleAPNs();
     }
     
-    // Check for firmware updates if network is connected
-    if (networkConnected) {
-      String firmwareUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID) + ".bin";
-      SerialMon.printf("Checking for firmware update at: %s\n", firmwareUrl.c_str());
-      
-      if (checkAndPerformOTA(firmwareUrl.c_str())) {
-        // OTA update in progress, will restart on completion
-      }
-    }
+         // Check for firmware updates if network is connected
+     if (networkConnected) {
+       String baseUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID);
+       SerialMon.printf("Checking for firmware update at: %s\n", baseUrl.c_str());
+       
+       if (checkForFirmwareUpdate(baseUrl.c_str())) {
+         // OTA update in progress, will restart on completion
+       }
+     }
     
     if (networkConnected) {
       bool success = sendJsonToServer(

@@ -1,7 +1,7 @@
 // Configuration - Update these values for your specific setup
 #define NODE_ID "playbuoy-vatna"
 #define NAME "Vatnakvamsvatnet"
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.1.0"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
 // API Configuration
@@ -11,8 +11,8 @@
 #define API_KEY "super-secret-key-123"
 
 // OTA Configuration
-#define OTA_SERVER "raw.githubusercontent.com"
-#define OTA_PATH "/trondve/PlayBuoy/main/firmware"
+#define OTA_SERVER "playbuoy.netlify.app"
+#define OTA_PATH "/firmware"
 
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"

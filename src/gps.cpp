@@ -82,14 +82,14 @@ void gpsEnd() {
 // Determine GPS fix timeout (in seconds) based on battery percentage
 uint16_t getGpsFixTimeout(bool isFirstFix) {
   if (isFirstFix) {
-    return 60; // 10 minutes
+    return 600; // 10 minutes
   }
   float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
   int percent = estimateBatteryPercent(voltage);
-  if (percent > 50) return 60;      // 10 minutes
-  if (percent > 30) return 30;      // 5 minutes
-  if (percent > 20) return 18;      // 3 minutes
-  return 12;                        // 2 minutes
+  if (percent > 50) return 600;     // 10 minutes
+  if (percent > 30) return 300;     // 5 minutes
+  if (percent > 20) return 180;     // 3 minutes
+  return 120;                       // 2 minutes
 }
 
 // Attempt to get a GPS fix with dynamic timeout
