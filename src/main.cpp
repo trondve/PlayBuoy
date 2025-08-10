@@ -28,9 +28,14 @@ extern "C" {
   #include "esp_partition.h"
 }
 
+// LilyGo T7000G Pin Definitions (matching your working test)
 #define MODEM_RX 26
 #define MODEM_TX 27
-#define MODEM_PWRKEY 12
+#define MODEM_PWRKEY 4
+#define MODEM_RST 5
+#define MODEM_POWER_ON 23
+#define MODEM_DTR 32
+#define MODEM_RI 33
 
 #define SerialMon Serial
 #define SerialAT Serial1
@@ -40,20 +45,56 @@ extern "C" {
 TinyGsm modem(SerialAT);
 
 void powerOnModem() {
+  SerialMon.println("Starting modem power sequence...");
+  
+  // Configure all modem pins
   pinMode(MODEM_PWRKEY, OUTPUT);
+  pinMode(MODEM_RST, OUTPUT);
+  pinMode(MODEM_POWER_ON, OUTPUT);
+  pinMode(MODEM_DTR, OUTPUT);
+  pinMode(MODEM_RI, INPUT);
+  
+  // Power sequence (matching your working test)
+  digitalWrite(MODEM_POWER_ON, LOW);
+  digitalWrite(MODEM_RST, LOW);
+  digitalWrite(MODEM_PWRKEY, HIGH);
+  digitalWrite(MODEM_DTR, HIGH);
+  delay(100);
+  
+  digitalWrite(MODEM_POWER_ON, HIGH);
+  delay(1000);
+  
+  digitalWrite(MODEM_RST, HIGH);
+  delay(100);
+  digitalWrite(MODEM_RST, LOW);
+  delay(100);
+  digitalWrite(MODEM_RST, HIGH);
+  delay(3000);
+  
   digitalWrite(MODEM_PWRKEY, LOW);
   delay(1000);
   digitalWrite(MODEM_PWRKEY, HIGH);
-  delay(3000);
+  
+  digitalWrite(MODEM_DTR, LOW);
+  
+  SerialMon.println("Power sequence complete. Waiting for modem...");
+  delay(5000);
 }
 
 void powerOffModem() {
-  // Power off modem using PWRKEY (if supported by your hardware)
-  pinMode(MODEM_PWRKEY, OUTPUT);
+  SerialMon.println("Powering off modem...");
+  
+  // Power off sequence
   digitalWrite(MODEM_PWRKEY, LOW);
   delay(1000);
   digitalWrite(MODEM_PWRKEY, HIGH);
   delay(1500); // Hold high for at least 1.2s to power off SIM7000G
+  
+  // Also power down the power control pin
+  digitalWrite(MODEM_POWER_ON, LOW);
+  digitalWrite(MODEM_DTR, HIGH);
+  
+  SerialMon.println("Modem powered off.");
 }
 
 // Set ESP32 RTC time from GPS epoch
@@ -116,10 +157,26 @@ void setup() {
   esp_task_wdt_add(NULL); // Add current thread to WDT
 
   powerOnModem();
-  SerialAT.begin(9600, SERIAL_8N1, MODEM_RX, MODEM_TX);
-  delay(3000);
-  modem.restart();
-
+  SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
+  delay(1000);
+  
+  // Test basic communication before proceeding
+  SerialMon.println("Testing basic modem communication...");
+  SerialAT.println("AT");
+  delay(1000);
+  
+  String response = "";
+  while (SerialAT.available()) {
+    response += (char)SerialAT.read();
+  }
+  
+  if (response.indexOf("OK") >= 0) {
+    SerialMon.println("✅ Modem communication successful");
+  } else {
+    SerialMon.println("❌ Modem communication failed. Response: " + response);
+  }
+  
+  // Get modem info
   SerialMon.println("Modem Info: " + modem.getModemInfo());
 
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
@@ -155,7 +212,9 @@ void loop() {
 
   GpsFixResult fix;
   if (shouldGetNewGpsFix) {
-    fix = getGpsFix(GPS_FIX_TIMEOUT_SEC);
+    // Use dynamic GPS timeout based on battery and whether this is first fix
+    bool isFirstFix = (rtcState.lastGpsFixTime == 0);
+    fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);
       checkAnchorDrift(fix.latitude, fix.longitude);
@@ -203,12 +262,24 @@ void loop() {
   SerialMon.println(json);
 
   // Try to send any buffered unsent JSON first
+  bool bufferedDataSent = false;
+  bool networkConnected = false;
+  bool shouldProceedWithNewData = true;
+  
   if (hasUnsentJson()) {
     SerialMon.println("Attempting to resend buffered unsent data...");
-    if (connectToNetwork("telenor.smart")) {
+    networkConnected = connectToNetwork("telenor");
+    
+    // If regular connection fails, try APN testing
+    if (!networkConnected) {
+      SerialMon.println("Regular connection failed, testing multiple APNs...");
+      networkConnected = testMultipleAPNs();
+    }
+    
+    if (networkConnected) {
       bool success = sendJsonToServer(
         "playbuoyapi.no",
-        443,
+        80,
         "/upload",
         getUnsentJson()
       );
@@ -216,40 +287,49 @@ void loop() {
         SerialMon.println("Buffered data upload successful.");
         clearUnsentJson();
         markUploadSuccess();
+        bufferedDataSent = true;
       } else {
         SerialMon.println("Buffered data upload failed, will retry next wakeup.");
         markUploadFailed();
-        // Do not proceed with new data upload if old data is still pending
-        goto sleep_now;
+        shouldProceedWithNewData = false;
       }
     } else {
       SerialMon.println("Network connection failed for buffered data.");
       markUploadFailed();
-      goto sleep_now;
+      shouldProceedWithNewData = false;
     }
   }
 
-  if (connectToNetwork("telenor.smart")) {
-    bool success = sendJsonToServer(
-      "playbuoyapi.no",
-      443,
-      "/upload",
-      json
-    );
-    if (success) {
-      markUploadSuccess();
-      clearUnsentJson();
+  // Only proceed with new data if buffered data was handled successfully
+  if (shouldProceedWithNewData) {
+    networkConnected = connectToNetwork("telenor");
+    
+    // If regular connection fails, try APN testing
+    if (!networkConnected) {
+      SerialMon.println("Regular connection failed, testing multiple APNs...");
+      networkConnected = testMultipleAPNs();
+    }
+    
+    if (networkConnected) {
+      bool success = sendJsonToServer(
+        "playbuoyapi.no",
+        80,
+        "/upload",
+        json
+      );
+      if (success) {
+        markUploadSuccess();
+        clearUnsentJson();
+      } else {
+        markUploadFailed();
+        storeUnsentJson(json);
+      }
     } else {
+      SerialMon.println("Network connection failed.");
       markUploadFailed();
       storeUnsentJson(json);
     }
-  } else {
-    SerialMon.println("Network connection failed.");
-    markUploadFailed();
-    storeUnsentJson(json);
   }
-
-sleep_now:
   int batteryPercent = estimateBatteryPercent(readBatteryVoltage());
   int sleepHours = determineSleepDuration(batteryPercent);
 

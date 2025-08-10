@@ -12,5 +12,9 @@ typedef struct {
 } GpsFixResult;
 
 void gpsBegin();                         // Enables GPS module
-GpsFixResult getGpsFix(uint16_t timeoutSec = 600);  // Attempts fix within timeout
+GpsFixResult getGpsFix(uint16_t timeoutSec = 600);  // Attempts fix within timeout (10 minutes default)
 void gpsEnd();                           // Optional: powers down GPS to save power
+
+// Dynamic GPS timeout functions
+uint16_t getGpsFixTimeout(bool isFirstFix);        // Returns timeout based on battery and first fix
+GpsFixResult getGpsFixDynamic(bool isFirstFix);    // Gets GPS fix with dynamic timeout

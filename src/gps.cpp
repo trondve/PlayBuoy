@@ -88,5 +88,9 @@ uint16_t getGpsFixTimeout(bool isFirstFix) {
 // Attempt to get a GPS fix with dynamic timeout
 GpsFixResult getGpsFixDynamic(bool isFirstFix) {
   uint16_t timeoutSec = getGpsFixTimeout(isFirstFix);
+  SerialMon.printf("GPS timeout: %u seconds (%s fix, battery: %d%%)\n", 
+                   timeoutSec, 
+                   isFirstFix ? "first" : "subsequent",
+                   estimateBatteryPercent(readBatteryVoltage()));
   return getGpsFix(timeoutSec);
 }

@@ -2,12 +2,13 @@
 
 #include "modem.h"
 #include <TinyGsmClient.h>
+#include <IPAddress.h>
 
 #define SerialMon Serial
 
 // Declare external modem from main.cpp
 extern TinyGsm modem;
-extern HardwareSerial SerialAT;
+extern HardwareSerial Serial1;  // SerialAT is defined as Serial1 in main.cpp
 
 // Add extern declarations for modem power control
 extern void powerOnModem();
@@ -24,10 +25,32 @@ bool connectToNetwork(const char* apn) {
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     SerialMon.printf("Connecting to cellular network (attempt %d/%d)...\n", attempt + 1, maxRetries);
 
+    // Initialize modem
+    SerialMon.println("Initializing modem...");
     modem.init();
+    
+    // Test basic communication first
+    SerialMon.println("Testing AT communication...");
+    if (!modem.testAT()) {
+      SerialMon.println("❌ AT communication failed");
+      if (attempt < maxRetries - 1) {
+        SerialMon.println("Power-cycling modem...");
+        powerOffModem();
+        delay(2000);
+        powerOnModem();
+        delay(3000);
+      }
+      continue;
+    }
+    SerialMon.println("✅ AT communication successful");
+
+    // Wait for network registration
+    SerialMon.println("Waiting for network registration...");
     if (!modem.waitForNetwork(NETWORK_TIMEOUT_MS)) {
-      SerialMon.println("Network registration failed.");
-      // Power-cycle modem if not last attempt
+      SerialMon.println("❌ Network registration failed.");
+      SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
+      SerialMon.println("Operator: " + modem.getOperator());
+      
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
@@ -38,8 +61,13 @@ bool connectToNetwork(const char* apn) {
       continue;
     }
 
+    SerialMon.println("✅ Network registered.");
+    SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
+    SerialMon.println("Operator: " + modem.getOperator());
+
+    // Check if network is connected
     if (!modem.isNetworkConnected()) {
-      SerialMon.println("Network not connected.");
+      SerialMon.println("❌ Network not connected.");
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
@@ -50,10 +78,16 @@ bool connectToNetwork(const char* apn) {
       continue;
     }
 
-    SerialMon.println("Network registered.");
+    SerialMon.println("✅ Network connected.");
 
+    // Connect to GPRS/APN
+    SerialMon.printf("Connecting to APN: %s\n", apn);
     if (!modem.gprsConnect(apn, "", "")) {
-      SerialMon.println("APN connection failed.");
+      SerialMon.println("❌ APN connection failed.");
+      SerialMon.println("Trying to get IP address...");
+      IPAddress ip = modem.localIP();
+      SerialMon.printf("IP: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
+      
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
@@ -64,9 +98,65 @@ bool connectToNetwork(const char* apn) {
       continue;
     }
 
-    SerialMon.println("Cellular network connected.");
+    SerialMon.println("✅ Cellular network connected.");
+    IPAddress localIP = modem.localIP();
+    SerialMon.printf("Local IP: %d.%d.%d.%d\n", localIP[0], localIP[1], localIP[2], localIP[3]);
     return true;
   }
+  return false;
+}
+
+//
+// Test multiple APNs to find one that works
+//
+bool testMultipleAPNs() {
+  String apns[] = {"telenor", "telenor.smart", "internet", "internet.telenor.no"};
+  int numApns = sizeof(apns) / sizeof(apns[0]);
+  
+  SerialMon.println("Testing multiple APNs...");
+  
+  for (int i = 0; i < numApns; i++) {
+    SerialMon.printf("\n--- Testing APN: %s ---\n", apns[i].c_str());
+    
+    // Configure APN
+    String apnCmd = "AT+CGDCONT=1,\"IP\",\"" + apns[i] + "\"";
+    SerialMon.println("Sending: " + apnCmd);
+    
+    // Send AT command directly
+    Serial1.println(apnCmd);
+    delay(2000);
+    
+    // Activate PDP context
+    SerialMon.println("Activating PDP context...");
+    Serial1.println("AT+CGACT=1,1");
+    delay(10000);
+    
+    // Check if we got an IP
+    SerialMon.println("Checking IP address...");
+    Serial1.println("AT+CGPADDR=1");
+    delay(2000);
+    
+    // Check connection status
+    Serial1.println("AT+CGACT?");
+    delay(2000);
+    
+    // Read responses
+    String response = "";
+    while (Serial1.available()) {
+      response += (char)Serial1.read();
+    }
+    SerialMon.println("Response: " + response);
+    
+    // If we got an IP, this APN works
+    if (response.indexOf("+CGPADDR: 1,") >= 0 && response.indexOf("0.0.0.0") == -1) {
+      SerialMon.printf("✅ APN %s works!\n", apns[i].c_str());
+      return true;
+    }
+    
+    delay(2000);
+  }
+  
+  SerialMon.println("❌ No APN worked");
   return false;
 }
 
@@ -89,6 +179,7 @@ bool sendJsonToServer(const char* server, uint16_t port, const char* endpoint, c
       String("POST ") + endpoint + " HTTP/1.1\r\n" +
       "Host: " + server + "\r\n" +
       "Content-Type: application/json\r\n" +
+      "X-API-Key: super-secret-key-123\r\n" +
       "Connection: close\r\n" +
       "Content-Length: " + payload.length() + "\r\n\r\n" +
       payload;
