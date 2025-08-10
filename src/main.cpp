@@ -239,10 +239,10 @@ void setup() {
       *std::min_element(voltageReadings, voltageReadings + validReadings),
       *std::max_element(voltageReadings, voltageReadings + validReadings));
     
-         // Calculate calibration factor based on actual vs measured
-     float calibrationFactor = 4.16f / stableBatteryVoltage;
-     SerialMon.printf("Calibration factor: %.3f (actual %.2fV / measured %.3fV)\n", 
-                     calibrationFactor, 4.16f, stableBatteryVoltage);
+                    // Calculate calibration factor based on actual vs measured
+           float calibrationFactor = 4.17f / stableBatteryVoltage;
+           SerialMon.printf("Calibration factor: %.3f (actual %.2fV / measured %.3fV)\n",
+                           calibrationFactor, 4.17f, stableBatteryVoltage);
      
      // Apply calibration and recalculate
      float calibratedVoltage = stableBatteryVoltage * calibrationFactor;

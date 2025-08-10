@@ -11,6 +11,9 @@
 // Declare external modem from main.cpp
 extern TinyGsm modem;
 
+// Forward declarations
+String testMethod6_EnhancedAtCommandsHttps(const char* versionUrl);
+
 // Version comparison function
 int compareVersions(const String& version1, const String& version2) {
   int v1[3] = {0, 0, 0};
@@ -35,20 +38,192 @@ int compareVersions(const String& version1, const String& version2) {
   return 0; // Versions are equal
 }
 
-String getServerFirmwareVersion(const char* versionUrl) {
-  // Parse URL to extract host and path
+// Test method 1: Modem's built-in HTTP client with HTTPS
+String testMethod1_ModemHttpHttps(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 1: Modem HTTP Client (HTTPS)");
+  
+  // Initialize HTTP service
+  SerialMon.println("  → Initializing HTTP service...");
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ Failed to initialize HTTP service");
+    return "";
+  }
+  
+  // Set URL (keep HTTPS)
+  SerialMon.printf("  → Setting URL: %s\n", versionUrl);
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + String(versionUrl) + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ Failed to set URL parameter");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Set custom headers
+  SerialMon.println("  → Setting custom headers...");
+  modem.sendAT("+HTTPPARA=\"USERDATA\",\"User-Agent: PlayBuoy/1.0\\r\\nAccept: text/plain, application/json\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ⚠️ Custom headers not supported");
+  }
+  
+  // Set data size
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ Failed to set HTTP data size");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Execute request
+  SerialMon.println("  → Executing HTTP GET request...");
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(30000L) != 1) {
+    SerialMon.println("  ❌ HTTP GET request failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read response
+  SerialMon.println("  → Reading HTTP response...");
+  modem.sendAT("+HTTPREAD");
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("  ❌ Failed to get HTTPREAD response");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read data
+  String response = "";
+  unsigned long timeout = millis();
+  while (modem.stream.available() || millis() - timeout < 10000) {
+    if (modem.stream.available()) {
+      char c = modem.stream.read();
+      response += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → Raw response: '%s'\n", response.c_str());
+  SerialMon.printf("  → Response length: %d\n", response.length());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  // Parse response
+  response.trim();
+  if (response.length() > 0 && response.length() < 20) {
+    SerialMon.printf("  ✅ Extracted version: %s\n", response.c_str());
+    return response;
+  }
+  
+  SerialMon.println("  ❌ Invalid version format");
+  return "";
+}
+
+// Test method 2: Modem's built-in HTTP client with HTTP (fallback)
+String testMethod2_ModemHttpHttp(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 2: Modem HTTP Client (HTTP)");
+  
+  // Convert HTTPS to HTTP
+  String httpUrl = String(versionUrl);
+  if (httpUrl.startsWith("https://")) {
+    httpUrl = "http://" + httpUrl.substring(8);
+    SerialMon.printf("  → Converted to HTTP: %s\n", httpUrl.c_str());
+  }
+  
+  // Initialize HTTP service
+  SerialMon.println("  → Initializing HTTP service...");
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ Failed to initialize HTTP service");
+    return "";
+  }
+  
+  // Set URL
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + httpUrl + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ Failed to set URL parameter");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Set data size
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ Failed to set HTTP data size");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Execute request
+  SerialMon.println("  → Executing HTTP GET request...");
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(30000L) != 1) {
+    SerialMon.println("  ❌ HTTP GET request failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read response
+  SerialMon.println("  → Reading HTTP response...");
+  modem.sendAT("+HTTPREAD");
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("  ❌ Failed to get HTTPREAD response");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read data
+  String response = "";
+  unsigned long timeout = millis();
+  while (modem.stream.available() || millis() - timeout < 10000) {
+    if (modem.stream.available()) {
+      char c = modem.stream.read();
+      response += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → Raw response: '%s'\n", response.c_str());
+  SerialMon.printf("  → Response length: %d\n", response.length());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  // Parse response
+  response.trim();
+  if (response.length() > 0 && response.length() < 20) {
+    SerialMon.printf("  ✅ Extracted version: %s\n", response.c_str());
+    return response;
+  }
+  
+  SerialMon.println("  ❌ Invalid version format");
+  return "";
+}
+
+// Test method 3: TinyGsmClient with HTTPS
+String testMethod3_TinyGsmHttps(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 3: TinyGsmClient (HTTPS)");
+  
+  // Parse URL
   String url = String(versionUrl);
   String host = "";
   String path = "";
   
-  // Remove protocol
   if (url.startsWith("https://")) {
     url = url.substring(8);
-  } else if (url.startsWith("http://")) {
-    url = url.substring(7);
   }
   
-  // Split host and path
   int slashIndex = url.indexOf('/');
   if (slashIndex > 0) {
     host = url.substring(0, slashIndex);
@@ -58,177 +233,592 @@ String getServerFirmwareVersion(const char* versionUrl) {
     path = "/";
   }
   
-  SerialMon.printf("Checking version from: %s%s\n", host.c_str(), path.c_str());
+  SerialMon.printf("  → Host: %s\n", host.c_str());
+  SerialMon.printf("  → Path: %s\n", path.c_str());
   
+  // Create client
   TinyGsmClient client(modem);
   
-  // GitHub requires HTTPS - no HTTP fallback
-  bool connected = false;
-  if (host.indexOf("githubusercontent.com") >= 0 || url.startsWith("https://")) {
-    SerialMon.printf("Attempting HTTPS connection to %s:443\n", host.c_str());
-    SerialMon.printf("URL: %s\n", url.c_str());
-    SerialMon.printf("Host: %s\n", host.c_str());
-    SerialMon.printf("Path: %s\n", path.c_str());
-    
-    connected = client.connect(host.c_str(), 443);
-    if (connected) {
-      SerialMon.println("✅ HTTPS connection successful");
-    } else {
-      SerialMon.println("❌ HTTPS connection failed");
-      SerialMon.printf("Connection failed - no error code available\n");
-    }
-  } else {
-    SerialMon.printf("Using HTTP connection to %s:80\n", host.c_str());
-    connected = client.connect(host.c_str(), 80);
-  }
-  
-  if (!connected) {
-    SerialMon.printf("Failed to connect to %s\n", host.c_str());
+  // Connect
+  SerialMon.printf("  → Connecting to %s:443...\n", host.c_str());
+  if (!client.connect(host.c_str(), 443)) {
+    SerialMon.printf("  ❌ Connection failed to %s:443\n", host.c_str());
     return "";
   }
   
-  // Build HTTP request with comprehensive headers
-  String request = 
-    String("GET ") + path + " HTTP/1.1\r\n" +
-    "Host: " + host + "\r\n" +
-    "User-Agent: PlayBuoy/1.0\r\n" +
-    "Accept: text/plain, application/json, */*\r\n" +
-    "Accept-Encoding: identity\r\n" +
-    "Cache-Control: no-cache\r\n" +
-    "Connection: close\r\n\r\n";
+  SerialMon.println("  ✅ Connected successfully");
   
-  SerialMon.println("=== HTTP REQUEST ===");
-  SerialMon.println(request);
-  SerialMon.println("=== END REQUEST ===");
+  // Send HTTP request
+  String request = "GET " + path + " HTTP/1.1\r\n";
+  request += "Host: " + host + "\r\n";
+  request += "User-Agent: PlayBuoy/1.0\r\n";
+  request += "Accept: text/plain, application/json\r\n";
+  request += "Accept-Encoding: identity\r\n";
+  request += "Connection: close\r\n";
+  request += "\r\n";
   
-  int bytesWritten = client.print(request);
-  SerialMon.printf("Request bytes written: %d\n", bytesWritten);
+  SerialMon.printf("  → Sending request:\n%s", request.c_str());
+  client.print(request);
   
-  // Read response with comprehensive debugging
+  // Read response
+  SerialMon.println("  → Reading response...");
   String response = "";
   unsigned long timeout = millis();
-  int bytesRead = 0;
-  int availableCount = 0;
   
-  SerialMon.println("=== READING HTTP RESPONSE ===");
-  SerialMon.printf("Client connected: %s\n", client.connected() ? "YES" : "NO");
-  SerialMon.printf("Client available: %d\n", client.available());
-  
-  while (client.connected() && millis() - timeout < 15000) { // Increased timeout
-    availableCount = client.available();
-    if (availableCount > 0) {
-      SerialMon.printf("Available bytes: %d\n", availableCount);
-      
-      for (int i = 0; i < availableCount && i < 10; i++) { // Read up to 10 bytes at once
-        char c = client.read();
-        response += c;
-        bytesRead++;
-        
-        // Log first 50 bytes in detail
-        if (bytesRead <= 50) {
-          SerialMon.printf("Byte %d: 0x%02X ('%c') [available: %d]\n", 
-                          bytesRead, (unsigned char)c, 
-                          (c >= 32 && c <= 126) ? c : '?', 
-                          client.available());
-        }
-      }
-      
-      // Reset timeout on successful read
+  while (client.connected() || millis() - timeout < 10000) {
+    if (client.available()) {
+      char c = client.read();
+      response += c;
       timeout = millis();
-    } else {
-      delay(100); // Small delay when no data available
     }
   }
   
-  SerialMon.printf("=== RESPONSE SUMMARY ===\n");
-  SerialMon.printf("Total bytes read: %d\n", bytesRead);
-  SerialMon.printf("Response length: %d\n", response.length());
-  SerialMon.printf("Client still connected: %s\n", client.connected() ? "YES" : "NO");
-  SerialMon.printf("Client available: %d\n", client.available());
+  SerialMon.printf("  → Raw response length: %d\n", response.length());
+  SerialMon.printf("  → Response preview: %s\n", response.substring(0, min(200, (int)response.length())).c_str());
   
   client.stop();
   
-  // Parse HTTP response with detailed debugging
-  SerialMon.println("=== PARSING HTTP RESPONSE ===");
-  SerialMon.printf("Full response length: %d\n", response.length());
-  
-  // Show first 200 characters of response
-  String responsePreview = response.substring(0, min(200, (int)response.length()));
-  SerialMon.println("Response preview:");
-  SerialMon.println(responsePreview);
-  
+  // Parse response
   int bodyStart = response.indexOf("\r\n\r\n");
-  SerialMon.printf("Body start position: %d\n", bodyStart);
-  
   if (bodyStart > 0) {
-    String headers = response.substring(0, bodyStart);
     String body = response.substring(bodyStart + 4);
     body.trim();
+    SerialMon.printf("  → Body: '%s'\n", body.c_str());
     
-    SerialMon.println("=== HTTP HEADERS ===");
-    SerialMon.println(headers);
-    SerialMon.println("=== END HEADERS ===");
-    
-    SerialMon.printf("Version response body: '%s' (length: %d)\n", body.c_str(), body.length());
-    
-    // Try to parse as JSON first
-    DynamicJsonDocument doc(512);
-    DeserializationError error = deserializeJson(doc, body);
-    
-    if (!error) {
-      // JSON format: {"version": "1.0.1", "url": "firmware.bin"}
-      if (doc.containsKey("version")) {
-        String version = doc["version"].as<String>();
-        SerialMon.printf("Parsed JSON version: %s\n", version.c_str());
-        return version;
-      }
-    }
-    
-    // Fallback: treat as plain text version
     if (body.length() > 0 && body.length() < 20) {
-      SerialMon.printf("Using plain text version: %s\n", body.c_str());
+      SerialMon.printf("  ✅ Extracted version: %s\n", body.c_str());
       return body;
-    }
-    
-    // Handle HTML-wrapped content from raw.githubusercontent.com
-    if (body.indexOf("<pre>") >= 0) {
-      int preStart = body.indexOf("<pre>");
-      int preEnd = body.indexOf("</pre>");
-      if (preStart >= 0 && preEnd > preStart) {
-        String version = body.substring(preStart + 5, preEnd);
-        version.trim();
-        SerialMon.printf("Extracted version from HTML: %s\n", version.c_str());
-        return version;
-      }
     }
   }
   
-  SerialMon.printf("Invalid version format received. Full response: %s\n", response.c_str());
+  SerialMon.println("  ❌ Could not parse response body");
+  return "";
+}
+
+// Test method 4: TinyGsmClient with HTTP
+String testMethod4_TinyGsmHttp(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 4: TinyGsmClient (HTTP)");
+  
+  // Convert to HTTP
+  String url = String(versionUrl);
+  if (url.startsWith("https://")) {
+    url = "http://" + url.substring(8);
+  }
+  
+  String host = "";
+  String path = "";
+  
+  if (url.startsWith("http://")) {
+    url = url.substring(7);
+  }
+  
+  int slashIndex = url.indexOf('/');
+  if (slashIndex > 0) {
+    host = url.substring(0, slashIndex);
+    path = url.substring(slashIndex);
+  } else {
+    host = url;
+    path = "/";
+  }
+  
+  SerialMon.printf("  → Host: %s\n", host.c_str());
+  SerialMon.printf("  → Path: %s\n", path.c_str());
+  
+  // Create client
+  TinyGsmClient client(modem);
+  
+  // Connect
+  SerialMon.printf("  → Connecting to %s:80...\n", host.c_str());
+  if (!client.connect(host.c_str(), 80)) {
+    SerialMon.printf("  ❌ Connection failed to %s:80\n", host.c_str());
+    return "";
+  }
+  
+  SerialMon.println("  ✅ Connected successfully");
+  
+  // Send HTTP request
+  String request = "GET " + path + " HTTP/1.1\r\n";
+  request += "Host: " + host + "\r\n";
+  request += "User-Agent: PlayBuoy/1.0\r\n";
+  request += "Accept: text/plain, application/json\r\n";
+  request += "Accept-Encoding: identity\r\n";
+  request += "Connection: close\r\n";
+  request += "\r\n";
+  
+  SerialMon.printf("  → Sending request:\n%s", request.c_str());
+  client.print(request);
+  
+  // Read response
+  SerialMon.println("  → Reading response...");
+  String response = "";
+  unsigned long timeout = millis();
+  
+  while (client.connected() || millis() - timeout < 10000) {
+    if (client.available()) {
+      char c = client.read();
+      response += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → Raw response length: %d\n", response.length());
+  SerialMon.printf("  → Response preview: %s\n", response.substring(0, min(200, (int)response.length())).c_str());
+  
+  client.stop();
+  
+  // Parse response
+  int bodyStart = response.indexOf("\r\n\r\n");
+  if (bodyStart > 0) {
+    String body = response.substring(bodyStart + 4);
+    body.trim();
+    SerialMon.printf("  → Body: '%s'\n", body.c_str());
+    
+    if (body.length() > 0 && body.length() < 20) {
+      SerialMon.printf("  ✅ Extracted version: %s\n", body.c_str());
+      return body;
+    }
+  }
+  
+  SerialMon.println("  ❌ Could not parse response body");
+  return "";
+}
+
+// Test method 5: Direct AT command with detailed debugging
+String testMethod5_DirectAtCommands(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 5: Direct AT Commands");
+  
+  // Convert to HTTP for testing
+  String httpUrl = String(versionUrl);
+  if (httpUrl.startsWith("https://")) {
+    httpUrl = "http://" + httpUrl.substring(8);
+  }
+  
+  SerialMon.printf("  → Testing URL: %s\n", httpUrl.c_str());
+  
+  // Use modem object instead of SerialAT
+  SerialMon.println("  → Sending AT+HTTPINIT");
+  modem.sendAT("+HTTPINIT");
+  delay(1000);
+  
+  SerialMon.println("  → Sending AT+HTTPPARA=\"URL\"");
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + httpUrl + "\"");
+  delay(1000);
+  
+  SerialMon.println("  → Sending AT+HTTPDATA");
+  modem.sendAT("+HTTPDATA=0,10000");
+  delay(1000);
+  
+  SerialMon.println("  → Sending AT+HTTPACTION=0");
+  modem.sendAT("+HTTPACTION=0");
+  delay(5000);
+  
+  SerialMon.println("  → Sending AT+HTTPREAD");
+  modem.sendAT("+HTTPREAD");
+  delay(3000);
+  
+  // Read all available data
+  String response = "";
+  while (modem.stream.available()) {
+    char c = modem.stream.read();
+    response += c;
+  }
+  
+  SerialMon.printf("  → AT Response: '%s'\n", response.c_str());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  delay(1000);
+  
+  // Try to extract version
+  response.trim();
+  if (response.length() > 0 && response.length() < 100) {
+    SerialMon.printf("  → Extracted: '%s'\n", response.c_str());
+    return response;
+  }
+  
+  SerialMon.println("  ❌ No valid response");
+  return "";
+}
+
+// Test method 6: Enhanced AT command with proper content reading
+String testMethod6_EnhancedAtCommands(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 6: Enhanced AT Commands (FIXED)");
+  
+  // Convert to HTTP for testing
+  String httpUrl = String(versionUrl);
+  if (httpUrl.startsWith("https://")) {
+    httpUrl = "http://" + httpUrl.substring(8);
+  }
+  
+  SerialMon.printf("  → Testing URL: %s\n", httpUrl.c_str());
+  
+  // Initialize HTTP service
+  SerialMon.println("  → Sending AT+HTTPINIT");
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPINIT failed");
+    return "";
+  }
+  
+  // Set URL
+  SerialMon.println("  → Sending AT+HTTPPARA=\"URL\"");
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + httpUrl + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPPARA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Set data size
+  SerialMon.println("  → Sending AT+HTTPDATA");
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPDATA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Execute request
+  SerialMon.println("  → Sending AT+HTTPACTION=0");
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(30000L) != 1) {
+    SerialMon.println("  ❌ HTTPACTION failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read response with proper parsing
+  SerialMon.println("  → Sending AT+HTTPREAD");
+  modem.sendAT("+HTTPREAD");
+  
+  // Wait for the modem to respond to the command
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("  ❌ HTTPREAD command failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Now read the actual content - FIXED VERSION
+  String content = "";
+  unsigned long timeout = millis();
+  
+  // Wait for the modem to start sending data
+  while (!modem.stream.available() && millis() - timeout < 5000) {
+    delay(10);
+  }
+  
+  // Read all available data
+  while (modem.stream.available() || millis() - timeout < 10000) {
+    if (modem.stream.available()) {
+      char c = modem.stream.read();
+      content += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → Raw content: '%s'\n", content.c_str());
+  SerialMon.printf("  → Content length: %d\n", content.length());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  // Parse the content - look for the actual version string
+  content.trim();
+  
+  // If we got a 301 redirect, try to follow it
+  if (content.indexOf("+HTTPACTION: 0,301") >= 0) {
+    SerialMon.println("  ⚠️ Got 301 redirect, trying HTTPS...");
+    return testMethod6_EnhancedAtCommandsHttps(versionUrl);
+  }
+  
+  // Look for the actual version content
+  if (content.length() > 0 && content.length() < 20) {
+    // Check if it looks like a version string (x.x.x format)
+    if (content.indexOf('.') > 0 && content.indexOf('.') < content.length() - 1) {
+      SerialMon.printf("  ✅ Extracted version: %s\n", content.c_str());
+      return content;
+    }
+  }
+  
+  SerialMon.println("  ❌ No valid version found in content");
+  return "";
+}
+
+// Test method 7: Direct GitHub test with minimal headers
+String testMethod7_DirectGitHubTest(const char* versionUrl) {
+  SerialMon.println("🔬 TEST METHOD 7: Direct GitHub Test (Minimal Headers)");
+  
+  // Initialize HTTP service
+  SerialMon.println("  → Sending AT+HTTPINIT");
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPINIT failed");
+    return "";
+  }
+  
+  // Set URL (keep HTTPS)
+  SerialMon.printf("  → Setting URL: %s\n", versionUrl);
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + String(versionUrl) + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPPARA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Set minimal headers that GitHub accepts
+  SerialMon.println("  → Setting minimal headers...");
+  modem.sendAT("+HTTPPARA=\"USERDATA\",\"User-Agent: PlayBuoy/1.0\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ⚠️ Custom headers not supported");
+  }
+  
+  // Set data size
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPDATA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Execute request
+  SerialMon.println("  → Executing HTTP GET request...");
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(30000L) != 1) {
+    SerialMon.println("  ❌ HTTPACTION failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read response
+  SerialMon.println("  → Reading HTTP response...");
+  modem.sendAT("+HTTPREAD");
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("  ❌ HTTPREAD command failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read content with proper waiting
+  String content = "";
+  unsigned long timeout = millis();
+  
+  // Wait for data to start arriving
+  while (!modem.stream.available() && millis() - timeout < 5000) {
+    delay(10);
+  }
+  
+  // Read all available data
+  while (modem.stream.available() || millis() - timeout < 10000) {
+    if (modem.stream.available()) {
+      char c = modem.stream.read();
+      content += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → Raw content: '%s'\n", content.c_str());
+  SerialMon.printf("  → Content length: %d\n", content.length());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  // Parse content
+  content.trim();
+  if (content.length() > 0 && content.length() < 20) {
+    if (content.indexOf('.') > 0 && content.indexOf('.') < content.length() - 1) {
+      SerialMon.printf("  ✅ Extracted version: %s\n", content.c_str());
+      return content;
+    }
+  }
+  
+  SerialMon.println("  ❌ No valid version in response");
+  return "";
+}
+
+// Helper method for HTTPS after 301 redirect
+String testMethod6_EnhancedAtCommandsHttps(const char* versionUrl) {
+  SerialMon.println("  → Following 301 redirect to HTTPS...");
+  
+  // Initialize HTTP service
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPINIT failed");
+    return "";
+  }
+  
+  // Set URL (keep HTTPS)
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + String(versionUrl) + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPPARA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Set data size
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("  ❌ HTTPDATA failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Execute request
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(30000L) != 1) {
+    SerialMon.println("  ❌ HTTPACTION failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read response
+  modem.sendAT("+HTTPREAD");
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("  ❌ HTTPREAD command failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
+    return "";
+  }
+  
+  // Read content - FIXED VERSION
+  String content = "";
+  unsigned long timeout = millis();
+  
+  // Wait for the modem to start sending data
+  while (!modem.stream.available() && millis() - timeout < 5000) {
+    delay(10);
+  }
+  
+  // Read all available data
+  while (modem.stream.available() || millis() - timeout < 10000) {
+    if (modem.stream.available()) {
+      char c = modem.stream.read();
+      content += c;
+      timeout = millis();
+    }
+  }
+  
+  SerialMon.printf("  → HTTPS content: '%s'\n", content.c_str());
+  
+  // Terminate
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  // Parse content
+  content.trim();
+  if (content.length() > 0 && content.length() < 20) {
+    if (content.indexOf('.') > 0 && content.indexOf('.') < content.length() - 1) {
+      SerialMon.printf("  ✅ Extracted version from HTTPS: %s\n", content.c_str());
+      return content;
+    }
+  }
+  
+  SerialMon.println("  ❌ No valid version in HTTPS response");
+  return "";
+}
+
+String getServerFirmwareVersion(const char* versionUrl) {
+  SerialMon.printf("🚀 STARTING MULTI-METHOD OTA TEST\n");
+  SerialMon.printf("Target URL: %s\n", versionUrl);
+  SerialMon.println("==========================================");
+  
+  // Test the direct GitHub method first (most likely to work)
+  SerialMon.println("🎯 PRIORITY: Testing Direct GitHub Test (Method 7)");
+  String directResult = testMethod7_DirectGitHubTest(versionUrl);
+  if (directResult.length() > 0) {
+    SerialMon.printf("✅ Direct GitHub method succeeded: %s\n", directResult.c_str());
+    return directResult;
+  }
+  
+  // Test the enhanced method second
+  SerialMon.println("🎯 SECONDARY: Testing Enhanced AT Commands (Method 6)");
+  String enhancedResult = testMethod6_EnhancedAtCommands(versionUrl);
+  if (enhancedResult.length() > 0) {
+    SerialMon.printf("✅ Enhanced method succeeded: %s\n", enhancedResult.c_str());
+    return enhancedResult;
+  }
+  
+  // Fallback to other methods if enhanced method fails
+  String results[5];
+  
+  // Method 1: Modem HTTP HTTPS
+  results[0] = testMethod1_ModemHttpHttps(versionUrl);
+  
+  // Method 2: Modem HTTP HTTP
+  results[1] = testMethod2_ModemHttpHttp(versionUrl);
+  
+  // Method 3: TinyGsm HTTPS
+  results[2] = testMethod3_TinyGsmHttps(versionUrl);
+  
+  // Method 4: TinyGsm HTTP
+  results[3] = testMethod4_TinyGsmHttp(versionUrl);
+  
+  // Method 5: Direct AT
+  results[4] = testMethod5_DirectAtCommands(versionUrl);
+  
+  // Analyze results
+  SerialMon.println("==========================================");
+  SerialMon.println("📊 TEST RESULTS SUMMARY:");
+  
+  for (int i = 0; i < 5; i++) {
+    SerialMon.printf("Method %d: %s\n", i + 1, results[i].length() > 0 ? results[i].c_str() : "FAILED");
+  }
+  
+  // Return first successful result
+  for (int i = 0; i < 5; i++) {
+    if (results[i].length() > 0) {
+      SerialMon.printf("✅ Using result from Method %d: %s\n", i + 1, results[i].c_str());
+      return results[i];
+    }
+  }
+  
+  SerialMon.println("❌ All test methods failed");
   return "";
 }
 
 bool downloadAndCheckVersion(const char* versionUrl) {
-  SerialMon.println("Checking for firmware updates...");
+  SerialMon.println("🔍 CHECKING FOR FIRMWARE UPDATES");
+  SerialMon.printf("Version URL: %s\n", versionUrl);
+  SerialMon.printf("Current firmware version: %s\n", FIRMWARE_VERSION);
+  SerialMon.println("----------------------------------------");
   
   String serverVersion = getServerFirmwareVersion(versionUrl);
+  
   if (serverVersion.length() == 0) {
-    SerialMon.println("Could not retrieve server version");
+    SerialMon.println("❌ Could not retrieve server version");
+    SerialMon.println("All test methods failed to get version");
     return false;
   }
   
-  String currentVersion = String(FIRMWARE_VERSION);
-  SerialMon.printf("Current version: %s\n", currentVersion.c_str());
-  SerialMon.printf("Server version: %s\n", serverVersion.c_str());
+  SerialMon.printf("✅ Server version retrieved: %s\n", serverVersion.c_str());
   
-  int comparison = compareVersions(serverVersion, currentVersion);
+  int comparison = compareVersions(serverVersion, FIRMWARE_VERSION);
+  
+  SerialMon.printf("Version comparison: %s vs %s = %d\n", 
+                   serverVersion.c_str(), FIRMWARE_VERSION, comparison);
   
   if (comparison > 0) {
-    SerialMon.println("✅ New firmware available!");
+    SerialMon.println("🎉 NEW FIRMWARE AVAILABLE!");
+    SerialMon.printf("Server: %s > Current: %s\n", serverVersion.c_str(), FIRMWARE_VERSION);
     return true;
   } else if (comparison == 0) {
     SerialMon.println("✅ Firmware is up to date");
+    SerialMon.printf("Server: %s = Current: %s\n", serverVersion.c_str(), FIRMWARE_VERSION);
   } else {
     SerialMon.println("⚠️ Server version is older than current version");
+    SerialMon.printf("Server: %s < Current: %s\n", serverVersion.c_str(), FIRMWARE_VERSION);
   }
   
   return false;
@@ -237,152 +827,67 @@ bool downloadAndCheckVersion(const char* versionUrl) {
 bool downloadAndInstallFirmware(const char* firmwareUrl) {
   SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
   
-  // Parse URL to extract host and path
-  String url = String(firmwareUrl);
-  String host = "";
-  String path = "";
+  // Use modem's built-in HTTP client for firmware download
+  // This should handle HTTPS properly
   
-  // Remove protocol
-  if (url.startsWith("https://")) {
-    url = url.substring(8);
-  } else if (url.startsWith("http://")) {
-    url = url.substring(7);
-  }
-  
-  // Split host and path
-  int slashIndex = url.indexOf('/');
-  if (slashIndex > 0) {
-    host = url.substring(0, slashIndex);
-    path = url.substring(slashIndex);
-  } else {
-    host = url;
-    path = "/";
-  }
-  
-  TinyGsmClient client(modem);
-  
-  // GitHub requires HTTPS - no HTTP fallback
-  bool connected = false;
-  if (host.indexOf("githubusercontent.com") >= 0 || url.startsWith("https://")) {
-    SerialMon.printf("Attempting HTTPS connection to %s:443\n", host.c_str());
-    SerialMon.printf("URL: %s\n", url.c_str());
-    SerialMon.printf("Host: %s\n", host.c_str());
-    SerialMon.printf("Path: %s\n", path.c_str());
-    
-    connected = client.connect(host.c_str(), 443);
-    if (connected) {
-      SerialMon.println("✅ HTTPS connection successful");
-    } else {
-      SerialMon.println("❌ HTTPS connection failed");
-      SerialMon.printf("Connection failed - no error code available\n");
-    }
-  } else {
-    SerialMon.printf("Using HTTP connection to %s:80\n", host.c_str());
-    connected = client.connect(host.c_str(), 80);
-  }
-  
-  if (!connected) {
-    SerialMon.printf("Failed to connect to %s\n", host.c_str());
+  // Initialize HTTP service
+  SerialMon.println("Initializing HTTP service for firmware download...");
+  modem.sendAT("+HTTPINIT");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("Failed to initialize HTTP service");
     return false;
   }
   
-  // Build HTTP request with comprehensive headers
-  String request = 
-    String("GET ") + path + " HTTP/1.1\r\n" +
-    "Host: " + host + "\r\n" +
-    "User-Agent: PlayBuoy/1.0\r\n" +
-    "Accept: text/plain, application/json, */*\r\n" +
-    "Accept-Encoding: identity\r\n" +
-    "Cache-Control: no-cache\r\n" +
-    "Connection: close\r\n\r\n";
-  
-  SerialMon.println("=== HTTP REQUEST ===");
-  SerialMon.println(request);
-  SerialMon.println("=== END REQUEST ===");
-  
-  int bytesWritten = client.print(request);
-  SerialMon.printf("Request bytes written: %d\n", bytesWritten);
-  
-  // Read HTTP headers to find content length
-  String headers = "";
-  int contentLength = 0;
-  bool foundBody = false;
-  
-  while (client.connected() && !foundBody) {
-    if (client.available()) {
-      String line = client.readStringUntil('\n');
-      headers += line + "\n";
-      
-      if (line.startsWith("Content-Length: ")) {
-        contentLength = line.substring(16).toInt();
-      }
-      
-      if (line.length() <= 1) { // Empty line marks end of headers
-        foundBody = true;
-      }
-    }
-  }
-  
-  if (contentLength <= 0) {
-    SerialMon.println("Content length is invalid.");
-    client.stop();
+  // Set HTTP parameters
+  SerialMon.println("Setting HTTP parameters...");
+  modem.sendAT("+HTTPPARA=\"URL\",\"" + String(firmwareUrl) + "\"");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("Failed to set URL parameter");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
     return false;
   }
   
-  SerialMon.printf("Firmware size: %d bytes\n", contentLength);
-  
-  if (!Update.begin(contentLength)) {
-    SerialMon.println("Update.begin() failed.");
-    client.stop();
+  // Set HTTP data size to 0 (GET request)
+  modem.sendAT("+HTTPDATA=0,10000");
+  if (modem.waitResponse() != 1) {
+    SerialMon.println("Failed to set HTTP data size");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
     return false;
   }
   
-  // Read firmware data
-  size_t written = 0;
-  unsigned long timeout = millis();
-  
-  while (written < contentLength && client.connected() && millis() - timeout < 300000) { // 5 minute timeout
-    if (client.available()) {
-      uint8_t buffer[1024];
-      int bytesRead = client.read(buffer, min(1024, (int)(contentLength - written)));
-      if (bytesRead > 0) {
-        size_t bytesWritten = Update.write(buffer, bytesRead);
-        written += bytesWritten;
-        timeout = millis(); // Reset timeout on successful read
-        
-        // Progress indicator
-        if (written % 10000 == 0) {
-          SerialMon.printf("Downloaded: %d/%d bytes (%.1f%%)\n", written, contentLength, (float)written/contentLength*100);
-        }
-      }
-    }
-  }
-  
-  if (written != contentLength) {
-    SerialMon.printf("Written only %d of %d bytes.\n", written, contentLength);
-    client.stop();
-    Update.abort();
+  // Execute HTTP GET request
+  SerialMon.println("Executing HTTP GET request for firmware...");
+  modem.sendAT("+HTTPACTION=0");
+  if (modem.waitResponse(60000L) != 1) { // 60 second timeout for firmware
+    SerialMon.println("HTTP GET request failed");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
     return false;
   }
   
-  // Verify firmware integrity
-  if (!Update.end()) {
-    SerialMon.printf("Update.end() failed. Error: %s\n", Update.errorString());
-    client.stop();
-    Update.abort();
+  // Get content length
+  SerialMon.println("Getting content length...");
+  modem.sendAT("+HTTPREAD");
+  if (modem.waitResponse(10000L) != 1) {
+    SerialMon.println("Failed to read HTTP response");
+    modem.sendAT("+HTTPTERM");
+    modem.waitResponse();
     return false;
   }
   
-  if (!Update.isFinished()) {
-    SerialMon.println("Update did not finish.");
-    client.stop();
-    Update.abort();
-    return false;
-  }
+  // For now, we'll need to implement a different approach for firmware download
+  // as the modem's HTTP client doesn't easily support large binary downloads
+  // Let's return false for now and implement a proper solution later
+  SerialMon.println("⚠️ Firmware download via modem HTTP client not yet implemented");
+  SerialMon.println("This requires a different approach for large binary downloads");
   
-  SerialMon.println("✅ Firmware download and verification successful");
-  client.stop();
-  return true;
+  // Terminate HTTP service
+  modem.sendAT("+HTTPTERM");
+  modem.waitResponse();
+  
+  return false;
 }
 
 bool checkForFirmwareUpdate(const char* baseUrl) {
