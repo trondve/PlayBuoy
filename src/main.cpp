@@ -239,9 +239,17 @@ void setup() {
       *std::min_element(voltageReadings, voltageReadings + validReadings),
       *std::max_element(voltageReadings, voltageReadings + validReadings));
     
-    // Calibrate against current multimeter reading
-    calibrateBatteryVoltage(4.16f);
-    setStableBatteryVoltage(stableBatteryVoltage);
+         // Calculate calibration factor based on actual vs measured
+     float calibrationFactor = 4.16f / stableBatteryVoltage;
+     SerialMon.printf("Calibration factor: %.3f (actual %.2fV / measured %.3fV)\n", 
+                     calibrationFactor, 4.16f, stableBatteryVoltage);
+     
+     // Apply calibration and recalculate
+     float calibratedVoltage = stableBatteryVoltage * calibrationFactor;
+     SerialMon.printf("Calibrated voltage: %.3fV\n", calibratedVoltage);
+     
+     // Store the calibrated voltage
+     setStableBatteryVoltage(calibratedVoltage);
   } else {
     SerialMon.println("⚠️  Insufficient valid readings for enhanced measurement");
     SerialMon.printf("Got %d valid readings, need at least 10\n", validReadings);

@@ -62,16 +62,23 @@ String getServerFirmwareVersion(const char* versionUrl) {
   
   TinyGsmClient client(modem);
   
-  // Try HTTPS first, fallback to HTTP
+  // GitHub requires HTTPS - no HTTP fallback
   bool connected = false;
-  if (url.startsWith("https://")) {
+  if (host.indexOf("githubusercontent.com") >= 0 || url.startsWith("https://")) {
     SerialMon.printf("Attempting HTTPS connection to %s:443\n", host.c_str());
+    SerialMon.printf("URL: %s\n", url.c_str());
+    SerialMon.printf("Host: %s\n", host.c_str());
+    SerialMon.printf("Path: %s\n", path.c_str());
+    
     connected = client.connect(host.c_str(), 443);
-    if (!connected) {
-      SerialMon.printf("HTTPS failed, trying HTTP\n");
-      connected = client.connect(host.c_str(), 80);
+    if (connected) {
+      SerialMon.println("✅ HTTPS connection successful");
+    } else {
+      SerialMon.println("❌ HTTPS connection failed");
+      SerialMon.printf("Connection failed - no error code available\n");
     }
   } else {
+    SerialMon.printf("Using HTTP connection to %s:80\n", host.c_str());
     connected = client.connect(host.c_str(), 80);
   }
   
@@ -80,30 +87,87 @@ String getServerFirmwareVersion(const char* versionUrl) {
     return "";
   }
   
-  // Build HTTP request
+  // Build HTTP request with comprehensive headers
   String request = 
     String("GET ") + path + " HTTP/1.1\r\n" +
     "Host: " + host + "\r\n" +
+    "User-Agent: PlayBuoy/1.0\r\n" +
+    "Accept: text/plain, application/json, */*\r\n" +
+    "Accept-Encoding: identity\r\n" +
+    "Cache-Control: no-cache\r\n" +
     "Connection: close\r\n\r\n";
   
-  client.print(request);
+  SerialMon.println("=== HTTP REQUEST ===");
+  SerialMon.println(request);
+  SerialMon.println("=== END REQUEST ===");
   
-  // Read response
+  int bytesWritten = client.print(request);
+  SerialMon.printf("Request bytes written: %d\n", bytesWritten);
+  
+  // Read response with comprehensive debugging
   String response = "";
   unsigned long timeout = millis();
-  while (client.connected() && millis() - timeout < 10000) {
-    if (client.available()) {
-      response += (char)client.read();
+  int bytesRead = 0;
+  int availableCount = 0;
+  
+  SerialMon.println("=== READING HTTP RESPONSE ===");
+  SerialMon.printf("Client connected: %s\n", client.connected() ? "YES" : "NO");
+  SerialMon.printf("Client available: %d\n", client.available());
+  
+  while (client.connected() && millis() - timeout < 15000) { // Increased timeout
+    availableCount = client.available();
+    if (availableCount > 0) {
+      SerialMon.printf("Available bytes: %d\n", availableCount);
+      
+      for (int i = 0; i < availableCount && i < 10; i++) { // Read up to 10 bytes at once
+        char c = client.read();
+        response += c;
+        bytesRead++;
+        
+        // Log first 50 bytes in detail
+        if (bytesRead <= 50) {
+          SerialMon.printf("Byte %d: 0x%02X ('%c') [available: %d]\n", 
+                          bytesRead, (unsigned char)c, 
+                          (c >= 32 && c <= 126) ? c : '?', 
+                          client.available());
+        }
+      }
+      
+      // Reset timeout on successful read
+      timeout = millis();
+    } else {
+      delay(100); // Small delay when no data available
     }
   }
   
+  SerialMon.printf("=== RESPONSE SUMMARY ===\n");
+  SerialMon.printf("Total bytes read: %d\n", bytesRead);
+  SerialMon.printf("Response length: %d\n", response.length());
+  SerialMon.printf("Client still connected: %s\n", client.connected() ? "YES" : "NO");
+  SerialMon.printf("Client available: %d\n", client.available());
+  
   client.stop();
   
-  // Parse HTTP response
+  // Parse HTTP response with detailed debugging
+  SerialMon.println("=== PARSING HTTP RESPONSE ===");
+  SerialMon.printf("Full response length: %d\n", response.length());
+  
+  // Show first 200 characters of response
+  String responsePreview = response.substring(0, min(200, (int)response.length()));
+  SerialMon.println("Response preview:");
+  SerialMon.println(responsePreview);
+  
   int bodyStart = response.indexOf("\r\n\r\n");
+  SerialMon.printf("Body start position: %d\n", bodyStart);
+  
   if (bodyStart > 0) {
+    String headers = response.substring(0, bodyStart);
     String body = response.substring(bodyStart + 4);
     body.trim();
+    
+    SerialMon.println("=== HTTP HEADERS ===");
+    SerialMon.println(headers);
+    SerialMon.println("=== END HEADERS ===");
     
     SerialMon.printf("Version response body: '%s' (length: %d)\n", body.c_str(), body.length());
     
@@ -197,16 +261,23 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
   
   TinyGsmClient client(modem);
   
-  // Try HTTPS first, fallback to HTTP
+  // GitHub requires HTTPS - no HTTP fallback
   bool connected = false;
-  if (url.startsWith("https://")) {
+  if (host.indexOf("githubusercontent.com") >= 0 || url.startsWith("https://")) {
     SerialMon.printf("Attempting HTTPS connection to %s:443\n", host.c_str());
+    SerialMon.printf("URL: %s\n", url.c_str());
+    SerialMon.printf("Host: %s\n", host.c_str());
+    SerialMon.printf("Path: %s\n", path.c_str());
+    
     connected = client.connect(host.c_str(), 443);
-    if (!connected) {
-      SerialMon.printf("HTTPS failed, trying HTTP\n");
-      connected = client.connect(host.c_str(), 80);
+    if (connected) {
+      SerialMon.println("✅ HTTPS connection successful");
+    } else {
+      SerialMon.println("❌ HTTPS connection failed");
+      SerialMon.printf("Connection failed - no error code available\n");
     }
   } else {
+    SerialMon.printf("Using HTTP connection to %s:80\n", host.c_str());
     connected = client.connect(host.c_str(), 80);
   }
   
@@ -215,13 +286,22 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
     return false;
   }
   
-  // Build HTTP request
+  // Build HTTP request with comprehensive headers
   String request = 
     String("GET ") + path + " HTTP/1.1\r\n" +
     "Host: " + host + "\r\n" +
+    "User-Agent: PlayBuoy/1.0\r\n" +
+    "Accept: text/plain, application/json, */*\r\n" +
+    "Accept-Encoding: identity\r\n" +
+    "Cache-Control: no-cache\r\n" +
     "Connection: close\r\n\r\n";
   
-  client.print(request);
+  SerialMon.println("=== HTTP REQUEST ===");
+  SerialMon.println(request);
+  SerialMon.println("=== END REQUEST ===");
+  
+  int bytesWritten = client.print(request);
+  SerialMon.printf("Request bytes written: %d\n", bytesWritten);
   
   // Read HTTP headers to find content length
   String headers = "";
