@@ -13,8 +13,8 @@
 #define ALT_ADC_CHANNEL_3 ADC1_CHANNEL_7   // GPIO 35
 
 // Voltage divider calibration - fine-tuned based on actual readings
-// For 4.15V battery, we're getting ~110 ADC units, ratio is working well
-#define VOLTAGE_DIVIDER_RATIO 47.0f  // Fine-tuned for more accurate readings
+// For 4.165V battery, we're getting ~109 ADC units, ratio needs adjustment
+#define VOLTAGE_DIVIDER_RATIO 50.0f  // Adjusted for more accurate readings
 #define ADC_REFERENCE_VOLTAGE 3.3f  // ESP32 ADC reference voltage
 #define ADC_RESOLUTION 4095.0f      // 12-bit ADC resolution
 
@@ -67,7 +67,7 @@ float readBatteryVoltageAlternative() {
   }
   
   if (bestReading == 0) {
-    SerialMon.println("❌ No valid analog readings found");
+    SerialMon.println(" No valid analog readings found");
     return 4.0f;  // Safe fallback
   }
   
@@ -92,10 +92,10 @@ float readBatteryVoltageAlternative() {
   }
   
   if (bestRatio > 0.0f) {
-    SerialMon.printf("✅ Found reasonable voltage with ratio %.1f: %.2fV\n", bestRatio, bestVoltage);
+    SerialMon.printf(" Found reasonable voltage with ratio %.1f: %.2fV\n", bestRatio, bestVoltage);
     return bestVoltage * calibrationFactor;
   } else {
-    SerialMon.println("❌ No reasonable voltage found with alternative method");
+    SerialMon.println(" No reasonable voltage found with alternative method");
     return 4.0f;  // Safe fallback
   }
 }
@@ -120,7 +120,7 @@ float readBatteryVoltage() {
   }
   
   if (validReadings == 0) {
-    SerialMon.println("❌ No valid ADC readings on primary channel, trying alternative");
+    SerialMon.println(" No valid ADC readings on primary channel, trying alternative");
     return readBatteryVoltageAlternative();
   }
   
@@ -133,7 +133,7 @@ float readBatteryVoltage() {
   
   // Validate the reading is reasonable
   if (batteryVoltage < 3.0f || batteryVoltage > 4.5f) {
-    SerialMon.printf("⚠️  Voltage %.2fV seems unreasonable, trying alternative method\n", batteryVoltage);
+    SerialMon.printf("  Voltage %.2fV seems unreasonable, trying alternative method\n", batteryVoltage);
     return readBatteryVoltageAlternative();
   }
   
@@ -150,7 +150,7 @@ void calibrateBatteryVoltage(float actualVoltage) {
     SerialMon.printf("Calibration: actual=%.2fV, measured=%.2fV, factor=%.3f\n", 
                      actualVoltage, measuredVoltage, calibrationFactor);
   } else {
-    SerialMon.println("❌ Cannot calibrate - invalid voltage reading");
+    SerialMon.println(" Cannot calibrate - invalid voltage reading");
   }
 }
 

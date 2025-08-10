@@ -39,7 +39,7 @@ static WaveSample lastSamples[MAX_POSSIBLE_SAMPLES];
 static int lastSampleCount = 0;
 
 void recordWaveData() {
-  SerialMon.println("🌊 Starting wave data collection...");
+  SerialMon.println(" Starting wave data collection...");
   sampleCount = 0;
 
   int sampleDurationMs = getSampleDurationMs();
@@ -48,7 +48,7 @@ void recordWaveData() {
   // Allocate on heap to prevent stack overflow
   WaveSample* samples = (WaveSample*)malloc(maxSamples * sizeof(WaveSample));
   if (!samples) {
-    SerialMon.println("❌ Failed to allocate memory for wave samples");
+    SerialMon.println(" Failed to allocate memory for wave samples");
     return;
   }
 
@@ -68,7 +68,7 @@ void recordWaveData() {
     delay(SAMPLE_INTERVAL_MS);
   }
 
-  SerialMon.printf("🌊 Collected %d wave samples\n", sampleCount);
+  SerialMon.printf(" Collected %d wave samples\n", sampleCount);
 
   // Store samples for later use by no-argument compute/log functions
   // If we collected more samples than our storage can hold, keep the most recent ones
@@ -84,7 +84,7 @@ void recordWaveData() {
     for (int i = 0; i < MAX_POSSIBLE_SAMPLES; ++i) {
       lastSamples[i] = samples[startIdx + i];
     }
-    SerialMon.printf("⚠️  Kept most recent %d of %d samples due to memory constraints\n", 
+    SerialMon.printf("  Kept most recent %d of %d samples due to memory constraints\n", 
                      MAX_POSSIBLE_SAMPLES, sampleCount);
   }
   

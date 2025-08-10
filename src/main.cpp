@@ -185,9 +185,9 @@ void setup() {
   }
   
   if (response.indexOf("OK") >= 0) {
-    SerialMon.println("✅ Modem communication successful");
+    SerialMon.println(" Modem communication successful");
   } else {
-    SerialMon.println("❌ Modem communication failed. Response: " + response);
+    SerialMon.println(" Modem communication failed. Response: " + response);
   }
   
   // Get modem info
@@ -196,25 +196,25 @@ void setup() {
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-    // Enhanced battery measurement with staggered sampling (60 seconds total)
-  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (60 SECONDS STAGGERED) ===");
-  const int TOTAL_READINGS = 12;  // 12 readings over 60 seconds
+    // Enhanced battery measurement with staggered sampling (30 seconds total)
+  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (30 SECONDS STAGGERED) ===");
+  const int TOTAL_READINGS = 6;   // 6 readings over 30 seconds
   const int DELAY_BETWEEN_READINGS = 5000;  // 5 seconds between readings
   float voltageReadings[TOTAL_READINGS];
   int validReadings = 0;
   
   for (int i = 0; i < TOTAL_READINGS; i++) {
-    // Take 3 quick readings and average them (reduces noise)
-    float sum = 0.0f;
-    int quickReadings = 0;
-    for (int j = 0; j < 3; j++) {
-      float voltage = readBatteryVoltage();
-      if (voltage >= 3.8f && voltage <= 4.3f) {
-        sum += voltage;
-        quickReadings++;
-      }
-      delay(100); // 100ms between quick readings
-    }
+         // Take 3 quick readings and average them (reduces noise)
+     float sum = 0.0f;
+     int quickReadings = 0;
+     for (int j = 0; j < 3; j++) {
+       float voltage = readBatteryVoltage();
+       if (voltage >= 3.5f && voltage <= 4.5f) {  // Lowered threshold to accept more readings
+         sum += voltage;
+         quickReadings++;
+       }
+       delay(100); // 100ms between quick readings
+     }
     
     if (quickReadings > 0) {
       float avgVoltage = sum / quickReadings;
@@ -229,7 +229,7 @@ void setup() {
   }
   
   float stableBatteryVoltage = 0.0f;
-  if (validReadings >= 6) {  // Need at least 6 valid readings (half of 12 total readings)
+  if (validReadings >= 3) {  // Need at least 3 valid readings (half of 6 total readings)
     // Calculate average
     float totalVoltage = 0.0f;
     for (int i = 0; i < validReadings; i++) {
@@ -252,10 +252,10 @@ void setup() {
       *std::min_element(voltageReadings, voltageReadings + validReadings),
       *std::max_element(voltageReadings, voltageReadings + validReadings));
     
-                    // Calculate calibration factor based on actual vs measured
-           float calibrationFactor = 4.17f / stableBatteryVoltage;
-           SerialMon.printf("Calibration factor: %.3f (actual %.2fV / measured %.3fV)\n",
-                           calibrationFactor, 4.17f, stableBatteryVoltage);
+                                         // Calculate calibration factor based on actual vs measured
+            float calibrationFactor = 4.165f / stableBatteryVoltage;
+            SerialMon.printf("Calibration factor: %.3f (actual %.3fV / measured %.3fV)\n",
+                            calibrationFactor, 4.165f, stableBatteryVoltage);
      
      // Apply calibration and recalculate
      float calibratedVoltage = stableBatteryVoltage * calibrationFactor;
@@ -264,8 +264,8 @@ void setup() {
      // Store the calibrated voltage
      setStableBatteryVoltage(calibratedVoltage);
   } else {
-    SerialMon.println("⚠️  Insufficient valid readings for enhanced measurement");
-    SerialMon.printf("Got %d valid readings, need at least 6\n", validReadings);
+    SerialMon.println("  Insufficient valid readings for enhanced measurement");
+    SerialMon.printf("Got %d valid readings, need at least 3\n", validReadings);
     stableBatteryVoltage = 4.0f;  // Safe fallback
     setStableBatteryVoltage(stableBatteryVoltage);
   }
@@ -429,8 +429,12 @@ void loop() {
     
          // Check for firmware updates if network is connected
      if (networkConnected) {
+       SerialMon.printf(" OTA: OTA_SERVER = %s\n", OTA_SERVER);
+       SerialMon.printf(" OTA: OTA_PATH = %s\n", OTA_PATH);
+       SerialMon.printf(" OTA: NODE_ID = %s\n", NODE_ID);
+       
        String baseUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID);
-       SerialMon.printf("Checking for firmware update at: %s\n", baseUrl.c_str());
+       SerialMon.printf(" OTA: Constructed baseUrl: %s\n", baseUrl.c_str());
        
        if (checkForFirmwareUpdate(baseUrl.c_str())) {
          // OTA update in progress, will restart on completion

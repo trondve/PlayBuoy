@@ -34,7 +34,7 @@ bool connectToNetwork(const char* apn) {
     // Test basic communication first
     SerialMon.println("Testing AT communication...");
     if (!modem.testAT()) {
-      SerialMon.println("❌ AT communication failed");
+      SerialMon.println(" AT communication failed");
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
@@ -44,13 +44,13 @@ bool connectToNetwork(const char* apn) {
       }
       continue;
     }
-    SerialMon.println("✅ AT communication successful");
+    SerialMon.println(" AT communication successful");
 
     // Wait for network registration
     SerialMon.println("Waiting for network registration...");
     esp_task_wdt_reset(); // Reset watchdog before network wait
     if (!modem.waitForNetwork(NETWORK_TIMEOUT_MS)) {
-      SerialMon.println("❌ Network registration failed.");
+      SerialMon.println(" Network registration failed.");
       SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
       SerialMon.println("Operator: " + modem.getOperator());
       
@@ -64,13 +64,13 @@ bool connectToNetwork(const char* apn) {
       continue;
     }
 
-    SerialMon.println("✅ Network registered.");
+    SerialMon.println(" Network registered.");
     SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
     SerialMon.println("Operator: " + modem.getOperator());
 
     // Check if network is connected
     if (!modem.isNetworkConnected()) {
-      SerialMon.println("❌ Network not connected.");
+      SerialMon.println(" Network not connected.");
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
@@ -81,13 +81,13 @@ bool connectToNetwork(const char* apn) {
       continue;
     }
 
-    SerialMon.println("✅ Network connected.");
+    SerialMon.println(" Network connected.");
 
     // Connect to GPRS/APN
     SerialMon.printf("Connecting to APN: %s\n", apn);
     esp_task_wdt_reset(); // Reset watchdog before APN connection
     if (!modem.gprsConnect(apn, "", "")) {
-      SerialMon.println("❌ APN connection failed.");
+      SerialMon.println(" APN connection failed.");
       SerialMon.println("Trying to get IP address...");
       IPAddress ip = modem.localIP();
       SerialMon.printf("IP: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
@@ -102,7 +102,7 @@ bool connectToNetwork(const char* apn) {
       continue;
     }
 
-    SerialMon.println("✅ Cellular network connected.");
+    SerialMon.println(" Cellular network connected.");
     IPAddress localIP = modem.localIP();
     SerialMon.printf("Local IP: %d.%d.%d.%d\n", localIP[0], localIP[1], localIP[2], localIP[3]);
     return true;
@@ -153,14 +153,14 @@ bool testMultipleAPNs() {
     
     // If we got an IP, this APN works
     if (response.indexOf("+CGPADDR: 1,") >= 0 && response.indexOf("0.0.0.0") == -1) {
-      SerialMon.printf("✅ APN %s works!\n", apns[i].c_str());
+      SerialMon.printf(" APN %s works!\n", apns[i].c_str());
       return true;
     }
     
     delay(2000);
   }
   
-  SerialMon.println("❌ No APN worked");
+  SerialMon.println(" No APN worked");
   return false;
 }
 
