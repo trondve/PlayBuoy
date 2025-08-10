@@ -3,6 +3,8 @@
 #include "gps.h"
 #include <TinyGsmClient.h>
 #include <time.h>
+#include "esp_task_wdt.h"  // For watchdog timer
+#include "battery.h"  // For getStableBatteryVoltage
 
 // Forward declarations for battery functions
 float readBatteryVoltage();
@@ -33,6 +35,11 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
 
   uint32_t start = millis();
   while ((millis() - start) < timeoutSec * 1000UL) {
+    // Reset watchdog timer every 30 seconds during GPS fix attempt
+    if (((millis() - start) / 30000) % 2 == 0) {
+      esp_task_wdt_reset();
+    }
+    
     if (modem.getGPS(&result.latitude, &result.longitude)) {
       result.success = true;
       result.accuracy = 0.0;  // Accuracy is not provided by TinyGSM API
@@ -75,14 +82,14 @@ void gpsEnd() {
 // Determine GPS fix timeout (in seconds) based on battery percentage
 uint16_t getGpsFixTimeout(bool isFirstFix) {
   if (isFirstFix) {
-    return 600; // 10 minutes
+    return 60; // 10 minutes
   }
-  float voltage = readBatteryVoltage();
+  float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
   int percent = estimateBatteryPercent(voltage);
-  if (percent > 50) return 600;      // 10 minutes
-  if (percent > 30) return 300;      // 5 minutes
-  if (percent > 20) return 180;      // 3 minutes
-  return 120;                        // 2 minutes
+  if (percent > 50) return 60;      // 10 minutes
+  if (percent > 30) return 30;      // 5 minutes
+  if (percent > 20) return 18;      // 3 minutes
+  return 12;                        // 2 minutes
 }
 
 // Attempt to get a GPS fix with dynamic timeout
@@ -91,6 +98,6 @@ GpsFixResult getGpsFixDynamic(bool isFirstFix) {
   SerialMon.printf("GPS timeout: %u seconds (%s fix, battery: %d%%)\n", 
                    timeoutSec, 
                    isFirstFix ? "first" : "subsequent",
-                   estimateBatteryPercent(readBatteryVoltage()));
+                   estimateBatteryPercent(getStableBatteryVoltage()));  // Use stable voltage
   return getGpsFix(timeoutSec);
 }

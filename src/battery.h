@@ -6,3 +6,5 @@ bool handleUndervoltageProtection();
 int estimateBatteryPercent(float voltage);
 int determineSleepDuration(int batteryPercent);
 void logBatteryStatus();
+void setStableBatteryVoltage(float voltage);  // Set stable battery voltage measured at startup
+float getStableBatteryVoltage();  // Get battery voltage measured at startup

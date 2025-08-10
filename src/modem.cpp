@@ -3,6 +3,7 @@
 #include "modem.h"
 #include <TinyGsmClient.h>
 #include <IPAddress.h>
+#include "esp_task_wdt.h"  // For watchdog timer
 
 #define SerialMon Serial
 
@@ -46,6 +47,7 @@ bool connectToNetwork(const char* apn) {
 
     // Wait for network registration
     SerialMon.println("Waiting for network registration...");
+    esp_task_wdt_reset(); // Reset watchdog before network wait
     if (!modem.waitForNetwork(NETWORK_TIMEOUT_MS)) {
       SerialMon.println("❌ Network registration failed.");
       SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
@@ -82,6 +84,7 @@ bool connectToNetwork(const char* apn) {
 
     // Connect to GPRS/APN
     SerialMon.printf("Connecting to APN: %s\n", apn);
+    esp_task_wdt_reset(); // Reset watchdog before APN connection
     if (!modem.gprsConnect(apn, "", "")) {
       SerialMon.println("❌ APN connection failed.");
       SerialMon.println("Trying to get IP address...");

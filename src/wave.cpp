@@ -1,6 +1,8 @@
 #include "wave.h"
 #include "sensors.h"
 #include <stdlib.h>  // For malloc/free
+#include "esp_task_wdt.h"  // For watchdog timer
+#include "battery.h"  // For getStableBatteryVoltage
 
 #define SerialMon Serial
 
@@ -19,12 +21,12 @@ const int SAMPLE_INTERVAL_MS = 1000;
 
 // Dynamically determine sample duration based on battery percent
 int getSampleDurationMs() {
-  float voltage = readBatteryVoltage();
+  float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
   int percent = estimateBatteryPercent(voltage);
   if (percent > 50) return 60000;      // 10 minutes
   if (percent > 30) return 30000;      // 5 minutes
   if (percent > 20) return 12000;      // 2 minutes
-  return 60000;                         // 1 minute
+  return 6000;                         // 1 minute
 }
 
 int sampleCount = 0;
@@ -52,6 +54,11 @@ void recordWaveData() {
 
   unsigned long startTime = millis();
   while (millis() - startTime < sampleDurationMs && sampleCount < maxSamples) {
+    // Reset watchdog timer every 30 seconds during wave data collection
+    if (sampleCount % 30 == 0) {
+      esp_task_wdt_reset();
+    }
+    
     WaveSample s;
     s.altitude = getRelativeAltitude();
     s.heading = getHeadingDegrees();

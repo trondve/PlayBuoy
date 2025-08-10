@@ -152,9 +152,21 @@ void setup() {
     }
   }
 
-  // Initialize watchdog timer (timeout 15 minutes = 900 seconds, panic on timeout)
-  esp_task_wdt_init(900, true);
+  // Initialize watchdog timer (timeout 45 minutes = 2700 seconds, panic on timeout)
+  esp_task_wdt_init(2700, true);
   esp_task_wdt_add(NULL); // Add current thread to WDT
+
+  // Initialize RTC with Europe/Oslo timezone (automatic DST)
+  configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", "no.pool.ntp.org");
+  SerialMon.println("RTC initialized with Europe/Oslo timezone (CET/CEST with DST)");
+  
+  // Set a default time if NTP is not available (August 10, 2025, 10:00:00 CEST)
+  // This ensures we have a reasonable time even without GPS or NTP
+  struct timeval tv;
+  tv.tv_sec = 1754812800;  // August 10, 2025 10:00:00 CEST (UTC+2) = 08:00:00 UTC
+  tv.tv_usec = 0;
+  settimeofday(&tv, nullptr);
+  SerialMon.println("Set default RTC time: August 10, 2025 10:00:00 CEST");
 
   powerOnModem();
   SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
@@ -182,6 +194,33 @@ void setup() {
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
+  // Measure battery voltage BEFORE any power-intensive operations
+  // This ensures we get a stable reading without voltage drops from other processes
+  SerialMon.println("=== BATTERY MEASUREMENT (STABLE STATE) ===");
+  float totalVoltage = 0.0f;
+  int validReadings = 0;
+  for (int i = 0; i < 5; i++) {
+    float voltage = readBatteryVoltage();
+    if (voltage >= 3.8f && voltage <= 4.3f) {
+      totalVoltage += voltage;
+      validReadings++;
+    }
+    delay(100);
+  }
+  
+  float stableBatteryVoltage = 0.0f;
+         if (validReadings > 0) {
+         stableBatteryVoltage = totalVoltage / validReadings;
+         SerialMon.printf("Stable battery voltage: %.2fV (from %d readings)\n", stableBatteryVoltage, validReadings);
+         calibrateBatteryVoltage(4.16f);  // Calibrate against current multimeter reading
+         setStableBatteryVoltage(stableBatteryVoltage);  // Store for use throughout cycle
+  } else {
+    SerialMon.println("⚠️  Could not get stable voltage readings for calibration");
+    stableBatteryVoltage = 4.0f;  // Safe fallback
+    setStableBatteryVoltage(stableBatteryVoltage);
+  }
+  SerialMon.println("=== END BATTERY MEASUREMENT ===");
+
   checkBatteryChargeState();
 
   logBatteryStatus();  // New battery status logging here
@@ -190,7 +229,11 @@ void setup() {
     // Device will deep sleep if battery critically low
   }
 
-  if (checkAndPerformOTA("http://your-server.com/firmware.bin")) {
+  // Build dynamic firmware URL based on node ID
+  String firmwareUrl = "http://your-server.com/firmware/playbuoy-" + String(NODE_ID) + ".bin";
+  SerialMon.printf("Checking for firmware update at: %s\n", firmwareUrl.c_str());
+  
+  if (checkAndPerformOTA(firmwareUrl.c_str())) {
     // OTA update in progress, will restart on completion
   }
 }
@@ -222,6 +265,20 @@ void loop() {
       if (fix.fixTimeEpoch > 1000000000) { // sanity check for valid epoch
         syncRtcWithGps(fix.fixTimeEpoch);
       }
+    } else {
+      // GPS failed, but we can still use last known GPS time to sync RTC
+      if (rtcState.lastGpsFixTime > 1000000000) {
+        // Calculate current time based on last GPS time + elapsed time
+        uint32_t elapsedSinceLastFix = time(NULL) - rtcState.lastGpsFixTime;
+        uint32_t currentTime = rtcState.lastGpsFixTime + elapsedSinceLastFix;
+        syncRtcWithGps(currentTime);
+        SerialMon.printf("GPS failed, synced RTC with last GPS time + %u seconds\n", elapsedSinceLastFix);
+      }
+      // Use last known position
+      fix.latitude = rtcState.lastGpsLat;
+      fix.longitude = rtcState.lastGpsLon;
+      fix.fixTimeEpoch = rtcState.lastGpsFixTime;
+      fix.success = false; // Mark as failed for logging
     }
   } else {
     fix.latitude = rtcState.lastGpsLat;
@@ -240,6 +297,22 @@ void loop() {
   uint32_t uptime = millis() / 1000; // seconds since boot
   String resetReason = getResetReasonString();
 
+  // Get current timestamp from RTC, with fallback to GPS time
+  uint32_t currentTimestamp = time(NULL);
+  if (currentTimestamp < 24 * 3600) {  // If RTC time is not valid
+    if (rtcState.lastGpsFixTime > 1000000000) {
+      // Use last GPS time as fallback
+      currentTimestamp = rtcState.lastGpsFixTime;
+      SerialMon.printf("Using last GPS time as timestamp: %lu\n", currentTimestamp);
+    } else {
+      // No valid time available
+      currentTimestamp = 0;
+      SerialMon.println("No valid timestamp available, using 0");
+    }
+  } else {
+    SerialMon.printf("Using RTC timestamp: %lu\n", currentTimestamp);
+  }
+
   String json = buildJsonPayload(
     fix.latitude,
     fix.longitude,
@@ -248,8 +321,8 @@ void loop() {
     computeWaveDirection(),
     computeWavePower(computeWaveHeight(), computeWavePeriod()),
     getWaterTemperature(),
-    readBatteryVoltage(),
-    rtcState.lastGpsFixTime,
+    getStableBatteryVoltage(),  // Use stable voltage instead of measuring during upload
+    currentTimestamp,  // Use current RTC time instead of last GPS time
     NODE_ID,
     NAME,
     FIRMWARE_VERSION,
@@ -330,7 +403,7 @@ void loop() {
       storeUnsentJson(json);
     }
   }
-  int batteryPercent = estimateBatteryPercent(readBatteryVoltage());
+  int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());  // Use stable voltage
   int sleepHours = determineSleepDuration(batteryPercent);
 
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);

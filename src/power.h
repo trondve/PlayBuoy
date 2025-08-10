@@ -4,4 +4,4 @@
 bool beginPowerMonitor();
 float readBatteryVoltage();
 float readBatteryCurrent();
-float readBatteryCurrent();
+void calibrateBatteryVoltage(float actualVoltage);
