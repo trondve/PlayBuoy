@@ -12,7 +12,7 @@
 
 // OTA Configuration
 #define OTA_SERVER "raw.githubusercontent.com"
-#define OTA_PATH "/your-username/your-repo/main/firmware"
+#define OTA_PATH "/trondve/PlayBuoy/main/firmware"
 
 // Network Configuration
 #define NETWORK_PROVIDER "your-network-provider"

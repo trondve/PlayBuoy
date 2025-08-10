@@ -19,7 +19,7 @@ BUOYS = [
 ]
 
 # Current firmware version (update this when you release new firmware)
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.1.0"
 
 def backup_config():
     """Backup the original config.h"""
@@ -51,7 +51,7 @@ def update_config(buoy):
 
 // OTA Configuration
 #define OTA_SERVER "raw.githubusercontent.com"
-#define OTA_PATH "/vladdus/PlayBuoy/main/firmware"
+#define OTA_PATH "/trondve/PlayBuoy/main/firmware"
 
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"
@@ -73,7 +73,7 @@ def create_version_files():
         # Create JSON version file
         version_json = {
             "version": CURRENT_VERSION,
-            "url": f"https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
+            "url": f"https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
             "name": buoy['name'],
             "node_id": buoy['node_id'],
             "description": f"Firmware for {buoy['name']} buoy"
@@ -186,7 +186,7 @@ def main():
     print(f"1. Upload the .bin files to your server")
     print(f"2. Upload the .version files to your server")
     print(f"3. Each buoy will check version before downloading firmware")
-    print(f"4. URLs will be: https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/")
+    print(f"4. URLs will be: https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/")
 
 if __name__ == "__main__":
     main()

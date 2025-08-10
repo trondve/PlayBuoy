@@ -15,7 +15,7 @@ BUOYS = [
 ]
 
 # Current firmware version (update this when you release new firmware)
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "1.1.0"
 
 def create_version_files():
     """Create version files for each buoy"""
@@ -31,7 +31,7 @@ def create_version_files():
         # Create JSON version file
         version_json = {
             "version": CURRENT_VERSION,
-            "url": f"https://raw.githubusercontent.com/vladdus/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
+            "url": f"https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
             "name": buoy['name'],
             "node_id": buoy['node_id'],
             "description": f"Firmware for {buoy['name']} buoy"
