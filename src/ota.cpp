@@ -1,11 +1,15 @@
+#define TINY_GSM_MODEM_SIM7000
 #include "ota.h"
 #include "rtc_state.h"
 #include "config.h"
-#include <HTTPClient.h>
+#include <TinyGsmClient.h>
 #include <Update.h>
 #include <ArduinoJson.h>
 
 #define SerialMon Serial
+
+// Declare external modem from main.cpp
+extern TinyGsm modem;
 
 // Version comparison function
 int compareVersions(const String& version1, const String& version2) {
@@ -32,34 +36,77 @@ int compareVersions(const String& version1, const String& version2) {
 }
 
 String getServerFirmwareVersion(const char* versionUrl) {
-  HTTPClient http;
-  http.begin(versionUrl);
+  // Parse URL to extract host and path
+  String url = String(versionUrl);
+  String host = "";
+  String path = "";
   
-  int httpCode = http.GET();
-  if (httpCode != HTTP_CODE_OK) {
-    SerialMon.printf("Failed to get version info. HTTP code: %d\n", httpCode);
-    http.end();
+  // Remove protocol
+  if (url.startsWith("https://")) {
+    url = url.substring(8);
+  } else if (url.startsWith("http://")) {
+    url = url.substring(7);
+  }
+  
+  // Split host and path
+  int slashIndex = url.indexOf('/');
+  if (slashIndex > 0) {
+    host = url.substring(0, slashIndex);
+    path = url.substring(slashIndex);
+  } else {
+    host = url;
+    path = "/";
+  }
+  
+  SerialMon.printf("Checking version from: %s%s\n", host.c_str(), path.c_str());
+  
+  TinyGsmClient client(modem);
+  
+  if (!client.connect(host.c_str(), 80)) {
+    SerialMon.printf("Failed to connect to %s\n", host.c_str());
     return "";
   }
   
-  String payload = http.getString();
-  http.end();
+  // Build HTTP request
+  String request = 
+    String("GET ") + path + " HTTP/1.1\r\n" +
+    "Host: " + host + "\r\n" +
+    "Connection: close\r\n\r\n";
   
-  // Try to parse as JSON first
-  DynamicJsonDocument doc(512);
-  DeserializationError error = deserializeJson(doc, payload);
+  client.print(request);
   
-  if (!error) {
-    // JSON format: {"version": "1.0.1", "url": "firmware.bin"}
-    if (doc.containsKey("version")) {
-      return doc["version"].as<String>();
+  // Read response
+  String response = "";
+  unsigned long timeout = millis();
+  while (client.connected() && millis() - timeout < 10000) {
+    if (client.available()) {
+      response += (char)client.read();
     }
   }
   
-  // Fallback: treat as plain text version
-  payload.trim();
-  if (payload.length() > 0 && payload.length() < 20) {
-    return payload;
+  client.stop();
+  
+  // Parse HTTP response
+  int bodyStart = response.indexOf("\r\n\r\n");
+  if (bodyStart > 0) {
+    String body = response.substring(bodyStart + 4);
+    body.trim();
+    
+    // Try to parse as JSON first
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, body);
+    
+    if (!error) {
+      // JSON format: {"version": "1.0.1", "url": "firmware.bin"}
+      if (doc.containsKey("version")) {
+        return doc["version"].as<String>();
+      }
+    }
+    
+    // Fallback: treat as plain text version
+    if (body.length() > 0 && body.length() < 20) {
+      return body;
+    }
   }
   
   SerialMon.println("Invalid version format received");
@@ -96,20 +143,66 @@ bool downloadAndCheckVersion(const char* versionUrl) {
 bool downloadAndInstallFirmware(const char* firmwareUrl) {
   SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
   
-  HTTPClient http;
-  http.begin(firmwareUrl);
+  // Parse URL to extract host and path
+  String url = String(firmwareUrl);
+  String host = "";
+  String path = "";
   
-  int httpCode = http.GET();
-  if (httpCode != HTTP_CODE_OK) {
-    SerialMon.printf("HTTP GET failed. Code: %d\n", httpCode);
-    http.end();
+  // Remove protocol
+  if (url.startsWith("https://")) {
+    url = url.substring(8);
+  } else if (url.startsWith("http://")) {
+    url = url.substring(7);
+  }
+  
+  // Split host and path
+  int slashIndex = url.indexOf('/');
+  if (slashIndex > 0) {
+    host = url.substring(0, slashIndex);
+    path = url.substring(slashIndex);
+  } else {
+    host = url;
+    path = "/";
+  }
+  
+  TinyGsmClient client(modem);
+  
+  if (!client.connect(host.c_str(), 80)) {
+    SerialMon.printf("Failed to connect to %s\n", host.c_str());
     return false;
   }
   
-  int contentLength = http.getSize();
+  // Build HTTP request
+  String request = 
+    String("GET ") + path + " HTTP/1.1\r\n" +
+    "Host: " + host + "\r\n" +
+    "Connection: close\r\n\r\n";
+  
+  client.print(request);
+  
+  // Read HTTP headers to find content length
+  String headers = "";
+  int contentLength = 0;
+  bool foundBody = false;
+  
+  while (client.connected() && !foundBody) {
+    if (client.available()) {
+      String line = client.readStringUntil('\n');
+      headers += line + "\n";
+      
+      if (line.startsWith("Content-Length: ")) {
+        contentLength = line.substring(16).toInt();
+      }
+      
+      if (line.length() <= 1) { // Empty line marks end of headers
+        foundBody = true;
+      }
+    }
+  }
+  
   if (contentLength <= 0) {
     SerialMon.println("Content length is invalid.");
-    http.end();
+    client.stop();
     return false;
   }
   
@@ -117,16 +210,34 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
   
   if (!Update.begin(contentLength)) {
     SerialMon.println("Update.begin() failed.");
-    http.end();
+    client.stop();
     return false;
   }
   
-  WiFiClient* stream = http.getStreamPtr();
-  size_t written = Update.writeStream(*stream);
+  // Read firmware data
+  size_t written = 0;
+  unsigned long timeout = millis();
+  
+  while (written < contentLength && client.connected() && millis() - timeout < 300000) { // 5 minute timeout
+    if (client.available()) {
+      uint8_t buffer[1024];
+      int bytesRead = client.read(buffer, min(1024, (int)(contentLength - written)));
+      if (bytesRead > 0) {
+        size_t bytesWritten = Update.write(buffer, bytesRead);
+        written += bytesWritten;
+        timeout = millis(); // Reset timeout on successful read
+        
+        // Progress indicator
+        if (written % 10000 == 0) {
+          SerialMon.printf("Downloaded: %d/%d bytes (%.1f%%)\n", written, contentLength, (float)written/contentLength*100);
+        }
+      }
+    }
+  }
   
   if (written != contentLength) {
     SerialMon.printf("Written only %d of %d bytes.\n", written, contentLength);
-    http.end();
+    client.stop();
     Update.abort();
     return false;
   }
@@ -134,20 +245,20 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
   // Verify firmware integrity
   if (!Update.end()) {
     SerialMon.printf("Update.end() failed. Error: %s\n", Update.errorString());
-    http.end();
+    client.stop();
     Update.abort();
     return false;
   }
   
   if (!Update.isFinished()) {
     SerialMon.println("Update did not finish.");
-    http.end();
+    client.stop();
     Update.abort();
     return false;
   }
   
   SerialMon.println("✅ Firmware download and verification successful");
-  http.end();
+  client.stop();
   return true;
 }
 
