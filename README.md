@@ -34,7 +34,7 @@ To build firmware for multiple buoys:
 python build_all_buoys.py
 ```
 
-This will create firmware files for each buoy in the `firmware_builds/` directory.
+This will create firmware files for each buoy in the `firmware/` directory.
 
 ## OTA Updates
 

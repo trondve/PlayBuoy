@@ -75,7 +75,7 @@ def build_firmware(buoy):
         if result.returncode == 0:
             # Copy the built firmware to the output directory
             source_bin = ".pio/build/lilygo-t-sim7000g/firmware.bin"
-            output_dir = "firmware_builds"
+            output_dir = "firmware"
             os.makedirs(output_dir, exist_ok=True)
             
             target_bin = f"{output_dir}/playbuoy-{buoy['id']}.bin"
@@ -99,7 +99,7 @@ def main():
     print("🚀 Starting PlayBuoy firmware build process...")
     
     # Create output directory
-    output_dir = "firmware_builds"
+    output_dir = "firmware"
     os.makedirs(output_dir, exist_ok=True)
     
     # Backup original config
