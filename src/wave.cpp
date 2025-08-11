@@ -17,26 +17,24 @@ struct WaveSample {
   unsigned long timestamp;
 };
 
-const int SAMPLE_INTERVAL_MS = 1000;
+// Sample at 10 Hz to capture wave crests/troughs reliably without overloading CPU
+const int SAMPLE_INTERVAL_MS = 100; // 10 Hz
 
 // Dynamically determine sample duration based on battery percent
 int getSampleDurationMs() {
-  // TEMP: force 10 seconds during OTA troubleshooting
-  return 10000; // 10 seconds
-  // float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
-  // int percent = estimateBatteryPercent(voltage);
-  // if (percent > 50) return 60000;      // 60 seconds
-  // if (percent > 30) return 30000;      // 30 seconds
-  // if (percent > 20) return 12000;      // 12 seconds
-  // return 6000;                         // 6 seconds
+  // Dynamic duration based on battery percent (use stable voltage measured at startup)
+  float voltage = getStableBatteryVoltage();
+  int percent = estimateBatteryPercent(voltage);
+  if (percent > 60) return 120000; // 120 s at 10 Hz => ~1200 samples
+  if (percent > 40) return  90000; // 90 s  at 10 Hz => ~900 samples
+  return 60000;                    // 60 s  at 10 Hz => ~600 samples
 }
 
 int sampleCount = 0;
 
 // Add static storage for last collected samples and count
-// Reduced from 600 to 300 to save memory (3.6KB instead of 7.2KB)
-// At >50% battery: 10 minutes = 600 samples, but we'll only keep most recent 300
-#define MAX_POSSIBLE_SAMPLES 300
+// Store up to 1200 samples (~120 s at 10 Hz). ~14.4 KB in BSS for WaveSample (3 * 4 bytes)
+#define MAX_POSSIBLE_SAMPLES 1200
 static WaveSample lastSamples[MAX_POSSIBLE_SAMPLES];
 static int lastSampleCount = 0;
 
@@ -56,8 +54,8 @@ void recordWaveData() {
 
   unsigned long startTime = millis();
   while (millis() - startTime < sampleDurationMs && sampleCount < maxSamples) {
-    // Reset watchdog timer every 30 seconds during wave data collection
-    if (sampleCount % 30 == 0) {
+    // Reset watchdog timer roughly every 30 seconds during wave data collection
+    if (sampleCount % 300 == 0) {
       esp_task_wdt_reset();
     }
     

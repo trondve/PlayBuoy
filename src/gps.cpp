@@ -16,10 +16,33 @@ int estimateBatteryPercent(float);
 extern TinyGsm modem;
 extern void ensureModemReady();
 
+// Seed modem clock from the ESP32 RTC to help GNSS TTFF
+static void seedModemClockFromRtc() {
+  time_t now = time(NULL);
+  if (now < 24 * 3600) return; // skip if RTC not valid
+  struct tm tloc, tgm;
+  localtime_r(&now, &tloc);
+  gmtime_r(&now, &tgm);
+  long offsetSec = mktime(&tloc) - mktime(&tgm); // local - UTC
+  int quarters = (int)(offsetSec / 900); // 15-minute units
+  if (quarters > 48) quarters = 48; if (quarters < -48) quarters = -48;
+  char sign = quarters >= 0 ? '+' : '-';
+  int qabs = quarters >= 0 ? quarters : -quarters;
+  char buf[40];
+  // yy/MM/dd,hh:mm:ss±zz  (zz = number of 15-minute units)
+  snprintf(buf, sizeof(buf), "\"%02d/%02d/%02d,%02d:%02d:%02d%c%02d\"",
+           (tloc.tm_year % 100), tloc.tm_mon + 1, tloc.tm_mday,
+           tloc.tm_hour, tloc.tm_min, tloc.tm_sec,
+           sign, qabs);
+  modem.sendAT(String("+CCLK=") + buf);
+  modem.waitResponse();
+}
+
 // Enable GPS functionality on the SIM7000G module
 void gpsBegin() {
   // Ensure modem is powered only when GPS is needed
   ensureModemReady();
+  seedModemClockFromRtc();
   if (!modem.enableGPS()) {
     SerialMon.println("Failed to enable GPS.");
   } else {
@@ -84,7 +107,13 @@ void gpsEnd() {
 
 // Determine GPS fix timeout (in seconds) based on battery percentage
 uint16_t getGpsFixTimeout(bool isFirstFix) {
-  return 10; // 10 seconds for faster troubleshooting
+  float v = getStableBatteryVoltage();
+  int pct = estimateBatteryPercent(v);
+  if (pct > 60) return 600; // 10 min
+  if (pct > 40) return 300; // 5 min
+  if (pct > 30) return 120; // 2 min
+  if (pct > 20) return 60;  // 1 min
+  return 0;                 // skip fix below 20%
 }
 
 // Attempt to get a GPS fix with dynamic timeout
@@ -94,5 +123,14 @@ GpsFixResult getGpsFixDynamic(bool isFirstFix) {
                    timeoutSec, 
                    isFirstFix ? "first" : "subsequent",
                    estimateBatteryPercent(getStableBatteryVoltage()));  // Use stable voltage
+  if (timeoutSec == 0) {
+    GpsFixResult r = {};
+    r.success = false;
+    r.latitude = r.longitude = 0;
+    r.accuracy = 0;
+    r.fixTimeEpoch = 0;
+    SerialMon.println("Battery low: skipping GPS fix");
+    return r;
+  }
   return getGpsFix(timeoutSec);
 }

@@ -48,8 +48,10 @@ TinyGsm modem(SerialAT);
 
 // Track modem power/serial state to avoid powering early and to save battery
 static bool g_modemReady = false;
+// Forward declaration for function defined later
+void powerOnModem();
 
-static void ensureModemReady() {
+void ensureModemReady() {
   if (g_modemReady) return;
   powerOnModem();
   SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);

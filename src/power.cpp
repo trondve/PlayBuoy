@@ -100,44 +100,64 @@ float readBatteryVoltageAlternative() {
   }
 }
 
-float readBatteryVoltage() {
-  // Configure ADC for battery voltage monitoring
+// Low-level: read one ADC sample and convert to voltage. No logging.
+float readBatteryVoltageSample() {
   adc1_config_width(ADC_WIDTH_BIT_12);
   adc1_config_channel_atten(BATTERY_ADC_CHANNEL, ADC_ATTEN_DB_12);
-  
-  // Take multiple readings and average them for stability
-  const int numReadings = 20;  // Increased for better stability
-  int totalReading = 0;
-  int validReadings = 0;
-  
-  for (int i = 0; i < numReadings; i++) {
-    int reading = adc1_get_raw(BATTERY_ADC_CHANNEL);
-    if (reading > 0 && reading < 4095) {  // Valid reading
-      totalReading += reading;
-      validReadings++;
-    }
-    delay(10);  // Small delay between readings
-  }
-  
-  if (validReadings == 0) {
-    SerialMon.println(" No valid ADC readings on primary channel, trying alternative");
-    return readBatteryVoltageAlternative();
-  }
-  
-  int avgReading = totalReading / validReadings;
-  float rawVoltage = (avgReading / ADC_RESOLUTION) * ADC_REFERENCE_VOLTAGE;
+  int reading = adc1_get_raw(BATTERY_ADC_CHANNEL);
+  if (reading <= 0 || reading >= 4095) return NAN;
+  float rawVoltage = (reading / ADC_RESOLUTION) * ADC_REFERENCE_VOLTAGE;
   float batteryVoltage = rawVoltage * VOLTAGE_DIVIDER_RATIO * calibrationFactor;
-  
-  SerialMon.printf("ADC: %d (valid: %d/%d), Raw: %.2fV, Calibrated: %.2fV\n", 
-                   avgReading, validReadings, numReadings, rawVoltage, batteryVoltage);
-  
-  // Validate the reading is reasonable
-  if (batteryVoltage < 3.0f || batteryVoltage > 4.5f) {
-    SerialMon.printf("  Voltage %.2fV seems unreasonable, trying alternative method\n", batteryVoltage);
-    return readBatteryVoltageAlternative();
-  }
-  
+  if (batteryVoltage < 2.5f || batteryVoltage > 5.5f) return NAN;
   return batteryVoltage;
+}
+
+// High-level: accurate quiet measurement using two spaced windows with trimmed mean
+float readBatteryVoltage() {
+  // Ensure quiet rails: caller should avoid calling during modem/GNSS activity
+  auto trimmedMean = [] (int samples, int spacingMs) -> float {
+    const int maxSamples = 200;
+    float buf[maxSamples];
+    int n = 0;
+    for (int i = 0; i < samples && n < maxSamples; ++i) {
+      float v = readBatteryVoltageSample();
+      if (!isnan(v)) buf[n++] = v;
+      delay(spacingMs);
+    }
+    if (n < 5) return NAN;
+    // Sort and trim 10% at each end
+    for (int i = 0; i < n - 1; ++i) {
+      for (int j = i + 1; j < n; ++j) {
+        if (buf[j] < buf[i]) { float t = buf[i]; buf[i] = buf[j]; buf[j] = t; }
+      }
+    }
+    int trim = n / 10; // 10%
+    if (trim > 10) trim = 10;
+    int start = trim;
+    int end = n - trim;
+    if (end - start < 3) { start = 0; end = n; }
+    float sum = 0.0f; int cnt = 0;
+    for (int i = start; i < end; ++i) { sum += buf[i]; cnt++; }
+    return (cnt > 0) ? (sum / cnt) : NAN;
+  };
+
+  // Window A: 75 samples, 15 ms spacing (~1.1 s)
+  float a = trimmedMean(75, 15);
+  delay(900); // idle ~0.9 s
+  // Window B: 75 samples, 15 ms spacing (~1.1 s)
+  float b = trimmedMean(75, 15);
+
+  // If either window failed, fall back to the other; if both failed, use alternative method
+  float v = NAN;
+  if (!isnan(a) && !isnan(b)) v = (a + b) * 0.5f;
+  else if (!isnan(a)) v = a;
+  else if (!isnan(b)) v = b;
+  else return readBatteryVoltageAlternative();
+
+  // Reasonableness check; if noisy, do a quick third window
+  if (v < 3.0f || v > 4.5f) return readBatteryVoltageAlternative();
+  SerialMon.printf("Battery (quiet): %.3fV\n", v);
+  return v;
 }
 
 // Function to calibrate voltage reading based on multimeter measurement
