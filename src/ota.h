@@ -7,5 +7,6 @@
 bool checkForFirmwareUpdate(const char* baseUrl);
 bool downloadAndCheckVersion(const char* versionUrl);
 String getServerFirmwareVersion(const char* versionUrl);
+bool downloadAndInstallFirmware(const char* firmwareUrl);
 
 #endif // OTA_H

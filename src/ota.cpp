@@ -2,6 +2,7 @@
 #include "ota.h"
 #include "config.h"
 #include <TinyGsmClient.h>
+#include <Update.h>
 
 #define SerialMon Serial
 
@@ -115,12 +116,141 @@ bool downloadAndCheckVersion(const char* versionUrl) {
   return false;
 }
 
+static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, size_t& contentLength) {
+  statusCode = -1;
+  contentLength = 0;
+  String line;
+  unsigned long t0 = millis();
+  // Read status line
+  while (millis() - t0 < 15000) {
+    while (client.available()) {
+      char c = client.read();
+      if (c == '\n') {
+        line.trim();
+        if (line.startsWith("HTTP/1.1 ") || line.startsWith("HTTP/1.0 ")) {
+          int sp = line.indexOf(' ');
+          if (sp > 0) statusCode = line.substring(sp + 1).toInt();
+        }
+        line = "";
+        goto read_headers;
+      } else if (c != '\r') {
+        line += c;
+      }
+    }
+    delay(5);
+  }
+read_headers:;
+  // Read headers until blank line
+  t0 = millis();
+  while (millis() - t0 < 15000) {
+    while (client.available()) {
+      char c = client.read();
+      if (c == '\n') {
+        String h = line; h.trim();
+        if (h.length() == 0) return (statusCode > 0);
+        if (h.startsWith("Content-Length:")) {
+          String v = h.substring(strlen("Content-Length:")); v.trim();
+          contentLength = (size_t)v.toInt();
+        }
+        line = "";
+      } else if (c != '\r') {
+        line += c;
+      }
+    }
+    delay(5);
+  }
+  return (statusCode > 0);
+}
+
+bool downloadAndInstallFirmware(const char* firmwareUrl) {
+  SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
+  if (!ensurePdpForHttp()) {
+    SerialMon.println("No PDP for firmware download");
+    return false;
+  }
+
+  // Parse URL
+  String u(firmwareUrl), host, path; uint16_t port = 80;
+  if (u.startsWith("http://")) u = u.substring(7);
+  else if (u.startsWith("https://")) u = u.substring(8);
+  int slash = u.indexOf('/');
+  if (slash > 0) { host = u.substring(0, slash); path = u.substring(slash); } else { host = u; path = "/"; }
+  int colon = host.indexOf(':');
+  if (colon > 0) { port = (uint16_t)host.substring(colon + 1).toInt(); host = host.substring(0, colon); }
+
+  TinyGsmClient client(modem);
+  if (!client.connect(host.c_str(), port)) { SerialMon.println("TCP connect failed"); return false; }
+
+  // Send request
+  String req;
+  req += String("GET ") + path + " HTTP/1.1\r\n";
+  req += String("Host: ") + host + "\r\n";
+  req += "User-Agent: TinyGSM-HTTP/1.0\r\n";
+  req += "Accept: application/octet-stream\r\n";
+  req += "Connection: close\r\n\r\n";
+  client.print(req);
+
+  int status = -1; size_t contentLength = 0;
+  if (!parseHttpResponseHeaders(client, status, contentLength)) { client.stop(); return false; }
+  SerialMon.printf("HTTP status: %d, Content-Length: %u\n", status, (unsigned)contentLength);
+  if (status != 200) { client.stop(); return false; }
+
+  size_t updateSize = (contentLength > 0) ? contentLength : (size_t)UPDATE_SIZE_UNKNOWN;
+  if (!Update.begin(updateSize)) {
+    SerialMon.printf("Update.begin failed: %s\n", Update.errorString());
+    client.stop();
+    return false;
+  }
+
+  size_t written = 0; uint8_t buf[1024]; unsigned long lastLog = millis();
+  while (client.connected()) {
+    int n = client.readBytes(buf, sizeof(buf));
+    if (n < 0) break;
+    if (n == 0) { delay(5); continue; }
+    size_t w = Update.write(buf, (size_t)n);
+    if (w != (size_t)n) {
+      SerialMon.printf("Update.write mismatch (w=%u n=%d) err=%s\n", (unsigned)w, n, Update.errorString());
+      client.stop();
+      Update.abort();
+      return false;
+    }
+    written += w;
+    if (millis() - lastLog > 2000) { SerialMon.printf("Downloaded %u bytes\n", (unsigned)written); lastLog = millis(); }
+    if (contentLength > 0 && written >= contentLength) break;
+  }
+  client.stop();
+
+  if (contentLength > 0 && written != contentLength) {
+    SerialMon.printf("Short read: expected %u, got %u\n", (unsigned)contentLength, (unsigned)written);
+    Update.abort();
+    return false;
+  }
+
+  if (!Update.end(true)) { // true => set boot partition, image pending verify
+    SerialMon.printf("Update.end failed: %s\n", Update.errorString());
+    return false;
+  }
+  SerialMon.println("OTA image written; rebooting into pending verify");
+  return true;
+}
+
 bool checkForFirmwareUpdate(const char* baseUrl) {
   String versionUrl = String(baseUrl);
   if (versionUrl.endsWith(".bin")) versionUrl = versionUrl.substring(0, versionUrl.length() - 4) + ".version";
   else versionUrl += ".version";
-  (void)downloadAndCheckVersion(versionUrl.c_str());
-  return false; // Version check only; install not implemented here
+  bool hasNew = downloadAndCheckVersion(versionUrl.c_str());
+  if (!hasNew) return false;
+
+  String firmwareUrl = String(baseUrl);
+  if (!firmwareUrl.endsWith(".bin")) firmwareUrl += ".bin";
+  if (downloadAndInstallFirmware(firmwareUrl.c_str())) {
+    SerialMon.println("OTA update successful. Rebooting...");
+    delay(500);
+    ESP.restart();
+    return true;
+  }
+  SerialMon.println("OTA update failed.");
+  return false;
 }
 
 

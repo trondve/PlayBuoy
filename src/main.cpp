@@ -141,16 +141,7 @@ void setup() {
   esp_ota_img_states_t otaState;
   if (esp_ota_get_state_partition(running, &otaState) == ESP_OK) {
     if (otaState == ESP_OTA_IMG_PENDING_VERIFY) {
-      SerialMon.println("Verifying OTA firmware...");
-      bool firmwareValid = true; // implement your own check if needed
-
-      if (firmwareValid) {
-        SerialMon.println("Marking firmware as valid.");
-        esp_ota_mark_app_valid_cancel_rollback();
-      } else {
-        SerialMon.println("Firmware invalid. Rolling back.");
-        esp_ota_mark_app_invalid_rollback_and_reboot();
-      }
+      SerialMon.println("OTA image pending verify (rollback enabled). Will mark valid after successful run.");
     }
   }
 
@@ -377,6 +368,17 @@ void loop() {
 
   SerialMon.println("JSON payload:");
   SerialMon.println(json);
+
+  // If booting from a pending OTA image, we consider reaching here as a successful run
+  {
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    esp_ota_img_states_t otaState;
+    if (esp_ota_get_state_partition(running, &otaState) == ESP_OK &&
+        otaState == ESP_OTA_IMG_PENDING_VERIFY) {
+      SerialMon.println("Marking OTA image as valid after successful run.");
+      esp_ota_mark_app_valid_cancel_rollback();
+    }
+  }
 
   // Try to send any buffered unsent JSON first
   bool bufferedDataSent = false;
