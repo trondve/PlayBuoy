@@ -22,18 +22,20 @@ BUOYS = [
 CURRENT_VERSION = "1.1.0"
 
 def backup_config():
-    """Backup the original config.h"""
-    if os.path.exists("src/config.h.backup"):
-        print("Backup already exists, skipping...")
-        return
+    """Backup the current config.h (always refresh to avoid stale values)."""
     shutil.copy("src/config.h", "src/config.h.backup")
-    print("✅ Backed up src/config.h")
+    print("✅ Backed up (refreshed) src/config.h -> src/config.h.backup")
 
 def restore_config():
-    """Restore the original config.h"""
+    """Restore the backed up config.h and remove the backup to prevent staleness."""
     if os.path.exists("src/config.h.backup"):
         shutil.copy("src/config.h.backup", "src/config.h")
         print("✅ Restored src/config.h")
+        try:
+            os.remove("src/config.h.backup")
+            print("🧹 Removed src/config.h.backup to avoid stale restores")
+        except Exception:
+            pass
 
 def update_config(buoy):
     """Update config.h with buoy-specific settings (matching your exact format)"""

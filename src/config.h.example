@@ -11,8 +11,8 @@
 #define API_KEY "your-api-key-here"
 
 // OTA Configuration
-#define OTA_SERVER "your-site.netlify.app"
-#define OTA_PATH "/firmware"
+#define OTA_SERVER "trondve.ddns.net"
+#define OTA_PATH ""
 
 // Network Configuration
 #define NETWORK_PROVIDER "your-network-provider"

@@ -18,7 +18,7 @@ ESP32-based wave monitoring buoy firmware for the LilyGo T-SIM7000G board.
    #define FIRMWARE_VERSION "1.0.0"         // Current firmware version
    #define API_SERVER "your-api-server.com" // Your API server
    #define API_KEY "your-api-key"           // Your API key
-   #define OTA_SERVER "raw.githubusercontent.com" // Your OTA server
+  #define OTA_SERVER "trondve.ddns.net" // Your OTA server
    #define NETWORK_PROVIDER "your-provider" // Your network provider
    #define NTP_SERVER "pool.ntp.org"        // Your NTP server
    ```
@@ -54,8 +54,8 @@ The build process creates two types of version files for each buoy:
 - **Text format**: `playbuoy-{id}.version` (fallback)
 
 ### Example URLs:
-- Version check: `https://raw.githubusercontent.com/your-username/your-repo/main/firmware/your-buoy-id.version.json`
-- Firmware download: `https://raw.githubusercontent.com/your-username/your-repo/main/firmware/your-buoy-id.bin`
+- Version check: `http://trondve.ddns.net/your-buoy-id.version.json`
+- Firmware download: `http://trondve.ddns.net/your-buoy-id.bin`
 
 ### Updating Firmware:
 1. Update `CURRENT_VERSION` in `build_all_buoys.py`

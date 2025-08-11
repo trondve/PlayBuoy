@@ -31,7 +31,7 @@ def create_version_files():
         # Create JSON version file
         version_json = {
             "version": CURRENT_VERSION,
-            "url": f"https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
+            "url": f"http://trondve.ddns.net/{buoy['node_id']}.bin",
             "name": buoy['name'],
             "node_id": buoy['node_id'],
             "description": f"Firmware for {buoy['name']} buoy"
