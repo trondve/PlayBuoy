@@ -179,79 +179,10 @@ void setup() {
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-  // Enhanced battery measurement with staggered sampling (~10 seconds total)
-  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (~10 SECONDS STAGGERED) ===");
-  const int TOTAL_READINGS = 3;   // 3 readings over ~9 seconds
-  const int DELAY_BETWEEN_READINGS = 3000;  // 3 seconds between readings
-  float voltageReadings[TOTAL_READINGS];
-  int validReadings = 0;
-  
-  for (int i = 0; i < TOTAL_READINGS; i++) {
-         // Take 3 quick readings and average them (reduces noise)
-     float sum = 0.0f;
-     int quickReadings = 0;
-     for (int j = 0; j < 3; j++) {
-       float voltage = readBatteryVoltage();
-       if (voltage >= 3.5f && voltage <= 4.5f) {  // Lowered threshold to accept more readings
-         sum += voltage;
-         quickReadings++;
-       }
-       delay(100); // 100ms between quick readings
-     }
-    
-    if (quickReadings > 0) {
-      float avgVoltage = sum / quickReadings;
-      voltageReadings[validReadings] = avgVoltage;
-      validReadings++;
-      SerialMon.printf("Reading %d: %.3fV (avg of %d quick readings)\n", i + 1, avgVoltage, quickReadings);
-    } else {
-      SerialMon.printf("Reading %d: No valid quick readings\n", i + 1);
-    }
-    
-    delay(DELAY_BETWEEN_READINGS);  // 3 second delay between main readings
-  }
-  
-  float stableBatteryVoltage = 0.0f;
-  if (validReadings >= 3) {  // Need at least 3 valid readings (half of 6 total readings)
-    // Calculate average
-    float totalVoltage = 0.0f;
-    for (int i = 0; i < validReadings; i++) {
-      totalVoltage += voltageReadings[i];
-    }
-    stableBatteryVoltage = totalVoltage / validReadings;
-    
-    // Calculate standard deviation for quality check
-    float variance = 0.0f;
-    for (int i = 0; i < validReadings; i++) {
-      variance += pow(voltageReadings[i] - stableBatteryVoltage, 2);
-    }
-    float stdDev = sqrt(variance / validReadings);
-    
-    SerialMon.printf("Enhanced battery measurement complete:\n");
-    SerialMon.printf("- Valid readings: %d/%d\n", validReadings, TOTAL_READINGS);
-    SerialMon.printf("- Average voltage: %.3fV\n", stableBatteryVoltage);
-    SerialMon.printf("- Standard deviation: %.3fV\n", stdDev);
-    SerialMon.printf("- Min: %.3fV, Max: %.3fV\n", 
-      *std::min_element(voltageReadings, voltageReadings + validReadings),
-      *std::max_element(voltageReadings, voltageReadings + validReadings));
-    
-                                         // Calculate calibration factor based on actual vs measured
-            float calibrationFactor = 4.165f / stableBatteryVoltage;
-            SerialMon.printf("Calibration factor: %.3f (actual %.3fV / measured %.3fV)\n",
-                            calibrationFactor, 4.165f, stableBatteryVoltage);
-     
-     // Apply calibration and recalculate
-     float calibratedVoltage = stableBatteryVoltage * calibrationFactor;
-     SerialMon.printf("Calibrated voltage: %.3fV\n", calibratedVoltage);
-     
-     // Store the calibrated voltage
-     setStableBatteryVoltage(calibratedVoltage);
-  } else {
-    SerialMon.println("  Insufficient valid readings for enhanced measurement");
-    SerialMon.printf("Got %d valid readings, need at least 3\n", validReadings);
-    stableBatteryVoltage = 4.0f;  // Safe fallback
-    setStableBatteryVoltage(stableBatteryVoltage);
-  }
+  // Accurate, quiet battery measurement (~3.1 seconds)
+  SerialMon.println("=== BATTERY MEASUREMENT (quiet windows) ===");
+  float stableBatteryVoltage = readBatteryVoltage();
+  setStableBatteryVoltage(stableBatteryVoltage);
   SerialMon.println("=== END BATTERY MEASUREMENT ===");
 
   checkBatteryChargeState();

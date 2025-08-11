@@ -114,53 +114,39 @@ bool connectToNetwork(const char* apn) {
 // Test multiple APNs to find one that works
 //
 bool testMultipleAPNs() {
-  String apns[] = {"telenor", "telenor.smart", "internet", "internet.telenor.no"};
-  int numApns = sizeof(apns) / sizeof(apns[0]);
-  
-  SerialMon.println("Testing multiple APNs...");
-  
-  for (int i = 0; i < numApns; i++) {
-    SerialMon.printf("\n--- Testing APN: %s ---\n", apns[i].c_str());
-    
-    // Configure APN
-    String apnCmd = "AT+CGDCONT=1,\"IP\",\"" + apns[i] + "\"";
-    SerialMon.println("Sending: " + apnCmd);
-    
-    // Send AT command directly
-    Serial1.println(apnCmd);
-    delay(2000);
-    
-    // Activate PDP context
-    SerialMon.println("Activating PDP context...");
-    Serial1.println("AT+CGACT=1,1");
-    delay(10000);
-    
-    // Check if we got an IP
-    SerialMon.println("Checking IP address...");
-    Serial1.println("AT+CGPADDR=1");
-    delay(2000);
-    
-    // Check connection status
-    Serial1.println("AT+CGACT?");
-    delay(2000);
-    
-    // Read responses
-    String response = "";
-    while (Serial1.available()) {
-      response += (char)Serial1.read();
+  const char* apns[] = {"telenor", "telenor.smart"};
+  const int numApns = sizeof(apns) / sizeof(apns[0]);
+
+  SerialMon.println("Trying known APNs...");
+
+  // Ensure we are registered before trying APNs
+  if (!modem.isNetworkConnected()) {
+    SerialMon.println(" Waiting for network registration...");
+    if (!modem.waitForNetwork(NETWORK_TIMEOUT_MS)) {
+      SerialMon.println(" Network registration failed.");
+      return false;
     }
-    SerialMon.println("Response: " + response);
-    
-    // If we got an IP, this APN works
-    if (response.indexOf("+CGPADDR: 1,") >= 0 && response.indexOf("0.0.0.0") == -1) {
-      SerialMon.printf(" APN %s works!\n", apns[i].c_str());
+  }
+
+  for (int i = 0; i < numApns; ++i) {
+    const char* apn = apns[i];
+    SerialMon.printf(" APN: %s\n", apn);
+
+    // Disconnect any existing PDP before switching APN
+    modem.gprsDisconnect();
+    delay(300);
+
+    if (modem.gprsConnect(apn, "", "")) {
+      IPAddress ip = modem.localIP();
+      SerialMon.printf(" Connected. IP: %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
       return true;
     }
-    
-    delay(2000);
+
+    SerialMon.println(" Failed. Trying next...");
+    delay(500);
   }
-  
-  SerialMon.println(" No APN worked");
+
+  SerialMon.println(" No known APN worked");
   return false;
 }
 

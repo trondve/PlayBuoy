@@ -21,83 +21,23 @@
 // Calibration factor - adjust this based on multimeter readings
 static float calibrationFactor = 1.0f;
 
-// Function to test different ADC channels
-uint32_t testAdcChannel(adc1_channel_t channel) {
-  adc1_config_channel_atten(channel, ADC_ATTEN_DB_12);
-  delay(100);
-  return adc1_get_raw(channel);
-}
-
-// Alternative battery voltage reading using analogRead
+// Alternative battery voltage reading: simple average on primary channel (quiet, minimal logging)
 float readBatteryVoltageAlternative() {
-  SerialMon.println("Trying alternative battery voltage reading method...");
-  
-  // Test all GPIO pins with analogRead
-  int readings[4] = {0};
-  int pins[4] = {32, 33, 34, 35};
-  
-  for (int i = 0; i < 4; i++) {
-    // Take multiple readings for stability
-    int total = 0;
-    int valid = 0;
-    for (int j = 0; j < 10; j++) {
-      int reading = analogRead(pins[i]);
-      if (reading > 0 && reading < 4095) {
-        total += reading;
-        valid++;
-      }
-      delay(5);
+  adc1_config_width(ADC_WIDTH_BIT_12);
+  adc1_config_channel_atten(BATTERY_ADC_CHANNEL, ADC_ATTEN_DB_12);
+  int valid = 0;
+  float sum = 0.0f;
+  for (int i = 0; i < 20; ++i) {
+    int reading = adc1_get_raw(BATTERY_ADC_CHANNEL);
+    if (reading > 0 && reading < 4095) {
+      float raw = (reading / ADC_RESOLUTION) * ADC_REFERENCE_VOLTAGE;
+      float v = raw * VOLTAGE_DIVIDER_RATIO * calibrationFactor;
+      if (v >= 2.5f && v <= 5.5f) { sum += v; valid++; }
     }
-    readings[i] = valid > 0 ? total / valid : 0;
+    delay(10);
   }
-  
-  SerialMon.printf("GPIO 32 analogRead: %d\n", readings[0]);
-  SerialMon.printf("GPIO 33 analogRead: %d\n", readings[1]);
-  SerialMon.printf("GPIO 34 analogRead: %d\n", readings[2]);
-  SerialMon.printf("GPIO 35 analogRead: %d\n", readings[3]);
-  
-  // Find the best reading (highest non-zero value)
-  int bestReading = 0;
-  int bestPin = -1;
-  for (int i = 0; i < 4; i++) {
-    if (readings[i] > bestReading) {
-      bestReading = readings[i];
-      bestPin = pins[i];
-    }
-  }
-  
-  if (bestReading == 0) {
-    SerialMon.println(" No valid analog readings found");
-    return 4.0f;  // Safe fallback
-  }
-  
-  SerialMon.printf("Best reading: GPIO %d = %d\n", bestPin, bestReading);
-  
-  // Try different voltage divider ratios to find the most accurate one
-  float ratios[] = {40.0f, 45.0f, 47.0f, 50.0f, 55.0f};
-  float bestVoltage = 0.0f;
-  float bestRatio = 0.0f;
-  
-  for (float ratio : ratios) {
-    float voltage = (bestReading / 4095.0f) * 3.3f * ratio;
-    SerialMon.printf("Ratio %.1f: %.2fV\n", ratio, voltage);
-    
-    // Check if this voltage is reasonable and close to expected 4.15V
-    if (voltage >= 3.8f && voltage <= 4.3f) {
-      if (bestRatio == 0.0f || abs(voltage - 4.15f) < abs(bestVoltage - 4.15f)) {
-        bestVoltage = voltage;
-        bestRatio = ratio;
-      }
-    }
-  }
-  
-  if (bestRatio > 0.0f) {
-    SerialMon.printf(" Found reasonable voltage with ratio %.1f: %.2fV\n", bestRatio, bestVoltage);
-    return bestVoltage * calibrationFactor;
-  } else {
-    SerialMon.println(" No reasonable voltage found with alternative method");
-    return 4.0f;  // Safe fallback
-  }
+  if (valid == 0) return 4.0f; // safe fallback
+  return sum / valid;
 }
 
 // Low-level: read one ADC sample and convert to voltage. No logging.
@@ -174,44 +114,11 @@ void calibrateBatteryVoltage(float actualVoltage) {
   }
 }
 
-float readBatteryCurrent() {
-  // Placeholder - no current sensor connected
-  return 0.0f;
-}
+
 
 bool beginPowerMonitor() {
-  SerialMon.println("Initializing power monitor...");
-  
-  // Test all ADC channels to find which one has the battery voltage
-  SerialMon.println("Testing all ADC channels...");
-  
+  // Configure ADC once
   adc1_config_width(ADC_WIDTH_BIT_12);
   adc1_config_channel_atten(BATTERY_ADC_CHANNEL, ADC_ATTEN_DB_12);
-  adc1_config_channel_atten(ALT_ADC_CHANNEL_1, ADC_ATTEN_DB_12);
-  adc1_config_channel_atten(ALT_ADC_CHANNEL_2, ADC_ATTEN_DB_12);
-  adc1_config_channel_atten(ALT_ADC_CHANNEL_3, ADC_ATTEN_DB_12);
-  
-  int testReading = adc1_get_raw(BATTERY_ADC_CHANNEL);
-  SerialMon.printf("Test ADC reading: %d\n", testReading);
-  
-  int ch5 = adc1_get_raw(BATTERY_ADC_CHANNEL);  // GPIO 33
-  int ch4 = adc1_get_raw(ALT_ADC_CHANNEL_1);    // GPIO 32
-  int ch6 = adc1_get_raw(ALT_ADC_CHANNEL_2);    // GPIO 34
-  int ch7 = adc1_get_raw(ALT_ADC_CHANNEL_3);    // GPIO 35
-  
-  SerialMon.printf("ADC test - CH5(GPIO33): %d, CH4(GPIO32): %d, CH6(GPIO34): %d, CH7(GPIO35): %d\n", 
-                   ch5, ch4, ch6, ch7);
-  
-  // Find the channel with the highest reading
-  int maxReading = 0;
-  adc1_channel_t bestChannel = BATTERY_ADC_CHANNEL;
-  
-  if (ch5 > maxReading) { maxReading = ch5; bestChannel = BATTERY_ADC_CHANNEL; }
-  if (ch4 > maxReading) { maxReading = ch4; bestChannel = ALT_ADC_CHANNEL_1; }
-  if (ch6 > maxReading) { maxReading = ch6; bestChannel = ALT_ADC_CHANNEL_2; }
-  if (ch7 > maxReading) { maxReading = ch7; bestChannel = ALT_ADC_CHANNEL_3; }
-  
-  SerialMon.printf("Using ADC channel with reading: %d\n", maxReading);
-  
   return true;
 }
