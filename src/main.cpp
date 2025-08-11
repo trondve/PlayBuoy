@@ -436,6 +436,9 @@ void loop() {
        SerialMon.printf(" OTA: NODE_ID = %s\n", NODE_ID);
        
        String baseUrl = "http://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID);
+       // If OTA_PATH is empty, remove the double slash
+       baseUrl.replace("//", "/");
+       if (baseUrl.startsWith("http:/")) baseUrl.replace("http:/", "http://");
        SerialMon.printf(" OTA: Constructed baseUrl: %s\n", baseUrl.c_str());
        
        if (checkForFirmwareUpdate(baseUrl.c_str())) {

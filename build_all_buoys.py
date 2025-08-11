@@ -49,9 +49,9 @@ def update_config(buoy):
 #define API_ENDPOINT "/upload"
 #define API_KEY "super-secret-key-123"
 
-// OTA Configuration (HTTP testing server)
+// OTA Configuration (HTTP testing server at root)
 #define OTA_SERVER "trondve.ddns.net"
-#define OTA_PATH "/firmware"
+#define OTA_PATH ""
 
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"
@@ -73,7 +73,7 @@ def create_version_files():
         # Create JSON version file
         version_json = {
             "version": CURRENT_VERSION,
-            "url": f"http://trondve.ddns.net/firmware/{buoy['node_id']}.bin",
+            "url": f"http://trondve.ddns.net/{buoy['node_id']}.bin",
             "name": buoy['name'],
             "node_id": buoy['node_id'],
             "description": f"Firmware for {buoy['name']} buoy"
@@ -186,7 +186,7 @@ def main():
         print(f"1. Upload the .bin files to your server")
         print(f"2. Upload the .version files to your server")
         print(f"3. Each buoy will check version before downloading firmware")
-        print(f"4. URLs will be: http://trondve.ddns.net/firmware/")
+        print(f"4. URLs will be: http://trondve.ddns.net/")
 
 if __name__ == "__main__":
     main()
