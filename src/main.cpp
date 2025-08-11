@@ -46,6 +46,17 @@ extern "C" {
 
 TinyGsm modem(SerialAT);
 
+// Track modem power/serial state to avoid powering early and to save battery
+static bool g_modemReady = false;
+
+static void ensureModemReady() {
+  if (g_modemReady) return;
+  powerOnModem();
+  SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
+  delay(1000);
+  g_modemReady = true;
+}
+
 void powerOnModem() {
   SerialMon.println("Starting modem power sequence...");
   
@@ -161,28 +172,7 @@ void setup() {
   settimeofday(&tv, nullptr);
   SerialMon.println("Set default RTC time: August 10, 2025 10:00:00 CEST");
 
-  powerOnModem();
-  SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
-  delay(1000);
-  
-  // Test basic communication before proceeding
-  SerialMon.println("Testing basic modem communication...");
-  SerialAT.println("AT");
-  delay(1000);
-  
-  String response = "";
-  while (SerialAT.available()) {
-    response += (char)SerialAT.read();
-  }
-  
-  if (response.indexOf("OK") >= 0) {
-    SerialMon.println(" Modem communication successful");
-  } else {
-    SerialMon.println(" Modem communication failed. Response: " + response);
-  }
-  
-  // Get modem info
-  SerialMon.println("Modem Info: " + modem.getModemInfo());
+  // Defer modem power-on and serial init until needed (GPS or network)
 
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
@@ -288,42 +278,41 @@ void loop() {
     }
   }
 
+  // 1) Collect wave data first (modem is still off for lower power)
+  recordWaveData();
+  logWaveStats();
+
+  // 2) Then attempt GPS (powers modem only if needed); disable GNSS immediately after
   GpsFixResult fix;
   if (shouldGetNewGpsFix) {
-    // Use dynamic GPS timeout based on battery and whether this is first fix
     bool isFirstFix = (rtcState.lastGpsFixTime == 0);
     fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);
       checkAnchorDrift(fix.latitude, fix.longitude);
-      // Sync RTC with GPS time
-      if (fix.fixTimeEpoch > 1000000000) { // sanity check for valid epoch
+      if (fix.fixTimeEpoch > 1000000000) {
         syncRtcWithGps(fix.fixTimeEpoch);
       }
     } else {
-      // GPS failed, but we can still use last known GPS time to sync RTC
       if (rtcState.lastGpsFixTime > 1000000000) {
-        // Calculate current time based on last GPS time + elapsed time
         uint32_t elapsedSinceLastFix = time(NULL) - rtcState.lastGpsFixTime;
         uint32_t currentTime = rtcState.lastGpsFixTime + elapsedSinceLastFix;
         syncRtcWithGps(currentTime);
         SerialMon.printf("GPS failed, synced RTC with last GPS time + %u seconds\n", elapsedSinceLastFix);
       }
-      // Use last known position
       fix.latitude = rtcState.lastGpsLat;
       fix.longitude = rtcState.lastGpsLon;
       fix.fixTimeEpoch = rtcState.lastGpsFixTime;
-      fix.success = false; // Mark as failed for logging
+      fix.success = false;
     }
+    // Always disable GNSS immediately after the attempt to save power
+    gpsEnd();
   } else {
     fix.latitude = rtcState.lastGpsLat;
     fix.longitude = rtcState.lastGpsLon;
     fix.fixTimeEpoch = rtcState.lastGpsFixTime;
     fix.success = true;
   }
-
-  recordWaveData();
-  logWaveStats();
 
   checkTemperatureAnomalies();
 
@@ -387,6 +376,7 @@ void loop() {
   
   if (hasUnsentJson()) {
     SerialMon.println("Attempting to resend buffered unsent data...");
+    ensureModemReady();
     networkConnected = connectToNetwork(NETWORK_PROVIDER);
     
     // If regular connection fails, try APN testing
@@ -421,6 +411,7 @@ void loop() {
 
   // Only proceed with new data if buffered data was handled successfully
   if (shouldProceedWithNewData) {
+    ensureModemReady();
     networkConnected = connectToNetwork(NETWORK_PROVIDER);
     
     // If regular connection fails, try APN testing

@@ -14,9 +14,12 @@ int estimateBatteryPercent(float);
 #define SerialAT Serial1
 
 extern TinyGsm modem;
+extern void ensureModemReady();
 
 // Enable GPS functionality on the SIM7000G module
 void gpsBegin() {
+  // Ensure modem is powered only when GPS is needed
+  ensureModemReady();
   if (!modem.enableGPS()) {
     SerialMon.println("Failed to enable GPS.");
   } else {
