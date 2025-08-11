@@ -16,5 +16,13 @@ String buildJsonPayload(
   const char* firmwareVersion,
   float heading,
   uint32_t uptime,           // <-- new
-  String resetReason         // <-- new
+  String resetReason,        // <-- new
+  // New: modem/network diagnostics
+  String operatorName,
+  String apn,
+  String ip,
+  int signalQuality,
+  // New: RTC snapshot values
+  float rtcBatteryVoltage,
+  float rtcWaterTemp
 );

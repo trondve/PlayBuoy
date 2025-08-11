@@ -1,4 +1,6 @@
 #include "power.h"
+#include "config.h"
+#include <Arduino.h>
 #include <driver/adc.h>
 #define SerialMon Serial
 
@@ -14,12 +16,16 @@
 
 // Voltage divider calibration - fine-tuned based on actual readings
 // For 4.165V battery, we're getting ~109 ADC units, ratio needs adjustment
-#define VOLTAGE_DIVIDER_RATIO 50.0f  // Adjusted for more accurate readings
+#define VOLTAGE_DIVIDER_RATIO 2.0f   // LilyGo T-SIM7000G battery divider is ~1:2 (adjust if needed)
 #define ADC_REFERENCE_VOLTAGE 3.3f  // ESP32 ADC reference voltage
 #define ADC_RESOLUTION 4095.0f      // 12-bit ADC resolution
 
 // Calibration factor - adjust this based on multimeter readings
+#ifdef BATTERY_CALIBRATION_FACTOR
+static float calibrationFactor = BATTERY_CALIBRATION_FACTOR;
+#else
 static float calibrationFactor = 1.0f;
+#endif
 
 // Alternative battery voltage reading: simple average on primary channel (quiet, minimal logging)
 float readBatteryVoltageAlternative() {
@@ -42,11 +48,9 @@ float readBatteryVoltageAlternative() {
 
 // Low-level: read one ADC sample and convert to voltage. No logging.
 float readBatteryVoltageSample() {
-  adc1_config_width(ADC_WIDTH_BIT_12);
-  adc1_config_channel_atten(BATTERY_ADC_CHANNEL, ADC_ATTEN_DB_12);
-  int reading = adc1_get_raw(BATTERY_ADC_CHANNEL);
-  if (reading <= 0 || reading >= 4095) return NAN;
-  float rawVoltage = (reading / ADC_RESOLUTION) * ADC_REFERENCE_VOLTAGE;
+  // Use calibrated Arduino helper to get mV at the ADC pin, then scale by divider
+  uint32_t mv = analogReadMilliVolts(BATTERY_ADC_PIN);
+  float rawVoltage = mv / 1000.0f;
   float batteryVoltage = rawVoltage * VOLTAGE_DIVIDER_RATIO * calibrationFactor;
   if (batteryVoltage < 2.5f || batteryVoltage > 5.5f) return NAN;
   return batteryVoltage;
@@ -97,6 +101,9 @@ float readBatteryVoltage() {
   // Reasonableness check; if noisy, do a quick third window
   if (v < 3.0f || v > 4.5f) return readBatteryVoltageAlternative();
   SerialMon.printf("Battery (quiet): %.3fV\n", v);
+  // Show how calibration factor affects the reported voltage
+  float preCal = v / calibrationFactor;
+  SerialMon.printf("Calibration: factor=%.4f, pre-cal=%.3fV -> final=%.3fV\n", calibrationFactor, preCal, v);
   return v;
 }
 

@@ -1,7 +1,7 @@
 // Configuration template - copy this to config.h and update with your actual values
 #define NODE_ID "your-buoy-id"
 #define NAME "Your Buoy Name"
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.1.1"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
 // API Configuration

@@ -102,10 +102,6 @@ String getServerFirmwareVersion(const char* versionUrl) {
 }
 
 bool downloadAndCheckVersion(const char* versionUrl) {
-  SerialMon.println("CHECKING FOR FIRMWARE UPDATES");
-  SerialMon.printf("Version URL: %s\n", versionUrl);
-  SerialMon.printf("Current firmware version: %s\n", FIRMWARE_VERSION);
-  SerialMon.println("----------------------------------------");
   String serverVersion = getServerFirmwareVersion(versionUrl);
   if (serverVersion.length() == 0) { SerialMon.println("Could not retrieve server version"); return false; }
   SerialMon.printf("Server version retrieved: %s\n", serverVersion.c_str());

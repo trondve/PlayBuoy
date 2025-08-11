@@ -42,12 +42,19 @@ static void seedModemClockFromRtc() {
 void gpsBegin() {
   // Ensure modem is powered only when GPS is needed
   ensureModemReady();
+  // Initialize modem if not already initialized for GNSS use
+  modem.init();
+  modem.testAT();
   seedModemClockFromRtc();
-  if (!modem.enableGPS()) {
-    SerialMon.println("Failed to enable GPS.");
-  } else {
-    SerialMon.println("GPS enabled.");
+  // Try enabling GPS with a brief retry
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    if (modem.enableGPS()) {
+      SerialMon.println("GPS enabled.");
+      return;
+    }
+    delay(500);
   }
+  SerialMon.println("Failed to enable GPS.");
 }
 
 // Attempt to get a GPS fix within a timeout (in seconds)

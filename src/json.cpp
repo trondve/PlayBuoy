@@ -19,7 +19,13 @@ String buildJsonPayload(
   const char* firmwareVersion,
   float heading,
   uint32_t uptime,
-  String resetReason
+  String resetReason,
+  String operatorName,
+  String apn,
+  String ip,
+  int signalQuality,
+  float rtcBatteryVoltage,
+  float rtcWaterTemp
 ) {
   StaticJsonDocument<512> doc;
 
@@ -57,6 +63,18 @@ String buildJsonPayload(
 
   doc["uptime"] = uptime;
   doc["reset_reason"] = resetReason;
+
+  // RTC snapshot values for visibility
+  JsonObject rtc = doc.createNestedObject("rtc");
+  rtc["batteryVoltage"] = rtcBatteryVoltage;
+  rtc["waterTemp"] = rtcWaterTemp;
+
+  // Modem/network diagnostics
+  JsonObject net = doc.createNestedObject("net");
+  net["operator"] = operatorName;
+  net["apn"] = apn;
+  net["ip"] = ip;
+  net["signal"] = signalQuality;
 
   JsonObject alerts = doc.createNestedObject("alerts");
   alerts["anchorDrift"]     = rtcState.anchorDriftDetected;

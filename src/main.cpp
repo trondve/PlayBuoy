@@ -162,37 +162,45 @@ void setup() {
   esp_task_wdt_init(2700, true);
   esp_task_wdt_add(NULL); // Add current thread to WDT
 
-  // Initialize RTC with Europe/Oslo timezone (automatic DST)
+  // Initialize RTC timezone. We'll sync time from GPS, and if that fails, try HTTP Date header.
   configTzTime(TIMEZONE, NTP_SERVER);
-  SerialMon.println("RTC initialized with Europe/Oslo timezone (CET/CEST with DST)");
+  SerialMon.println("RTC timezone configured (CET/CEST)");
   
-  // Set a default time if NTP is not available (August 10, 2025, 10:00:00 CEST)
-  // This ensures we have a reasonable time even without GPS or NTP
-  struct timeval tv;
-  tv.tv_sec = 1754812800;  // August 10, 2025 10:00:00 CEST (UTC+2) = 08:00:00 UTC
-  tv.tv_usec = 0;
-  settimeofday(&tv, nullptr);
-  SerialMon.println("Set default RTC time: August 10, 2025 10:00:00 CEST");
+  // Do not overwrite RTC with a fixed default; retain time across deep sleep.
 
   // Defer modem power-on and serial init until needed (GPS or network)
 
-  if (!beginSensors()) SerialMon.println("Sensor init failed.");
+  // Measure battery early to avoid sensor bus activity influencing ADC
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
   // Accurate, quiet battery measurement (~3.1 seconds)
   SerialMon.println("=== BATTERY MEASUREMENT (quiet windows) ===");
   float stableBatteryVoltage = readBatteryVoltage();
   setStableBatteryVoltage(stableBatteryVoltage);
+  // Update RTC snapshot values for visibility in logs
+  rtcState.lastBatteryVoltage = stableBatteryVoltage;
+  float tempC = getWaterTemperature();
+  if (!isnan(tempC)) {
+    rtcState.lastWaterTemp = tempC;
+  }
   SerialMon.println("=== END BATTERY MEASUREMENT ===");
 
   checkBatteryChargeState();
 
-  logBatteryStatus();  // New battery status logging here
+  logBatteryStatus();  // Battery status
 
   if (handleUndervoltageProtection()) {
     // Device will deep sleep if battery critically low
   }
 
+  // Initialize the rest of sensors after battery measurement (less interference)
+  if (!beginSensors()) SerialMon.println("Sensor init failed.");
+  // After sensors are initialized, capture first valid temp into RTC snapshot
+  {
+    float t = getWaterTemperature();
+    if (!isnan(t)) rtcState.lastWaterTemp = t;
+  }
+  
   // OTA check will happen in loop() after cellular connection is established
 }
 
@@ -254,6 +262,14 @@ void loop() {
   uint32_t uptime = millis() / 1000; // seconds since boot
   String resetReason = getResetReasonString();
 
+  // Ensure time is valid before building JSON: if GPS failed or was skipped, try network time sync once more
+  if ((shouldGetNewGpsFix && !fix.success) || !shouldGetNewGpsFix) {
+    // If network is not up yet, we'll sync right after connecting below; here we just attempt if already valid
+    if (modem.isGprsConnected()) {
+      syncTimeFromNetwork();
+    }
+  }
+
   // Get current timestamp from RTC, with fallback to GPS time
   uint32_t currentTimestamp = time(NULL);
   if (currentTimestamp < 24 * 3600) {  // If RTC time is not valid
@@ -285,11 +301,21 @@ void loop() {
     FIRMWARE_VERSION,
     getHeadingDegrees(),
     uptime,           // <-- new
-    resetReason       // <-- new
+    resetReason,       // <-- new
+    String(""), String(""), String(""), 0, // net fields will be set later when connected
+    rtcState.lastBatteryVoltage,
+    rtcState.lastWaterTemp
   );
 
   SerialMon.println("JSON payload:");
   SerialMon.println(json);
+  // Print a human-friendly current local date/time
+  time_t nowTs = time(NULL);
+  if (nowTs >= 24 * 3600) {
+    struct tm lt; localtime_r(&nowTs, &lt);
+    char buf[64]; strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &lt);
+    SerialMon.printf("The current date and time is: %s\n", buf);
+  }
 
   // If booting from a pending OTA image, we consider reaching here as a successful run
   {
@@ -353,8 +379,16 @@ void loop() {
       networkConnected = testMultipleAPNs();
     }
     
-         // Check for firmware updates if network is connected
-     if (networkConnected) {
+    // If GPS failed or we skipped GPS, try to sync time via HTTP Date now that PDP is up
+    if ((shouldGetNewGpsFix && !fix.success) || !shouldGetNewGpsFix) {
+      if (syncTimeFromNetwork()) {
+        // Recompute currentTimestamp after successful time sync
+        SerialMon.println("Time synced from network; rebuilding timestamp for JSON");
+      }
+    }
+
+    // Check for firmware updates if network is connected
+    if (networkConnected) {
        SerialMon.printf(" OTA: OTA_SERVER = %s\n", OTA_SERVER);
        SerialMon.printf(" OTA: OTA_PATH = %s\n", OTA_PATH);
        SerialMon.printf(" OTA: NODE_ID = %s\n", NODE_ID);
@@ -365,9 +399,41 @@ void loop() {
        if (checkForFirmwareUpdate(baseUrl.c_str())) {
          // OTA update in progress, will restart on completion
        }
-     }
+    }
     
     if (networkConnected) {
+      // If we synced time from network just above, prefer to rebuild currentTimestamp now
+      uint32_t ts = time(NULL);
+      if (ts >= 24 * 3600) {
+        currentTimestamp = ts;
+      }
+      // Rebuild JSON so it includes updated timestamp and network diagnostics
+      String op = modem.getOperator();
+      String ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
+      int rssi = modem.getSignalQuality();
+      json = buildJsonPayload(
+        fix.latitude,
+        fix.longitude,
+        computeWaveHeight(),
+        computeWavePeriod(),
+        computeWaveDirection(),
+        computeWavePower(computeWaveHeight(), computeWavePeriod()),
+        getWaterTemperature(),
+        getStableBatteryVoltage(),
+        currentTimestamp,
+        NODE_ID,
+        NAME,
+        FIRMWARE_VERSION,
+        getHeadingDegrees(),
+        uptime,
+        resetReason,
+        op,
+        String(NETWORK_PROVIDER),
+        ipStr,
+        rssi,
+        rtcState.lastBatteryVoltage,
+        rtcState.lastWaterTemp
+      );
       bool success = sendJsonToServer(
         API_SERVER,
         API_PORT,
@@ -393,7 +459,7 @@ void loop() {
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
   delay(100);
 
-  // powerOffModem();
+  powerOffModem();
 
   esp_sleep_enable_timer_wakeup((uint64_t)sleepHours * 3600ULL * 1000000ULL);
   esp_deep_sleep_start();
