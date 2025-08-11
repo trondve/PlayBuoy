@@ -1,6 +1,6 @@
 {
   "version": "1.1.0",
-  "url": "https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/playbuoy-vatna.bin",
+  "url": "http://trondve.ddns.net/firmware/playbuoy-vatna.bin",
   "name": "Vatnakvamsvatnet",
   "node_id": "playbuoy-vatna",
   "description": "Firmware for Vatnakvamsvatnet buoy"

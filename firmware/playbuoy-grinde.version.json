@@ -1,6 +1,6 @@
 {
   "version": "1.1.0",
-  "url": "https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/playbuoy-grinde.bin",
+  "url": "http://trondve.ddns.net/firmware/playbuoy-grinde.bin",
   "name": "Litla Grindevatnet",
   "node_id": "playbuoy-grinde",
   "description": "Firmware for Litla Grindevatnet buoy"

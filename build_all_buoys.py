@@ -49,9 +49,9 @@ def update_config(buoy):
 #define API_ENDPOINT "/upload"
 #define API_KEY "super-secret-key-123"
 
-// OTA Configuration
-#define OTA_SERVER "raw.githubusercontent.com"
-#define OTA_PATH "/trondve/PlayBuoy/main/firmware"
+// OTA Configuration (HTTP testing server)
+#define OTA_SERVER "trondve.ddns.net"
+#define OTA_PATH "/firmware"
 
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"
@@ -73,7 +73,7 @@ def create_version_files():
         # Create JSON version file
         version_json = {
             "version": CURRENT_VERSION,
-            "url": f"https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/{buoy['node_id']}.bin",
+            "url": f"http://trondve.ddns.net/firmware/{buoy['node_id']}.bin",
             "name": buoy['name'],
             "node_id": buoy['node_id'],
             "description": f"Firmware for {buoy['name']} buoy"
@@ -182,11 +182,11 @@ def main():
             if file.endswith('.version') or file.endswith('.version.json'):
                 print(f"  - {file}")
     
-    print(f"\n🎯 Next steps:")
-    print(f"1. Upload the .bin files to your server")
-    print(f"2. Upload the .version files to your server")
-    print(f"3. Each buoy will check version before downloading firmware")
-    print(f"4. URLs will be: https://raw.githubusercontent.com/trondve/PlayBuoy/main/firmware/")
+        print(f"\n🎯 Next steps:")
+        print(f"1. Upload the .bin files to your server")
+        print(f"2. Upload the .version files to your server")
+        print(f"3. Each buoy will check version before downloading firmware")
+        print(f"4. URLs will be: http://trondve.ddns.net/firmware/")
 
 if __name__ == "__main__":
     main()
