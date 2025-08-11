@@ -10,9 +10,9 @@
 #define API_ENDPOINT "/upload"
 #define API_KEY "super-secret-key-123"
 
-// OTA Configuration (HTTP testing server)
-#define OTA_SERVER "trondve.ddns.net"
-#define OTA_PATH "/firmware"
+// OTA Configuration
+#define OTA_SERVER "raw.githubusercontent.com"
+#define OTA_PATH "/trondve/PlayBuoy/main/firmware"
 
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"
