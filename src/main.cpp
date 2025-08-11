@@ -196,10 +196,10 @@ void setup() {
   if (!beginSensors()) SerialMon.println("Sensor init failed.");
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-    // Enhanced battery measurement with staggered sampling (30 seconds total)
-  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (30 SECONDS STAGGERED) ===");
-  const int TOTAL_READINGS = 6;   // 6 readings over 30 seconds
-  const int DELAY_BETWEEN_READINGS = 5000;  // 5 seconds between readings
+  // Enhanced battery measurement with staggered sampling (~10 seconds total)
+  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (~10 SECONDS STAGGERED) ===");
+  const int TOTAL_READINGS = 3;   // 3 readings over ~9 seconds
+  const int DELAY_BETWEEN_READINGS = 3000;  // 3 seconds between readings
   float voltageReadings[TOTAL_READINGS];
   int validReadings = 0;
   
@@ -225,7 +225,7 @@ void setup() {
       SerialMon.printf("Reading %d: No valid quick readings\n", i + 1);
     }
     
-    delay(DELAY_BETWEEN_READINGS);  // 5 second delay between main readings
+    delay(DELAY_BETWEEN_READINGS);  // 3 second delay between main readings
   }
   
   float stableBatteryVoltage = 0.0f;
@@ -433,7 +433,7 @@ void loop() {
        SerialMon.printf(" OTA: OTA_PATH = %s\n", OTA_PATH);
        SerialMon.printf(" OTA: NODE_ID = %s\n", NODE_ID);
        
-       String baseUrl = "https://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID);
+       String baseUrl = "http://" + String(OTA_SERVER) + String(OTA_PATH) + "/" + String(NODE_ID);
        SerialMon.printf(" OTA: Constructed baseUrl: %s\n", baseUrl.c_str());
        
        if (checkForFirmwareUpdate(baseUrl.c_str())) {

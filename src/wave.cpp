@@ -21,12 +21,14 @@ const int SAMPLE_INTERVAL_MS = 1000;
 
 // Dynamically determine sample duration based on battery percent
 int getSampleDurationMs() {
-  float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
-  int percent = estimateBatteryPercent(voltage);
-  if (percent > 50) return 60000;      // 10 minutes
-  if (percent > 30) return 30000;      // 5 minutes
-  if (percent > 20) return 12000;      // 2 minutes
-  return 6000;                         // 1 minute
+  // TEMP: force 10 seconds during OTA troubleshooting
+  return 10000; // 10 seconds
+  // float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
+  // int percent = estimateBatteryPercent(voltage);
+  // if (percent > 50) return 60000;      // 60 seconds
+  // if (percent > 30) return 30000;      // 30 seconds
+  // if (percent > 20) return 12000;      // 12 seconds
+  // return 6000;                         // 6 seconds
 }
 
 int sampleCount = 0;

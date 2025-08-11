@@ -1,140 +1,103 @@
 #define TINY_GSM_MODEM_SIM7000
 #include "ota.h"
-#include "rtc_state.h"
 #include "config.h"
 #include <TinyGsmClient.h>
-#include <Update.h>
-#include <ArduinoJson.h>
 
 #define SerialMon Serial
 
-// Declare external modem from main.cpp
 extern TinyGsm modem;
 
-// Version comparison function
-int compareVersions(const String& version1, const String& version2) {
-  int v1[3] = {0, 0, 0};
-  int v2[3] = {0, 0, 0};
-  
-  // Parse version strings (format: "major.minor.patch")
-  sscanf(version1.c_str(), "%d.%d.%d", &v1[0], &v1[1], &v1[2]);
-  sscanf(version2.c_str(), "%d.%d.%d", &v2[0], &v2[1], &v2[2]);
-  
-  // Compare major version
-  if (v1[0] > v2[0]) return 1;
-  if (v1[0] < v2[0]) return -1;
-  
-  // Compare minor version
-  if (v1[1] > v2[1]) return 1;
-  if (v1[1] < v2[1]) return -1;
-  
-  // Compare patch version
-  if (v1[2] > v2[2]) return 1;
-  if (v1[2] < v2[2]) return -1;
-  
-  return 0; // Versions are equal
+static bool ensurePdpForHttp() {
+  if (modem.isGprsConnected()) return true;
+  return modem.gprsConnect(NETWORK_PROVIDER, "", "");
 }
 
-// Simple HTTP GET request using modem's built-in HTTP client
+static String extractVersionFromBody(const String& body) {
+  String trimmed = body; trimmed.trim();
+  if (trimmed.length() == 0) return "";
+  String candidate;
+  for (size_t i = 0; i < trimmed.length(); ++i) {
+    char c = trimmed[i];
+    if ((c >= '0' && c <= '9') || c == '.') candidate += c;
+    else if (candidate.length() > 0) break;
+  }
+  int a = candidate.indexOf('.');
+  int b = candidate.lastIndexOf('.');
+  if (a > 0 && b > a) return candidate;
+  return "";
+}
+
+static int compareVersions(const String& a, const String& b) {
+  auto parse = [](const String& v, int out[3]) {
+    for (int i = 0; i < 3; ++i) out[i] = 0;
+    int idx = 0, val = 0; bool has = false;
+    for (size_t i = 0; i < v.length() && idx < 3; ++i) {
+      char c = v[i];
+      if (c >= '0' && c <= '9') { has = true; val = val * 10 + (c - '0'); }
+      else if (c == '.') { out[idx++] = has ? val : 0; val = 0; has = false; }
+      else { break; }
+    }
+    if (idx < 3) out[idx] = has ? val : 0;
+  };
+  int va[3], vb[3]; parse(a, va); parse(b, vb);
+  for (int i = 0; i < 3; ++i) { if (va[i] > vb[i]) return 1; if (va[i] < vb[i]) return -1; }
+  return 0;
+}
+
+static String httpGetTinyGsm(const char* url) {
+  String u(url), host, path; uint16_t port = 80;
+  if (u.startsWith("http://")) u = u.substring(7);
+  else if (u.startsWith("https://")) u = u.substring(8);
+  int slash = u.indexOf('/');
+  if (slash > 0) { host = u.substring(0, slash); path = u.substring(slash); }
+  else { host = u; path = "/"; }
+  int colon = host.indexOf(':');
+  if (colon > 0) { port = (uint16_t)host.substring(colon + 1).toInt(); host = host.substring(0, colon); }
+
+  SerialMon.printf("HTTP GET Host=%s Port=%u Path=%s\n", host.c_str(), port, path.c_str());
+  if (!ensurePdpForHttp()) { SerialMon.println("No PDP"); return ""; }
+
+  TinyGsmClient client(modem);
+  if (!client.connect(host.c_str(), port)) { SerialMon.println("TCP connect failed"); return ""; }
+
+  String req;
+  req += String("GET ") + path + " HTTP/1.1\r\n";
+  req += String("Host: ") + host + "\r\n";
+  req += "User-Agent: TinyGSM-HTTP/1.0\r\n";
+  req += "Accept: */*\r\n";
+  req += "Connection: close\r\n\r\n";
+  client.print(req);
+
+  unsigned long t0 = millis(); String headers;
+  while (millis() - t0 < 15000 && client.connected()) {
+    while (client.available()) {
+      char c = client.read();
+      headers += c;
+      if (headers.endsWith("\r\n\r\n")) goto headers_done;
+    }
+    delay(5);
+  }
+headers_done:
+  String body; unsigned long t1 = millis();
+  while (millis() - t1 < 20000) {
+    while (client.available()) body += (char)client.read();
+    if (!client.connected()) break; delay(5);
+  }
+  client.stop();
+  int p = body.indexOf("\r\n\r\n"); if (p >= 0) body = body.substring(p + 4);
+  body.trim();
+  SerialMon.printf("HTTP body: '%s'\n", body.c_str());
+  return body;
+}
+
 String getServerFirmwareVersion(const char* versionUrl) {
   SerialMon.println("CHECKING FOR FIRMWARE UPDATES");
   SerialMon.printf("Version URL: %s\n", versionUrl);
   SerialMon.printf("Current firmware version: %s\n", FIRMWARE_VERSION);
   SerialMon.println("----------------------------------------");
-  
-  // Initialize HTTP service
-  SerialMon.println("Initializing HTTP service...");
-  modem.sendAT("+HTTPINIT");
-  if (modem.waitResponse() != 1) {
-    SerialMon.println("Failed to initialize HTTP service");
-    return "";
-  }
-  
-  // Set URL
-  SerialMon.printf("Setting URL: %s\n", versionUrl);
-  modem.sendAT("+HTTPPARA=\"URL\",\"" + String(versionUrl) + "\"");
-  if (modem.waitResponse() != 1) {
-    SerialMon.println("Failed to set URL parameter");
-    modem.sendAT("+HTTPTERM");
-    modem.waitResponse();
-    return "";
-  }
-  
-  // Set minimal headers to avoid 603 errors
-  SerialMon.println("Setting minimal headers...");
-  modem.sendAT("+HTTPPARA=\"USERDATA\",\"User-Agent: PlayBuoy/1.0\"");
-  if (modem.waitResponse() != 1) {
-    SerialMon.println("Warning: Custom headers not supported");
-  }
-  
-  // Set data size to 0 for GET request
-  SerialMon.println("Setting HTTP data size...");
-  modem.sendAT("+HTTPDATA=0,10000");
-  if (modem.waitResponse() != 1) {
-    SerialMon.println("Failed to set HTTP data size");
-    modem.sendAT("+HTTPTERM");
-    modem.waitResponse();
-    return "";
-  }
-  
-  // Execute HTTP GET request
-  SerialMon.println("Executing HTTP GET request...");
-  modem.sendAT("+HTTPACTION=0");
-  if (modem.waitResponse(30000L) != 1) {
-    SerialMon.println("HTTP GET request failed");
-    modem.sendAT("+HTTPTERM");
-    modem.waitResponse();
-    return "";
-  }
-  
-  // Read HTTP response
-  SerialMon.println("Reading HTTP response...");
-  modem.sendAT("+HTTPREAD");
-  if (modem.waitResponse(10000L) != 1) {
-    SerialMon.println("Failed to get HTTPREAD response");
-    modem.sendAT("+HTTPTERM");
-    modem.waitResponse();
-    return "";
-  }
-  
-  // Read data with proper timeout handling
-  String response = "";
-  unsigned long timeout = millis();
-  
-  // Wait for data to start arriving
-  while (!modem.stream.available() && millis() - timeout < 5000) {
-    delay(10);
-  }
-  
-  // Read all available data
-  while (modem.stream.available() || millis() - timeout < 10000) {
-    if (modem.stream.available()) {
-      char c = modem.stream.read();
-      response += c;
-      timeout = millis();
-    }
-  }
-  
-  SerialMon.printf("Raw response: '%s'\n", response.c_str());
-  SerialMon.printf("Response length: %d\n", response.length());
-  
-  // Terminate HTTP service
-  modem.sendAT("+HTTPTERM");
-  modem.waitResponse();
-  
-  // Parse response - look for version string
-  response.trim();
-  
-  // Check if response looks like a version string (x.x.x format)
-  if (response.length() > 0 && response.length() < 20) {
-    if (response.indexOf('.') > 0 && response.indexOf('.') < response.length() - 1) {
-      SerialMon.printf("Extracted version: %s\n", response.c_str());
-      return response;
-    }
-  }
-  
-  SerialMon.println("Invalid version format in response");
-  return "";
+  String body = httpGetTinyGsm(versionUrl);
+  if (body.length() == 0) return "";
+  return extractVersionFromBody(body);
 }
 
 bool downloadAndCheckVersion(const char* versionUrl) {
@@ -142,97 +105,22 @@ bool downloadAndCheckVersion(const char* versionUrl) {
   SerialMon.printf("Version URL: %s\n", versionUrl);
   SerialMon.printf("Current firmware version: %s\n", FIRMWARE_VERSION);
   SerialMon.println("----------------------------------------");
-  
   String serverVersion = getServerFirmwareVersion(versionUrl);
-  
-  if (serverVersion.length() == 0) {
-    SerialMon.println("Could not retrieve server version");
-    return false;
-  }
-  
+  if (serverVersion.length() == 0) { SerialMon.println("Could not retrieve server version"); return false; }
   SerialMon.printf("Server version retrieved: %s\n", serverVersion.c_str());
-  
-  int comparison = compareVersions(serverVersion, FIRMWARE_VERSION);
-  
-  SerialMon.printf("Version comparison: %s vs %s = %d\n", 
-                   serverVersion.c_str(), FIRMWARE_VERSION, comparison);
-  
-  if (comparison > 0) {
-    SerialMon.println("NEW FIRMWARE AVAILABLE!");
-    SerialMon.printf("Server: %s > Current: %s\n", serverVersion.c_str(), FIRMWARE_VERSION);
-    return true;
-  } else if (comparison == 0) {
-    SerialMon.println("Firmware is up to date");
-    SerialMon.printf("Server: %s = Current: %s\n", serverVersion.c_str(), FIRMWARE_VERSION);
-  } else {
-    SerialMon.println("Server version is older than current version");
-    SerialMon.printf("Server: %s < Current: %s\n", serverVersion.c_str(), FIRMWARE_VERSION);
-  }
-  
-  return false;
-}
-
-bool downloadAndInstallFirmware(const char* firmwareUrl) {
-  SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
-  
-  // For now, we'll need to implement a different approach for firmware download
-  // as the modem's HTTP client doesn't easily support large binary downloads
-  SerialMon.println("Firmware download via modem HTTP client not yet implemented");
-  SerialMon.println("This requires a different approach for large binary downloads");
-  
+  int cmp = compareVersions(serverVersion, FIRMWARE_VERSION);
+  SerialMon.printf("Version comparison: %s vs %s = %d\n", serverVersion.c_str(), FIRMWARE_VERSION, cmp);
+  if (cmp > 0) { SerialMon.println("NEW FIRMWARE AVAILABLE!"); return true; }
+  if (cmp == 0) SerialMon.println("Firmware is up to date"); else SerialMon.println("Server version is older");
   return false;
 }
 
 bool checkForFirmwareUpdate(const char* baseUrl) {
-  if (rtcState.firmwareUpdateAttempted) {
-    SerialMon.println("OTA already attempted this cycle. Skipping.");
-    return false;
-  }
-  
-  SerialMon.printf("OTA: Base URL received: %s\n", baseUrl);
-  
-  // Construct version URL (e.g., baseUrl + ".version")
   String versionUrl = String(baseUrl);
-  SerialMon.printf("OTA: Initial versionUrl: %s\n", versionUrl.c_str());
-  
-  if (versionUrl.endsWith(".bin")) {
-    versionUrl = versionUrl.substring(0, versionUrl.length() - 4) + ".version";
-    SerialMon.printf("OTA: URL ends with .bin, modified to: %s\n", versionUrl.c_str());
-  } else {
-    // For base URLs, append .version (not /version.json)
-    versionUrl += ".version";
-    SerialMon.printf("OTA: URL does not end with .bin, appended .version: %s\n", versionUrl.c_str());
-  }
-  
-  SerialMon.printf("OTA: Final version URL: %s\n", versionUrl.c_str());
-  
-  // Check if new version is available
-  if (!downloadAndCheckVersion(versionUrl.c_str())) {
-    return false;
-  }
-  
-  // Mark that we've attempted an update this cycle
-  markFirmwareUpdateAttempted();
-  
-  // Download and install the firmware
-  if (downloadAndInstallFirmware(baseUrl)) {
-    SerialMon.println("OTA update successful. Rebooting...");
-    delay(1000);
-    ESP.restart();
-    return true;
-  } else {
-    SerialMon.println("OTA update failed. Continuing with current firmware.");
-    return false;
-  }
+  if (versionUrl.endsWith(".bin")) versionUrl = versionUrl.substring(0, versionUrl.length() - 4) + ".version";
+  else versionUrl += ".version";
+  (void)downloadAndCheckVersion(versionUrl.c_str());
+  return false; // Version check only; install not implemented here
 }
 
-// Legacy function for backward compatibility
-bool checkAndPerformOTA(const char* url) {
-  return checkForFirmwareUpdate(url);
-}
 
-bool verifyFirmwareSignature(const uint8_t* firmware, size_t length, const char* signature) {
-  // TODO: Implement firmware signature verification
-  SerialMon.println("Firmware signature verification not implemented");
-  return true;
-}
