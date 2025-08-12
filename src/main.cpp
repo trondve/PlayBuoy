@@ -173,9 +173,14 @@ void setup() {
   // Measure battery early to avoid sensor bus activity influencing ADC
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-  // Accurate, quiet battery measurement (~3.1 seconds)
-  SerialMon.println("=== BATTERY MEASUREMENT (quiet windows) ===");
-  float stableBatteryVoltage = readBatteryVoltage();
+  // Enhanced staggered battery measurement for maximum accuracy (~60s)
+  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (120 SECONDS STAGGERED) ===");
+  float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/24, /*delayBetweenReadingsMs*/5000, /*quickReadsPerGroup*/3, /*minValidGroups*/12);
+  if (isnan(stableBatteryVoltage)) {
+    // Fallback to quiet windows method if enhanced fails
+    SerialMon.println("Enhanced measurement insufficient, falling back to quiet windows");
+    stableBatteryVoltage = readBatteryVoltage();
+  }
   setStableBatteryVoltage(stableBatteryVoltage);
   // Update RTC snapshot values for visibility in logs
   rtcState.lastBatteryVoltage = stableBatteryVoltage;

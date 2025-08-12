@@ -51,9 +51,35 @@ bool handleUndervoltageProtection() {
 }
 
 int estimateBatteryPercent(float voltage) {
-  if (voltage >= 4.2f) return 100;
-  if (voltage <= 3.0f) return 0;
-  return (int)(((voltage - 3.0f) / (4.2f - 3.0f)) * 100);
+  // User-provided OCV table: voltage at each integer percent 0..100
+  static const float ocvByPercent[101] = {
+    3.000f, 3.081f, 3.161f, 3.242f, 3.322f, 3.403f, 3.423f, 3.443f, 3.463f, 3.483f,
+    3.503f, 3.519f, 3.535f, 3.551f, 3.567f, 3.583f, 3.593f, 3.603f, 3.613f, 3.623f,
+    3.633f, 3.641f, 3.649f, 3.657f, 3.665f, 3.673f, 3.679f, 3.685f, 3.691f, 3.697f,
+    3.703f, 3.709f, 3.715f, 3.721f, 3.727f, 3.733f, 3.737f, 3.741f, 3.745f, 3.749f,
+    3.753f, 3.759f, 3.765f, 3.771f, 3.777f, 3.783f, 3.787f, 3.791f, 3.795f, 3.799f,
+    3.803f, 3.807f, 3.811f, 3.815f, 3.819f, 3.823f, 3.829f, 3.835f, 3.841f, 3.847f,
+    3.853f, 3.859f, 3.865f, 3.871f, 3.877f, 3.883f, 3.889f, 3.895f, 3.901f, 3.907f,
+    3.913f, 3.921f, 3.929f, 3.937f, 3.945f, 3.953f, 3.959f, 3.965f, 3.971f, 3.977f,
+    3.983f, 3.995f, 4.007f, 4.019f, 4.031f, 4.043f, 4.055f, 4.067f, 4.079f, 4.091f,
+    4.103f, 4.119f, 4.136f, 4.153f, 4.168f, 4.183f, 4.186f, 4.190f, 4.193f, 4.197f,
+    4.200f
+  };
+
+  if (voltage <= ocvByPercent[0]) return 0;
+  if (voltage >= ocvByPercent[100]) return 100;
+
+  int lo = 0, hi = 100;
+  while (hi - lo > 1) {
+    int mid = (lo + hi) / 2;
+    if (ocvByPercent[mid] <= voltage) lo = mid; else hi = mid;
+  }
+  float vLo = ocvByPercent[lo];
+  float vHi = ocvByPercent[hi];
+  float t = (vHi - vLo) > 1e-6f ? (voltage - vLo) / (vHi - vLo) : 0.0f;
+  int pct = (int)roundf(lo + t * (hi - lo));
+  if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+  return pct;
 }
 
 
