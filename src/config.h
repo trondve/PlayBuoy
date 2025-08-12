@@ -22,4 +22,4 @@
 #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // Power/ADC calibration
-#define BATTERY_CALIBRATION_FACTOR 1.1237f  // 4.165V / pre-cal mean 3.754375V (ignore first 8 samples)
+#define BATTERY_CALIBRATION_FACTOR 1.131418f  // 4.165V / pre-cal mean 3.754375V (ignore first 8 samples)
