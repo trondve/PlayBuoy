@@ -23,3 +23,11 @@
 
 // Power/ADC calibration
 #define BATTERY_CALIBRATION_FACTOR 1.131418f  // 4.165V / pre-cal mean 3.754375V (ignore first 8 samples)
+
+// Debug configuration
+// When enabled, the firmware will not enter deep sleep; instead it will stay awake
+// and wait in the run loop between cycles. The wait duration is forced to 3 hours.
+#define DEBUG_NO_DEEP_SLEEP 1
+
+// Optional SIM PIN (leave empty if not required)
+#define SIM_PIN ""

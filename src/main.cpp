@@ -173,7 +173,22 @@ void setup() {
   // Measure battery early to avoid sensor bus activity influencing ADC
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-  // Enhanced staggered battery measurement for maximum accuracy (~60s)
+  // Temporarily use a quick 1-second battery measurement while troubleshooting
+#if DEBUG_NO_DEEP_SLEEP
+  SerialMon.println("=== QUICK BATTERY MEASUREMENT (1 SECOND) ===");
+  unsigned long t0 = millis();
+  float stableBatteryVoltage = 0.0f;
+  int reads = 0;
+  while (millis() - t0 < 1000) {
+    float v = readBatteryVoltage();
+    if (v > 0.1f) { stableBatteryVoltage = v; reads++; }
+    delay(50);
+  }
+  if (reads == 0) {
+    stableBatteryVoltage = readBatteryVoltage();
+  }
+#else
+  // Enhanced staggered battery measurement for maximum accuracy (~60-120s)
   SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (120 SECONDS STAGGERED) ===");
   float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/24, /*delayBetweenReadingsMs*/5000, /*quickReadsPerGroup*/3, /*minValidGroups*/12);
   if (isnan(stableBatteryVoltage)) {
@@ -181,6 +196,7 @@ void setup() {
     SerialMon.println("Enhanced measurement insufficient, falling back to quiet windows");
     stableBatteryVoltage = readBatteryVoltage();
   }
+#endif
   setStableBatteryVoltage(stableBatteryVoltage);
   // Update RTC snapshot values for visibility in logs
   rtcState.lastBatteryVoltage = stableBatteryVoltage;
@@ -484,12 +500,29 @@ void loop() {
   }
   int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());  // Use stable voltage
   int sleepHours = determineSleepDuration(batteryPercent);
+#if DEBUG_NO_DEEP_SLEEP
+  // Force 3-hour cycle during debugging
+  sleepHours = 3;
+#endif
 
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
   delay(100);
 
   powerOffModem();
 
+#if DEBUG_NO_DEEP_SLEEP
+  SerialMon.println("DEBUG_NO_DEEP_SLEEP active: staying awake and delaying instead of deep sleep.");
+  // Stay awake but idle for the sleep duration, resetting WDT periodically
+  uint32_t remainingMs = (uint32_t)sleepHours * 3600UL * 1000UL;
+  const uint32_t chunkMs = 10000UL; // 10s chunks to keep logs responsive
+  while (remainingMs > 0) {
+    esp_task_wdt_reset();
+    uint32_t d = remainingMs > chunkMs ? chunkMs : remainingMs;
+    delay(d);
+    remainingMs -= d;
+  }
+#else
   esp_sleep_enable_timer_wakeup((uint64_t)sleepHours * 3600ULL * 1000000ULL);
   esp_deep_sleep_start();
+#endif
 }

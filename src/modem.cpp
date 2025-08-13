@@ -49,6 +49,8 @@ bool connectToNetwork(const char* apn) {
     }
     SerialMon.println(" AT communication successful");
 
+    // Use modem defaults (matches previously working configuration)
+
     // Wait for network registration
     SerialMon.println("Waiting for network registration...");
     esp_task_wdt_reset(); // Reset watchdog before network wait

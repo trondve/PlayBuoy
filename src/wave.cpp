@@ -1,5 +1,6 @@
 #include "wave.h"
 #include "sensors.h"
+#include "config.h"
 #include <stdlib.h>  // For malloc/free
 #include "esp_task_wdt.h"  // For watchdog timer
 #include "battery.h"  // For getStableBatteryVoltage
@@ -22,12 +23,17 @@ const int SAMPLE_INTERVAL_MS = 100; // 10 Hz
 
 // Dynamically determine sample duration based on battery percent
 int getSampleDurationMs() {
+#if DEBUG_NO_DEEP_SLEEP
+  // Temporary fast mode for troubleshooting: 1 second only
+  return 1000;
+#else
   // Dynamic duration based on battery percent (use stable voltage measured at startup)
   float voltage = getStableBatteryVoltage();
   int percent = estimateBatteryPercent(voltage);
   if (percent > 60) return 120000; // 120 s at 10 Hz => ~1200 samples
   if (percent > 40) return  90000; // 90 s  at 10 Hz => ~900 samples
   return 60000;                    // 60 s  at 10 Hz => ~600 samples
+#endif
 }
 
 int sampleCount = 0;

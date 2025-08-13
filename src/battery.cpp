@@ -1,5 +1,6 @@
 #include "battery.h"
 #include "power.h"
+#include "config.h"
 #include "rtc_state.h"
 #include <time.h>
 
@@ -41,10 +42,15 @@ bool handleUndervoltageProtection() {
   SerialMon.printf("Battery voltage: %.2f V\n", voltage);
 
   if (voltage < BATTERY_CRITICAL_VOLTAGE) {
-    SerialMon.println("Battery undervoltage detected, entering long deep sleep.");
+    SerialMon.println("Battery undervoltage detected.");
+#if DEBUG_NO_DEEP_SLEEP
+    SerialMon.println("DEBUG_NO_DEEP_SLEEP active: skipping deep sleep on undervoltage.");
+#else
+    SerialMon.println("Entering long deep sleep due to undervoltage.");
     delay(100);
     esp_sleep_enable_timer_wakeup((uint64_t)BATTERY_UNDERVOLTAGE_SLEEP_HOURS * 3600ULL * 1000000ULL);
     esp_deep_sleep_start();
+#endif
     return true;
   }
   return false;
