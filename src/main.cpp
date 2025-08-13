@@ -228,7 +228,35 @@ void loop() {
   recordWaveData();
   logWaveStats();
 
-  // 2) Then attempt GPS (powers modem only if needed); disable GNSS immediately after
+  // 2) Connect to network and sync time BEFORE GPS (this helps TTFF dramatically)
+  bool networkConnected = false;
+  bool timeSynced = false;
+  
+  if (shouldGetNewGpsFix) {
+    SerialMon.println("Connecting to network before GPS fix to enable time sync and XTRA...");
+    ensureModemReady();
+    networkConnected = connectToNetwork(NETWORK_PROVIDER);
+    
+    // If regular connection fails, try APN testing
+    if (!networkConnected) {
+      SerialMon.println("Regular connection failed, testing multiple APNs...");
+      networkConnected = testMultipleAPNs();
+    }
+    
+    if (networkConnected) {
+      SerialMon.println("Network connected, syncing time from network...");
+      timeSynced = syncTimeFromNetwork();
+      if (timeSynced) {
+        SerialMon.println("✓ Time synced from network - this will help GPS TTFF");
+      } else {
+        SerialMon.println("⚠ Time sync failed, but network is available for XTRA");
+      }
+    } else {
+      SerialMon.println("Network connection failed, proceeding without time sync and XTRA");
+    }
+  }
+
+  // 3) Then attempt GPS (now with valid time and potentially XTRA)
   GpsFixResult fix;
   if (shouldGetNewGpsFix) {
     bool isFirstFix = (rtcState.lastGpsFixTime == 0);
@@ -335,20 +363,11 @@ void loop() {
 
   // Try to send any buffered unsent JSON first
   bool bufferedDataSent = false;
-  bool networkConnected = false;
   bool shouldProceedWithNewData = true;
   
   if (hasUnsentJson()) {
     SerialMon.println("Attempting to resend buffered unsent data...");
-    ensureModemReady();
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
-    
-    // If regular connection fails, try APN testing
-    if (!networkConnected) {
-      SerialMon.println("Regular connection failed, testing multiple APNs...");
-      networkConnected = testMultipleAPNs();
-    }
-    
+    // Network should already be connected from GPS attempt above
     if (networkConnected) {
       bool success = sendJsonToServer(
         API_SERVER,
@@ -367,7 +386,7 @@ void loop() {
         shouldProceedWithNewData = false;
       }
     } else {
-      SerialMon.println("Network connection failed for buffered data.");
+      SerialMon.println("Network not connected for buffered data.");
       markUploadFailed();
       shouldProceedWithNewData = false;
     }
@@ -375,20 +394,25 @@ void loop() {
 
   // Only proceed with new data if buffered data was handled successfully
   if (shouldProceedWithNewData) {
-    ensureModemReady();
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
-    
-    // If regular connection fails, try APN testing
+    // Network should already be connected from GPS attempt above
     if (!networkConnected) {
-      SerialMon.println("Regular connection failed, testing multiple APNs...");
-      networkConnected = testMultipleAPNs();
+      SerialMon.println("Reconnecting to network for data upload...");
+      ensureModemReady();
+      networkConnected = connectToNetwork(NETWORK_PROVIDER);
+      
+      // If regular connection fails, try APN testing
+      if (!networkConnected) {
+        SerialMon.println("Regular connection failed, testing multiple APNs...");
+        networkConnected = testMultipleAPNs();
+      }
     }
     
-    // If GPS failed or we skipped GPS, try to sync time via HTTP Date now that PDP is up
+    // Time should already be synced from GPS attempt above, but try again if needed
     if ((shouldGetNewGpsFix && !fix.success) || !shouldGetNewGpsFix) {
-      if (syncTimeFromNetwork()) {
+      if (!timeSynced && syncTimeFromNetwork()) {
         // Recompute currentTimestamp after successful time sync
         SerialMon.println("Time synced from network; rebuilding timestamp for JSON");
+        timeSynced = true;
       }
     }
 
