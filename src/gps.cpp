@@ -30,7 +30,7 @@ static bool setModemClockFromRtc() {
 // 0) GNSS off
 static bool gnssOff() { return sendAT("+CGNSPWR=0"); }
 
-// 1) PDP up for time/XTRA
+// 1) PDP up for time sync only
 static bool pdpUp(const char* apn) {
   sendAT("+CGATT=1", 10000);
   sendAT(String("+CGDCONT=1,\"IP\",\"") + apn + "\"", 3000);
@@ -40,34 +40,7 @@ static bool pdpUp(const char* apn) {
   return modem.isGprsConnected();
 }
 
-// 2) Enable XTRA, download to /customer, import and report validity
-static bool fetchXtra() {
-  sendAT("+CGNSXTRA=1", 3000);
-  if (!sendAT("+HTTPINIT", 5000)) return false;
-  const char* urls[] = {
-    "http://xtrapath1.izatcloud.net/xtra3grc.bin",
-    "http://xtrapath2.izatcloud.net/xtra3grc.bin",
-    "http://xtrapath3.izatcloud.net/xtra3grc.bin"
-  };
-  bool ok = false;
-  for (int i = 0; i < 3 && !ok; i++) {
-    String cmd = String("+HTTPTOFS=\"") + urls[i] + "\",\"/customer/xtra3grc.bin\"";
-    if (sendAT(cmd, 70000)) {
-      modem.sendAT("+HTTPTOFSRL?");
-      if (modem.waitResponse(3000) == 1) {
-        String r = modem.stream.readString();
-        if (r.indexOf("200") != -1) ok = true;
-      }
-    }
-  }
-  sendAT("+HTTPTERM", 3000);
-  if (!ok) return false;
-  if (!sendAT("+CGNSCPY", 10000)) return false; // import
-  sendAT("+CGNSXTRA", 3000); // execution: prints validity window per manual
-  return true;
-}
-
-// 3) Disconnect data fully before GNSS
+// 2) Disconnect data fully before GNSS
 static void pdpDown() {
   sendAT("+CIPSHUT", 5000);
   sendAT("+CGACT=0,1", 5000);
@@ -75,7 +48,7 @@ static void pdpDown() {
   sendAT("+CGATT=0", 5000);
 }
 
-// 4) Configure constellations/URCs (best-effort)
+// 3) Configure constellations/URCs (best-effort)
 static void gnssConfig() {
   sendAT("+CGNSMOD=1,1,1,1", 5000); // GPS, GLONASS, BEIDOU, GALILEO
   sendAT("+CGNSCFG=1", 3000);       // optional routing
@@ -83,7 +56,7 @@ static void gnssConfig() {
   sendAT("+CGNSURC=1", 3000);       // URC on fix
 }
 
-// 5) GNSS on
+// 4) GNSS on
 static bool gnssOn() { return sendAT("+CGNSPWR=1", 3000); }
 
 // Public minimal API
@@ -96,24 +69,23 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
   // 0
   gnssOff();
 
-  // 1 time + PDP
+  // 1 time sync only
   if (pdpUp(NETWORK_PROVIDER)) {
     setModemClockFromRtc();
-    // 2 XTRA
-    fetchXtra();
   }
 
-  // 3 disconnect PDP for GNSS
+  // 2 disconnect PDP for GNSS
   pdpDown();
 
-  // 4 config
+  // 3 config
   gnssConfig();
 
-  // 5 power GNSS
+  // 4 power GNSS
   if (!gnssOn()) return r;
 
-  // 6 wait for fix (poll +CGNSINF; use TinyGSM quick parse via getGPS)
+  // 5 wait for fix (poll +CGNSINF; use TinyGSM quick parse via getGPS)
   uint32_t start = millis();
+  uint32_t nextProgressSec = 30;
   while ((millis() - start) < timeoutSec * 1000UL) {
     float lat, lon;
     if (modem.getGPS(&lat, &lon)) {
@@ -124,17 +96,34 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
         r.fixTimeEpoch = mktime(&t);
       }
       break;
+          }
+      
+      uint32_t elapsedSec = (millis() - start) / 1000UL;
+      if (elapsedSec >= nextProgressSec) {
+        if (elapsedSec >= 60) {
+          uint32_t minutes = elapsedSec / 60;
+          uint32_t seconds = elapsedSec % 60;
+          if (seconds == 0) {
+            SerialMon.printf("Searched for GPS fix for %lu minute%s\n", minutes, minutes == 1 ? "" : "s");
+          } else {
+            SerialMon.printf("Searched for GPS fix for %lu minute%s and %lu second%s\n", minutes, minutes == 1 ? "" : "s", seconds, seconds == 1 ? "" : "s");
+          }
+        } else {
+          SerialMon.printf("Searched for GPS fix for %lu seconds\n", elapsedSec);
+        }
+        nextProgressSec += 30;
+      }
+      
+      delay(1000);
     }
-    delay(1000);
-  }
 
-  // 7 GNSS off here; main will bring PDP up to upload
+  // 6 GNSS off here; main will bring PDP up to upload
   gnssOff();
   return r;
 }
 
 uint16_t getGpsFixTimeout(bool isFirstFix) {
-  // Fixed 30 min per request (could adapt later using RTC age)
+  // Set to 30 minutes for robust fix attempts in tough conditions
   (void)isFirstFix; return 1800;
 }
 

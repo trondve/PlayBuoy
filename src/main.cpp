@@ -8,6 +8,8 @@
 #include <math.h>
 #include <algorithm>
 
+
+
 // Project modules
 #include "wave.h" // Wave data processing
 #include "power.h" // Power management and battery monitoring
@@ -139,7 +141,7 @@ String getResetReasonString() {
 }
 
 void setup() {
-  SerialMon.begin(115200);
+  Serial.begin(115200);
   delay(3000);
   logWakeupReason();  // Log why we woke up
 
@@ -168,35 +170,23 @@ void setup() {
   
   // Do not overwrite RTC with a fixed default; retain time across deep sleep.
 
+  // One-time multi-GNSS config at boot (non-intrusive if already set)
+  ensureModemReady();
+  modem.sendAT("+CGNSMOD=1,1,1,1");
+  modem.waitResponse(1000);
+
   // Defer modem power-on and serial init until needed (GPS or network)
 
   // Measure battery early to avoid sensor bus activity influencing ADC
   if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
 
-  // Temporarily use a quick 1-second battery measurement while troubleshooting
-#if DEBUG_NO_DEEP_SLEEP
-  SerialMon.println("=== QUICK BATTERY MEASUREMENT (1 SECOND) ===");
-  unsigned long t0 = millis();
-  float stableBatteryVoltage = 0.0f;
-  int reads = 0;
-  while (millis() - t0 < 1000) {
-    float v = readBatteryVoltage();
-    if (v > 0.1f) { stableBatteryVoltage = v; reads++; }
-    delay(50);
-  }
-  if (reads == 0) {
-    stableBatteryVoltage = readBatteryVoltage();
-  }
-#else
-  // Enhanced staggered battery measurement for maximum accuracy (~60-120s)
-  SerialMon.println("=== ENHANCED BATTERY MEASUREMENT (120 SECONDS STAGGERED) ===");
-  float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/24, /*delayBetweenReadingsMs*/5000, /*quickReadsPerGroup*/3, /*minValidGroups*/12);
+  // Battery measurement (~5 minutes): 30 groups × 10s spacing ≈ 5 minutes total
+  SerialMon.println("=== BATTERY MEASUREMENT (~5 MINUTES) ===");
+  float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/30, /*delayBetweenReadingsMs*/10000, /*quickReadsPerGroup*/3, /*minValidGroups*/12);
   if (isnan(stableBatteryVoltage)) {
-    // Fallback to quiet windows method if enhanced fails
     SerialMon.println("Enhanced measurement insufficient, falling back to quiet windows");
     stableBatteryVoltage = readBatteryVoltage();
   }
-#endif
   setStableBatteryVoltage(stableBatteryVoltage);
   // Update RTC snapshot values for visibility in logs
   rtcState.lastBatteryVoltage = stableBatteryVoltage;
@@ -241,7 +231,9 @@ void loop() {
   }
 
   // 1) Collect wave data first (modem is still off for lower power)
+  esp_task_wdt_reset();
   recordWaveData();
+  esp_task_wdt_reset();
   logWaveStats();
 
   // 2) Connect to network and sync time BEFORE GPS (this helps TTFF dramatically)
@@ -249,9 +241,12 @@ void loop() {
   bool timeSynced = false;
   
   if (shouldGetNewGpsFix) {
-    SerialMon.println("Connecting to network before GPS fix to enable time sync and XTRA...");
+    SerialMon.println("Connecting to network before GPS fix to enable time sync...");
+    SerialMon.println("=== CRITICAL: Starting modem initialization ===");
     ensureModemReady();
+    SerialMon.println("=== CRITICAL: Modem ready, attempting network connection ===");
     networkConnected = connectToNetwork(NETWORK_PROVIDER);
+    SerialMon.printf("=== CRITICAL: Network connection result: %s ===\n", networkConnected ? "SUCCESS" : "FAILED");
     
     // If regular connection fails, try APN testing
     if (!networkConnected) {
@@ -265,14 +260,15 @@ void loop() {
       if (timeSynced) {
         SerialMon.println("✓ Time synced from network - this will help GPS TTFF");
       } else {
-        SerialMon.println("⚠ Time sync failed, but network is available for XTRA");
+        SerialMon.println("⚠ Time sync failed, but network is available");
       }
     } else {
-      SerialMon.println("Network connection failed, proceeding without time sync and XTRA");
+      SerialMon.println("Network connection failed, proceeding without time sync");
     }
   }
 
-  // 3) Then attempt GPS (now with valid time and potentially XTRA)
+  // 3) Then attempt GPS (now with valid time)
+  SerialMon.println("Starting GNSS fix procedure...");
   GpsFixResult fix;
   if (shouldGetNewGpsFix) {
     bool isFirstFix = (rtcState.lastGpsFixTime == 0);
@@ -320,6 +316,7 @@ void loop() {
   }
 
   // Get current timestamp from RTC, with fallback to GPS time
+  SerialMon.println("Building JSON payload...");
   uint32_t currentTimestamp = time(NULL);
   if (currentTimestamp < 24 * 3600) {  // If RTC time is not valid
     if (rtcState.lastGpsFixTime > 1000000000) {
@@ -332,7 +329,7 @@ void loop() {
       SerialMon.println("No valid timestamp available, using 0");
     }
   } else {
-    SerialMon.printf("Using RTC timestamp: %lu\n", currentTimestamp);
+    SerialMon.printf("Using RTC timestamp (UTC epoch): %lu\n", currentTimestamp);
   }
 
   String json = buildJsonPayload(
@@ -479,12 +476,14 @@ void loop() {
         rtcState.lastBatteryVoltage,
         rtcState.lastWaterTemp
       );
+      SerialMon.println("=== CRITICAL: Attempting JSON upload ===");
       bool success = sendJsonToServer(
         API_SERVER,
         API_PORT,
         API_ENDPOINT,
         json
       );
+      SerialMon.printf("=== CRITICAL: JSON upload result: %s ===\n", success ? "SUCCESS" : "FAILED");
       if (success) {
         markUploadSuccess();
         clearUnsentJson();
@@ -508,6 +507,8 @@ void loop() {
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
   delay(100);
 
+
+  
   powerOffModem();
 
 #if DEBUG_NO_DEEP_SLEEP

@@ -38,6 +38,9 @@ typedef struct {
   // Data buffering for failed uploads
   char lastUnsentJson[512];         // Buffer for last unsent JSON payload
   bool hasUnsentData;               // Flag if there is unsent data
+
+
+
 } rtc_state_t;
 
 //

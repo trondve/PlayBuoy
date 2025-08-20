@@ -19,6 +19,9 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .anchorDriftDetected = false,
   .anchorDriftCounter = 0,
   .chargingProblemDetected = false,
+  .lastUnsentJson = {0},
+  .hasUnsentData = false,
+
 };
 
 // Haversine formula to calculate distance in meters between two lat/lon points
@@ -63,6 +66,7 @@ void logRtcState() {
   SerialMon.printf("- Over temp detected: %s\n", rtcState.overTempDetected ? "YES" : "NO");
   SerialMon.printf("- Firmware update attempted: %s\n", rtcState.firmwareUpdateAttempted ? "YES" : "NO");
   SerialMon.printf("- Last upload failed: %s\n", rtcState.lastUploadFailed ? "YES" : "NO");
+
 }
 
 void updateLastGpsFix(float lat, float lon, uint32_t epochSec) {

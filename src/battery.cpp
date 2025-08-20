@@ -9,7 +9,7 @@
 #define CHARGE_THRESHOLD       3.7f
 #define CHARGE_HYSTERESIS      0.03f
 
-#define BATTERY_CRITICAL_VOLTAGE 3.00f
+#define BATTERY_CRITICAL_VOLTAGE 3.00f  // Re-enabled but will only print voltage, not sleep
 #define BATTERY_UNDERVOLTAGE_SLEEP_HOURS 168
 
 static bool isCharging = false;
@@ -41,18 +41,15 @@ bool handleUndervoltageProtection() {
   float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
   SerialMon.printf("Battery voltage: %.2f V\n", voltage);
 
+  // Undervoltage protection (compile-time optional)
+#ifdef BATTERY_CRITICAL_VOLTAGE
   if (voltage < BATTERY_CRITICAL_VOLTAGE) {
-    SerialMon.println("Battery undervoltage detected.");
-#if DEBUG_NO_DEEP_SLEEP
-    SerialMon.println("DEBUG_NO_DEEP_SLEEP active: skipping deep sleep on undervoltage.");
-#else
-    SerialMon.println("Entering long deep sleep due to undervoltage.");
-    delay(100);
-    esp_sleep_enable_timer_wakeup((uint64_t)BATTERY_UNDERVOLTAGE_SLEEP_HOURS * 3600ULL * 1000000ULL);
-    esp_deep_sleep_start();
-#endif
+    SerialMon.println("WARNING: Battery undervoltage detected!");
+    SerialMon.printf("Current voltage: %.3f V (threshold: %.2f V)\n", voltage, BATTERY_CRITICAL_VOLTAGE);
+    SerialMon.println("Continuing operation - no deep sleep triggered.");
     return true;
   }
+#endif
   return false;
 }
 
@@ -210,18 +207,18 @@ int determineSleepDuration(int batteryPercent) {
   SerialMon.printf("Summer season detected (month %d)\n", month);
   // May–September: use battery-based logic
   if (batteryPercent > 80) {
-    SerialMon.printf("Summer mode: battery >80%%, sleeping 3 hours\n");
-    return 3;          // minimum 3 hours
+    SerialMon.printf("Summer mode: battery >80%%, sleeping 1 hours\n");
+    return 1;          // minimum 3 hours
   }
-  if (batteryPercent > 70) return 6;          // 6 hours
-  if (batteryPercent > 60) return 8;          // 8 hours
-  if (batteryPercent > 50) return 10;         // 10 hours  
-  if (batteryPercent > 40) return 12;         // 12 hours
-  if (batteryPercent > 30) return 24;         // 1 day (24 hours)
-  if (batteryPercent > 20) return 48;         // 2 days (48 hours)
-  if (batteryPercent > 15) return 168;        // 7 days (168 hours)
-  if (batteryPercent > 10) return 720;        // 1 month (720 hours)
-  return 1460;                                // 2 month (1460 hours)
+  if (batteryPercent > 70) return 1;          // 6 hours
+  if (batteryPercent > 60) return 1;          // 8 hours
+  if (batteryPercent > 50) return 1;         // 10 hours  
+  if (batteryPercent > 40) return 1;         // 12 hours
+  if (batteryPercent > 30) return 1;         // 1 day (24 hours)
+  if (batteryPercent > 20) return 1;         // 2 days (48 hours)
+  if (batteryPercent > 15) return 1;        // 7 days (168 hours)
+  if (batteryPercent > 10) return 1;        // 1 month (720 hours)
+  return 1;                                // 2 month (1460 hours)
 }
 
 // New function to log battery voltage and estimated percentage

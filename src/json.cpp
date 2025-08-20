@@ -3,6 +3,8 @@
 #include "rtc_state.h"
 #include "config.h"
 #include "sensors.h"
+#include "power.h"
+#include <time.h>
 
 String buildJsonPayload(
   float lat,
@@ -27,11 +29,12 @@ String buildJsonPayload(
   float rtcBatteryVoltage,
   float rtcWaterTemp
 ) {
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
 
   doc["nodeId"] = nodeId;
   doc["name"] = name;
   doc["version"] = firmwareVersion;
+  // Send timestamp as Unix epoch integer (UTC)
   doc["timestamp"] = timestamp;
   doc["lat"] = lat;
   doc["lon"] = lon;
@@ -44,6 +47,14 @@ String buildJsonPayload(
 
   doc["temp"] = waterTemp;
   doc["battery"] = batteryVoltage;
+  // Include pre-calibrated (raw) voltage and calibration factor
+  {
+    float f = getBatteryCalibrationFactor();
+    float preCal = batteryVoltage;
+    if (f > 1e-6f) preCal = batteryVoltage / f;
+    doc["battery_precal"] = preCal;
+    doc["battery_cal_factor"] = f;
+  }
 
   // Flag invalid temperature
   if (isnan(waterTemp)) {

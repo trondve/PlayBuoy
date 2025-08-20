@@ -25,6 +25,10 @@ static float calibrationFactor = BATTERY_CALIBRATION_FACTOR;
 static float calibrationFactor = 1.0f;
 #endif
 
+float getBatteryCalibrationFactor() {
+  return calibrationFactor;
+}
+
 // Low-level: read one ADC sample and convert to voltage. No logging.
 float readBatteryVoltageSample() {
   // Use calibrated Arduino helper to get mV at the ADC pin, then scale by divider

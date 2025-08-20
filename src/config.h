@@ -1,5 +1,5 @@
 // Configuration - Update these values for your specific setup
-#define NODE_ID "playbuoy-vatna"
+#define NODE_ID "playbuoy_vatna"
 #define NAME "Vatnakvamsvatnet"
 #define FIRMWARE_VERSION "1.1.1"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
@@ -17,17 +17,19 @@
 // Network Configuration
 #define NETWORK_PROVIDER "telenor"
 
+// DNS Configuration (optional). Enable to override network-provided DNS.
+// Set USE_CUSTOM_DNS to 1 to use the servers below; set back to 0 to revert.
+#define USE_CUSTOM_DNS 1
+#define DNS_PRIMARY "1.1.1.1"
+#define DNS_SECONDARY "8.8.8.8"
+
 // Time Configuration
 #define NTP_SERVER "no.pool.ntp.org"
 #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // Power/ADC calibration
-#define BATTERY_CALIBRATION_FACTOR 1.131418f  // 4.165V / pre-cal mean 3.754375V (ignore first 8 samples)
+#define BATTERY_CALIBRATION_FACTOR 0.500243f
 
-// Debug configuration
-// When enabled, the firmware will not enter deep sleep; instead it will stay awake
-// and wait in the run loop between cycles. The wait duration is forced to 3 hours.
-#define DEBUG_NO_DEEP_SLEEP 1
 
 // Optional SIM PIN (leave empty if not required)
 #define SIM_PIN ""

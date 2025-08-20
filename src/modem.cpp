@@ -49,6 +49,8 @@ bool connectToNetwork(const char* apn) {
     }
     SerialMon.println(" AT communication successful");
 
+    // (Custom DNS will be applied after IP is obtained)
+
     // Use modem defaults (matches previously working configuration)
 
     // Wait for network registration
@@ -110,6 +112,12 @@ bool connectToNetwork(const char* apn) {
     SerialMon.println(" Cellular network connected.");
     IPAddress localIP = modem.localIP();
     SerialMon.printf("Local IP: %d.%d.%d.%d\n", localIP[0], localIP[1], localIP[2], localIP[3]);
+#if USE_CUSTOM_DNS
+    // Apply DNS settings now that IP/PDP is up
+    SerialMon.println("Applying custom DNS...");
+    modem.sendAT(String("+CDNSCFG=\"") + DNS_PRIMARY + "\",\"" + DNS_SECONDARY + "\"" );
+    delay(100);
+#endif
     return true;
   }
   return false;
