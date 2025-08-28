@@ -66,8 +66,9 @@ static bool bringUpPDP(const char* apn) {
     if (sendAT("AT+CNACT?", &r)) {
       int ipIdx = r.indexOf("+CNACT: 1,\"");
       if (ipIdx >= 0) {
-        int q = r.indexOf('\"', ipIdx + 12);
-        String ip = r.substring(ipIdx + 12, q);
+        int firstQ = r.indexOf('"', ipIdx);
+        int secondQ = (firstQ >= 0) ? r.indexOf('"', firstQ + 1) : -1;
+        String ip = (firstQ >= 0 && secondQ > firstQ) ? r.substring(firstQ + 1, secondQ) : String("");
         if (ip.length() && ip != "0.0.0.0") {
           SerialMon.print("PDP ACTIVE ✅  IP: "); SerialMon.println(ip);
           return true;
@@ -85,10 +86,13 @@ static void tearDownPDP() {
   if (!sendAT("AT+CNACT=0,0", &dummy, 5000)) {
     sendAT("AT+CNACT=0", nullptr, 5000);
   }
+  delay(400);
   sendAT("AT+CGACT=0,1", nullptr, 5000);
+  delay(400);
   sendAT("AT+CGATT=0",   nullptr, 5000);
+  delay(400);
   sendAT("AT+CIPSHUT",   nullptr, 8000);
-  delay(200);
+  delay(400);
 }
 
 // ---------- Time helpers ----------

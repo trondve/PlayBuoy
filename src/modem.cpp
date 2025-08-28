@@ -33,6 +33,8 @@ bool connectToNetwork(const char* apn) {
     // Initialize modem
     SerialMon.println("Initializing modem...");
     modem.init();
+    // Guard: give UART/modem a moment before first AT test
+    delay(2500);
     
     // Test basic communication first
     SerialMon.println("Testing AT communication...");

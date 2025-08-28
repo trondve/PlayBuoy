@@ -169,38 +169,38 @@ int determineSleepDuration(int batteryPercent) {
     SerialMon.printf("Winter season detected (month %d)\n", month);
     
     // Winter battery protection strategy
-    if (batteryPercent >= 35) {
+    if (batteryPercent >= 40) {
       // Wake up once daily at noon (battery 35% - 100%)
       int hoursToNoon = 12 - hour;
       if (hoursToNoon <= 0) {
         hoursToNoon += 24;  // Next day at noon
       }
-      SerialMon.printf("Winter mode: battery %d%% (35-100%%), waking daily at noon, sleeping %d hours\n", batteryPercent, hoursToNoon);
+      SerialMon.printf("Winter mode: battery %d%% (40-100%%), waking daily at noon, sleeping %d hours\n", batteryPercent, hoursToNoon);
       return hoursToNoon;
-    } else if (batteryPercent >= 30) {
+    } else if (batteryPercent >= 35) {
       // Wake up every 2 days
-      SerialMon.printf("Winter mode: battery %d%% (30-34%%), sleeping 48 hours (2 days)\n", batteryPercent);
-      return 48;
+      SerialMon.printf("Winter mode: battery %d%% (30-34%%), sleeping 336 hours (14 days)\n", batteryPercent);
+      return 336;
     } else if (batteryPercent >= 25) {
       // Wake up every 3 days
-      SerialMon.printf("Winter mode: battery %d%% (25-29%%), sleeping 72 hours (3 days)\n", batteryPercent);
-      return 72;
+      SerialMon.printf("Winter mode: battery %d%% (25-29%%), sleeping 720 hours (30 days)\n", batteryPercent);
+      return 720;
     } else if (batteryPercent >= 20) {
       // Wake up every 7 days
-      SerialMon.printf("Winter mode: battery %d%% (20-24%%), sleeping 168 hours (7 days)\n", batteryPercent);
-      return 168;
+      SerialMon.printf("Winter mode: battery %d%% (20-24%%), sleeping 1056 hours (45 days)\n", batteryPercent);
+      return 1056;
     } else if (batteryPercent >= 15) {
       // Wake up every 14 days
-      SerialMon.printf("Winter mode: battery %d%% (15-19%%), sleeping 336 hours (14 days)\n", batteryPercent);
-      return 336;
+      SerialMon.printf("Winter mode: battery %d%% (15-19%%), sleeping 1460 hours (60 days)\n", batteryPercent);
+      return 1460;
     } else if (batteryPercent >= 10) {
       // Wake up every 30 days
-      SerialMon.printf("Winter mode: battery %d%% (10-14%%), sleeping 720 hours (30 days)\n", batteryPercent);
-      return 720;
+      SerialMon.printf("Winter mode: battery %d%% (10-14%%), sleeping 1796 hours (75 days)\n", batteryPercent);
+      return 1796;
     } else {
       // Wake up every 60 days (battery below 10%)
-      SerialMon.printf("Winter mode: battery %d%% (<10%%), sleeping 1440 hours (60 days)\n", batteryPercent);
-      return 1440;
+      SerialMon.printf("Winter mode: battery %d%% (<10%%), sleeping 2180 hours (90 days)\n", batteryPercent);
+      return 2180;
     }
   }
 
@@ -208,17 +208,17 @@ int determineSleepDuration(int batteryPercent) {
   // May–September: use battery-based logic
   if (batteryPercent > 80) {
     SerialMon.printf("Summer mode: battery >80%%, sleeping 1 hours\n");
-    return 1;          // minimum 3 hours
+    return 3;          // minimum 3 hours
   }
-  if (batteryPercent > 70) return 1;          // 6 hours
-  if (batteryPercent > 60) return 1;          // 8 hours
-  if (batteryPercent > 50) return 1;         // 10 hours  
-  if (batteryPercent > 40) return 1;         // 12 hours
-  if (batteryPercent > 30) return 1;         // 1 day (24 hours)
-  if (batteryPercent > 20) return 1;         // 2 days (48 hours)
-  if (batteryPercent > 15) return 1;        // 7 days (168 hours)
-  if (batteryPercent > 10) return 1;        // 1 month (720 hours)
-  return 1;                                // 2 month (1460 hours)
+  if (batteryPercent > 70) return 6;          // 6 hours
+  if (batteryPercent > 60) return 12;         // 12 hours
+  if (batteryPercent > 50) return 24;         // 24 hours  
+  if (batteryPercent > 40) return 48;         // 2 day (48 hours)
+  if (batteryPercent > 30) return 168;        // 7 days (168 hours)
+  if (batteryPercent > 20) return 720;        // 1 month (720 hours)
+  if (batteryPercent > 15) return 1460;       // 2 month (1460 hours)
+  if (batteryPercent > 10) return 2180;        // 3 month (2180 hours)
+  return 2;                               
 }
 
 // New function to log battery voltage and estimated percentage

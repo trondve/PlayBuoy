@@ -624,6 +624,8 @@ void loop() {
         rtcState.lastBatteryVoltage,
         rtcState.lastWaterTemp
       );
+      SerialMon.println("Final JSON (with network diagnostics):");
+      SerialMon.println(json);
       SerialMon.println("=== CRITICAL: Attempting JSON upload ===");
       bool success = sendJsonToServer(
         API_SERVER,
