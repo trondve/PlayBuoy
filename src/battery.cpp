@@ -168,39 +168,33 @@ int determineSleepDuration(int batteryPercent) {
   if (isWinterSeason(month)) {
     SerialMon.printf("Winter season detected (month %d)\n", month);
     
-    // Winter battery protection strategy
-    if (batteryPercent >= 40) {
-      // Wake up once daily at noon (battery 35% - 100%)
+    // More conservative winter strategy as requested
+    if (batteryPercent >= 70) {
+      // Wake up once daily at noon
       int hoursToNoon = 12 - hour;
       if (hoursToNoon <= 0) {
         hoursToNoon += 24;  // Next day at noon
       }
-      SerialMon.printf("Winter mode: battery %d%% (40-100%%), waking daily at noon, sleeping %d hours\n", batteryPercent, hoursToNoon);
+      SerialMon.printf("Winter mode: battery %d%% (>=70%%), waking daily at noon, sleeping %d hours\n", batteryPercent, hoursToNoon);
       return hoursToNoon;
-    } else if (batteryPercent >= 35) {
-      // Wake up every 2 days
-      SerialMon.printf("Winter mode: battery %d%% (30-34%%), sleeping 336 hours (14 days)\n", batteryPercent);
-      return 336;
-    } else if (batteryPercent >= 25) {
-      // Wake up every 3 days
-      SerialMon.printf("Winter mode: battery %d%% (25-29%%), sleeping 720 hours (30 days)\n", batteryPercent);
-      return 720;
+    } else if (batteryPercent >= 60) {
+      SerialMon.printf("Winter mode: battery %d%% (60-69%%), sleeping 48 hours (2 days)\n", batteryPercent);
+      return 48;   // 2 days
+    } else if (batteryPercent >= 50) {
+      SerialMon.printf("Winter mode: battery %d%% (50-59%%), sleeping 168 hours (7 days)\n", batteryPercent);
+      return 168;  // 7 days
+    } else if (batteryPercent >= 40) {
+      SerialMon.printf("Winter mode: battery %d%% (40-49%%), sleeping 336 hours (14 days)\n", batteryPercent);
+      return 336;  // 14 days
+    } else if (batteryPercent >= 30) {
+      SerialMon.printf("Winter mode: battery %d%% (30-39%%), sleeping 720 hours (30 days)\n", batteryPercent);
+      return 720;  // 30 days
     } else if (batteryPercent >= 20) {
-      // Wake up every 7 days
-      SerialMon.printf("Winter mode: battery %d%% (20-24%%), sleeping 1056 hours (45 days)\n", batteryPercent);
-      return 1056;
-    } else if (batteryPercent >= 15) {
-      // Wake up every 14 days
-      SerialMon.printf("Winter mode: battery %d%% (15-19%%), sleeping 1460 hours (60 days)\n", batteryPercent);
-      return 1460;
-    } else if (batteryPercent >= 10) {
-      // Wake up every 30 days
-      SerialMon.printf("Winter mode: battery %d%% (10-14%%), sleeping 1796 hours (75 days)\n", batteryPercent);
-      return 1796;
+      SerialMon.printf("Winter mode: battery %d%% (20-29%%), sleeping 1440 hours (60 days)\n", batteryPercent);
+      return 1440; // 60 days
     } else {
-      // Wake up every 60 days (battery below 10%)
-      SerialMon.printf("Winter mode: battery %d%% (<10%%), sleeping 2180 hours (90 days)\n", batteryPercent);
-      return 2180;
+      SerialMon.printf("Winter mode: battery %d%% (<20%%), sleeping 2160 hours (90 days)\n", batteryPercent);
+      return 2160; // 90 days (hibernate-like)
     }
   }
 

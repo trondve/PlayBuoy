@@ -34,20 +34,24 @@ bool connectToNetwork(const char* apn) {
     SerialMon.println("Initializing modem...");
     modem.init();
     // Guard: give UART/modem a moment before first AT test
-    delay(2500);
+    delay(4000);
     
     // Test basic communication first
     SerialMon.println("Testing AT communication...");
     if (!modem.testAT()) {
-      SerialMon.println(" AT communication failed");
-      if (attempt < maxRetries - 1) {
-        SerialMon.println("Power-cycling modem...");
-        powerOffModem();
-        delay(2000);
-        powerOnModem();
-        delay(3000);
+      // One soft retry before deciding to power-cycle
+      delay(2000);
+      if (!modem.testAT()) {
+        SerialMon.println(" AT communication failed");
+        if (attempt < maxRetries - 1) {
+          SerialMon.println("Power-cycling modem...");
+          powerOffModem();
+          delay(2000);
+          powerOnModem();
+          delay(3000);
+        }
+        continue;
       }
-      continue;
     }
     SerialMon.println(" AT communication successful");
 

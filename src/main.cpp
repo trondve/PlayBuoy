@@ -72,7 +72,7 @@ void ensureModemReady() {
   if (g_modemReady) return;
   powerOnModem();
   SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
-  delay(1000);
+  delay(2000);
   g_modemReady = true;
 }
 
@@ -307,7 +307,7 @@ void setup() {
     SerialMon.println("=== BATTERY MEASUREMENT (~2 MINUTES) - DEFAULT ===");
   }
   
-  float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/batteryReadings, /*delayBetweenReadingsMs*/10000, /*quickReadsPerGroup*/3, /*minValidGroups*/max(6, batteryReadings/2));
+  float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/batteryReadings, /*delayBetweenReadingsMs*/10000, /*quickReadsPerGroup*/3, /*minValidGroups*/4);
   if (isnan(stableBatteryVoltage)) {
     SerialMon.println("Enhanced measurement insufficient, falling back to quiet windows");
     stableBatteryVoltage = readBatteryVoltage();
@@ -445,7 +445,7 @@ void loop() {
     // Re-establish cellular data connection for firmware updates and JSON upload
     SerialMon.println("Re-establishing cellular data connection for upload...");
     ensureModemReady();
-    delay(2000);  // 2 second delay as requested
+    delay(4000);  // increased settle before first connect attempt
     networkConnected = connectToNetwork(NETWORK_PROVIDER);
     
     // If regular connection fails, try APN testing
@@ -462,7 +462,7 @@ void loop() {
     // GPS was skipped, but we still need cellular data for firmware updates and JSON upload
     SerialMon.println("GPS skipped, establishing cellular data connection for upload...");
     ensureModemReady();
-    delay(2000);  // 2 second delay as requested
+    delay(4000);  // increased settle before first connect attempt
     networkConnected = connectToNetwork(NETWORK_PROVIDER);
     
     // If regular connection fails, try APN testing
@@ -519,8 +519,7 @@ void loop() {
     rtcState.lastWaterTemp
   );
 
-  SerialMon.println("JSON payload:");
-  SerialMon.println(json);
+  // (Initial JSON suppressed; final JSON will be printed before upload)
   // Print a human-friendly current local date/time
   time_t nowTs = time(NULL);
   if (nowTs >= 24 * 3600) {
