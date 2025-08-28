@@ -288,7 +288,7 @@ static void ensureFilterInitialized() {
 }
 
 void recordWaveData() {
-  SerialMon.println("=== Starting wave data collection ===");
+  SerialMon.println("=== Starting wave data collection (3 minutes) ===");
   ensureFilterInitialized();
   
   if (!imuInitialized) {
@@ -297,10 +297,11 @@ void recordWaveData() {
       SerialMon.println("ERROR: Failed to initialize IMU; wave data will be zeros");
       SerialMon.println("Please check:");
       SerialMon.println("1. I2C connections (SDA=21, SCL=22)");
-      SerialMon.println("2. Power supply (3.3V)");
+      SerialMon.println("2. Power supply (3.3V) - ensure 3.3V rail is powered on");
       SerialMon.println("3. GY-91 module is properly connected");
       SerialMon.println("4. No short circuits or loose connections");
       SerialMon.println("5. Try power cycling the ESP32 and GY-91");
+      SerialMon.println("6. Check if sensors are powered on via power management");
       s_lastHs = 0.0f; s_lastTp = 0.0f; s_lastWaves = 0; s_headingSum = 0.0f; s_headingCount = 0;
       return;
     } else {
@@ -314,8 +315,8 @@ void recordWaveData() {
   float prev_a = 0.0f, prev_v = 0.0f;
   s_headingSum = 0.0f; s_headingCount = 0;
 
-  // Run for a fixed 5-minute window as requested
-  const uint32_t sampleMs = (uint32_t)(300000UL);
+  // Run for a fixed 3-minute window (optimized from 5 minutes)
+  const uint32_t sampleMs = (uint32_t)(180000UL);
   uint32_t start = millis();
   uint32_t nextTick = start;
   uint32_t tick = 0;
@@ -381,7 +382,7 @@ void recordWaveData() {
     tick++;
   }
 
-  SerialMon.printf("Wave data collection complete: %d samples collected in %d seconds\n", dispCount, (millis() - start) / 1000);
+  SerialMon.printf("Wave data collection complete: %d samples collected in %d seconds (target: 1800 samples in 180 seconds)\n", dispCount, (millis() - start) / 1000);
 
   // If not enough samples, produce zeros
   if (dispCount < (uint32_t)(FS_HZ * 5.0f)) {

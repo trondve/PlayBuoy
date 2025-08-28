@@ -28,7 +28,7 @@
 #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // Power/ADC calibration
-#define BATTERY_CALIBRATION_FACTOR 0.500243f
+#define BATTERY_CALIBRATION_FACTOR 0.454398f
 
 
 // Optional SIM PIN (leave empty if not required)
