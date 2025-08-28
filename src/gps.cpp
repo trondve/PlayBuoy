@@ -6,6 +6,7 @@
 
 #include <Preferences.h>
 #include <time.h>
+#include <sys/time.h>
 
 #define SerialMon Serial
 
@@ -316,7 +317,7 @@ static void gnssSmoke60s() {
 }
 
 // ---------- Public API ----------
-void gpsBegin() {}
+// (gpsBegin removed; not needed)
 
 void gpsEnd() { gnssStop(); }
 
@@ -326,6 +327,15 @@ static void syncTimeAndMaybeApplyXTRA() {
   bool pdp = bringUpPDP(APN_PRIMARY) || bringUpPDP(APN_SECONDARY);
   if (pdp) {
     if (doNTPSync(&nowCi)) {
+      // Set ESP32 RTC from modem time (convert local time + tz to UTC epoch)
+      if (nowCi.valid) {
+        uint32_t epochLocal = makeEpochUTC(nowCi.year, nowCi.month, nowCi.day, nowCi.hour, nowCi.min, nowCi.sec);
+        long tzSeconds = (long)nowCi.tz_q * 15L * 60L;
+        uint32_t epochUtc = (tzSeconds >= 0 && (uint32_t)tzSeconds > epochLocal) ? 0 : (uint32_t)((long)epochLocal - tzSeconds);
+        struct timeval tv; tv.tv_sec = epochUtc; tv.tv_usec = 0;
+        settimeofday(&tv, nullptr);
+        SerialMon.printf("RTC set from NTP via modem: %lu (UTC)\n", (unsigned long)epochUtc);
+      }
       if (nowCi.valid && shouldDownloadXTRA(nowCi)) {
         if (downloadAndApplyXTRA()) markXTRAJustApplied(nowCi);
       }

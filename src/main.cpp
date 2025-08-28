@@ -351,13 +351,7 @@ void setup() {
   
   // OTA check will happen in loop() after cellular connection is established
   
-  // Time optimization summary
-  SerialMon.println("=== TIME OPTIMIZATIONS APPLIED ===");
-  SerialMon.println("1. Battery measurement: Adaptive 1.3-2.7 minutes (was 5 minutes)");
-  SerialMon.println("2. Wave data collection: 3 minutes (was 5 minutes)");
-  SerialMon.println("3. GPS timeout: Smart 5-20 minutes based on battery/first fix (was 30 minutes)");
-  SerialMon.println("4. Total cycle time reduction: ~50% (from ~40 to ~20 minutes)");
-  SerialMon.println("=====================================");
+  // (Removed verbose time optimization banner)
 }
 
 void loop() {
@@ -409,57 +403,8 @@ void loop() {
   
   SerialMon.println("=== Wave data collection complete ===");
 
-  // 2) Connect to network and sync time BEFORE GPS (this helps TTFF dramatically)
+  // 2) Skip pre-GPS HTTP time sync; GPS flow will do NTP + XTRA
   bool networkConnected = false;
-  bool timeSynced = false;
-  
-  if (shouldGetNewGpsFix) {
-    SerialMon.println("Connecting to network before GPS fix to enable time sync...");
-    SerialMon.println("=== CRITICAL: Starting modem initialization ===");
-    
-    // Check voltage before modem operations to prevent brownout
-    float voltage = readBatteryVoltage();
-    if (!isnan(voltage)) {
-      if (voltage < 3.2f) {
-        SerialMon.printf("WARNING: Low voltage (%.2fV) before modem operations\n", voltage);
-        SerialMon.println("Consider reducing power consumption or delaying operation");
-      } else if (voltage < 3.5f) {
-        SerialMon.printf("CAUTION: Moderate voltage (%.2fV) - monitoring closely\n", voltage);
-      } else {
-        SerialMon.printf("Voltage OK (%.2fV) for modem operations\n", voltage);
-      }
-    }
-    
-    // Turn on modem, wait 5 seconds, then enable cellular data
-    ensureModemReady();
-    delay(5000);  // 5 second delay as requested
-    SerialMon.println("=== CRITICAL: Modem ready, attempting network connection ===");
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
-    SerialMon.printf("=== CRITICAL: Network connection result: %s ===\n", networkConnected ? "SUCCESS" : "FAILED");
-    
-    // If regular connection fails, try APN testing
-    if (!networkConnected) {
-      SerialMon.println("Regular connection failed, testing multiple APNs...");
-      networkConnected = testMultipleAPNs();
-    }
-    
-    if (networkConnected) {
-      SerialMon.println("Network connected, syncing time from network...");
-      timeSynced = syncTimeFromNetwork();
-      if (timeSynced) {
-        SerialMon.println("✓ Time synced from network - this will help GPS TTFF");
-      } else {
-        SerialMon.println("⚠ Time sync failed, but network is available");
-      }
-      
-      // Tear down cellular connection after time sync, wait 5 seconds
-      SerialMon.println("Tearing down cellular connection after time sync...");
-      delay(5000);  // 5 second delay as requested
-      // Note: Connection will be re-established later for data upload
-    } else {
-      SerialMon.println("Network connection failed, proceeding without time sync");
-    }
-  }
 
   // 3) Then attempt GPS (now with valid time)
   // OPTIMIZED: Smart timeout based on battery level and first fix status
@@ -534,13 +479,7 @@ void loop() {
   uint32_t uptime = millis() / 1000; // seconds since boot
   String resetReason = getResetReasonString();
 
-  // Ensure time is valid before building JSON: if GPS failed or was skipped, try network time sync once more
-  if ((shouldGetNewGpsFix && !fix.success) || !shouldGetNewGpsFix) {
-    // If network is not up yet, we'll sync right after connecting below; here we just attempt if already valid
-    if (modem.isGprsConnected()) {
-      syncTimeFromNetwork();
-    }
-  }
+  // Skip legacy HTTP time sync; RTC was set during GPS NTP step if available
 
   // Get current timestamp from RTC, with fallback to GPS time
   SerialMon.println("Building JSON payload...");
@@ -636,14 +575,7 @@ void loop() {
   if (shouldProceedWithNewData) {
     // Network should already be connected from GPS attempt above (established after GPS shutdown)
     
-    // Time should already be synced from GPS attempt above, but try again if needed
-    if ((shouldGetNewGpsFix && !fix.success) || !shouldGetNewGpsFix) {
-      if (!timeSynced && syncTimeFromNetwork()) {
-        // Recompute currentTimestamp after successful time sync
-        SerialMon.println("Time synced from network; rebuilding timestamp for JSON");
-        timeSynced = true;
-      }
-    }
+    // Time should already be synced from NTP during GPS flow
 
     // Check for firmware updates if network is connected
     if (networkConnected) {

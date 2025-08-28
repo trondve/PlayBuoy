@@ -19,7 +19,6 @@ void gpsEnd();                           // Optional: powers down GPS to save po
 uint16_t getGpsFixTimeout(bool isFirstFix);        // Returns timeout based on battery and first fix
 GpsFixResult getGpsFixDynamic(bool isFirstFix);    // Gets GPS fix with dynamic timeout
 
-// Test function for extended GPS debugging
-void testGpsExtended(uint16_t timeoutSec = 1800);  // 30 minutes default
+// (Removed legacy testGpsExtended)
 
 
