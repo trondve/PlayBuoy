@@ -69,7 +69,26 @@ void powerOnGPS();
 void powerOffGPS();
 
 void ensureModemReady() {
-  if (g_modemReady) return;
+  if (g_modemReady) {
+    // Probe modem liveness with a raw AT; if unresponsive, force re-power
+    while (SerialAT.available()) SerialAT.read(); // flush
+    SerialAT.print("AT\r\n");
+    unsigned long t0 = millis();
+    bool ok = false;
+    String resp;
+    while (millis() - t0 < 1000) {
+      while (SerialAT.available()) {
+        char c = (char)SerialAT.read();
+        resp += c;
+        if (resp.indexOf("OK") >= 0) { ok = true; break; }
+      }
+      if (ok) break;
+      delay(10);
+    }
+    if (ok) return;
+    SerialMon.println("Modem not responsive; re-powering...");
+    g_modemReady = false;
+  }
   powerOnModem();
   SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
   delay(2000);
