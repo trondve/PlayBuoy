@@ -1,0 +1,7 @@
+{
+  "version": "1.1.1",
+  "url": "http://trondve.ddns.net/playbuoy_vatna.bin",
+  "name": "Vatnakvamsvatnet",
+  "node_id": "playbuoy_vatna",
+  "description": "Firmware for Vatnakvamsvatnet buoy"
+}

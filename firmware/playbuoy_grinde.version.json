@@ -1,0 +1,7 @@
+{
+  "version": "1.1.1",
+  "url": "http://trondve.ddns.net/playbuoy_grinde.bin",
+  "name": "Litla Grindevatnet",
+  "node_id": "playbuoy_grinde",
+  "description": "Firmware for Litla Grindevatnet buoy"
+}
