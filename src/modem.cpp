@@ -33,19 +33,25 @@ bool connectToNetwork(const char* apn) {
     // Initialize modem
     SerialMon.println("Initializing modem...");
     modem.init();
+    // Guard: give UART/modem a moment before first AT test
+    delay(4000);
     
     // Test basic communication first
     SerialMon.println("Testing AT communication...");
     if (!modem.testAT()) {
-      SerialMon.println(" AT communication failed");
-      if (attempt < maxRetries - 1) {
-        SerialMon.println("Power-cycling modem...");
-        powerOffModem();
-        delay(2000);
-        powerOnModem();
-        delay(3000);
+      // One soft retry before deciding to power-cycle
+      delay(2000);
+      if (!modem.testAT()) {
+        SerialMon.println(" AT communication failed");
+        if (attempt < maxRetries - 1) {
+          SerialMon.println("Power-cycling modem...");
+          powerOffModem();
+          delay(2000);
+          powerOnModem();
+          delay(3000);
+        }
+        continue;
       }
-      continue;
     }
     SerialMon.println(" AT communication successful");
 
@@ -211,93 +217,4 @@ bool sendJsonToServer(const char* server, uint16_t port, const char* endpoint, c
   return false;
 }
 
-// Try to sync time using an HTTP HEAD to retrieve Date header (avoids HTTPS)
-bool syncTimeFromNetwork() {
-  // Must already have PDP up
-  if (!modem.isGprsConnected()) return false;
-
-  TinyGsmClient client(modem);
-  // Use API server as a time source (any HTTP server with Date header works)
-  if (!client.connect(API_SERVER, API_PORT)) {
-    SerialMon.println("Time sync: TCP connect failed");
-    return false;
-  }
-  String req = String("HEAD ") + "/" + " HTTP/1.1\r\n" +
-               "Host: " + API_SERVER + "\r\n" +
-               "Connection: close\r\n\r\n";
-  client.print(req);
-
-  // Parse headers, look for 'Date:'
-  String line;
-  unsigned long t0 = millis();
-  time_t parsed = 0;
-  while (millis() - t0 < 10000) {
-    while (client.available()) {
-      char c = client.read();
-      if (c == '\n') {
-        line.trim();
-        if (line.length() == 0) { // end of headers
-          client.stop();
-          if (parsed > 0) {
-            struct timeval tv; tv.tv_sec = parsed; tv.tv_usec = 0; settimeofday(&tv, nullptr);
-            // Also print human-readable local time (with timezone/DST)
-            time_t now = parsed; struct tm lt; localtime_r(&now, &lt);
-            char buf[64]; strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &lt);
-            SerialMon.printf("Time sync: set RTC from HTTP Date to %lu (%s)\n", (unsigned long)parsed, buf);
-            return true;
-          }
-          return false;
-        }
-        if (line.startsWith("Date:")) {
-          // Example: Date: Sun, 11 Aug 2025 20:18:30 GMT
-          // We parse minimal fields
-          // Skip "Date: "
-          String ds = line.substring(5); ds.trim();
-          // Very simple parse using tm structure
-          struct tm t = {};
-          // Day of week is ignored; format: Ddd, DD Mon YYYY HH:MM:SS GMT
-          // Extract components
-          // Find day
-          int comma = ds.indexOf(',');
-          String rest = (comma >= 0) ? ds.substring(comma + 1) : ds;
-          rest.trim();
-          // Day
-          int sp1 = rest.indexOf(' ');
-          int day = rest.substring(0, sp1).toInt();
-          // Month
-          int sp2 = rest.indexOf(' ', sp1 + 1);
-          String monStr = rest.substring(sp1 + 1, sp2);
-          const char* months = "JanFebMarAprMayJunJulAugSepOctNovDec";
-          int mon = 0; for (; mon < 12; ++mon) { if (monStr.equalsIgnoreCase(String(months + mon * 3).substring(0,3))) break; }
-          // Year
-          int sp3 = rest.indexOf(' ', sp2 + 1);
-          int year = rest.substring(sp2 + 1, sp3).toInt();
-          // Time HH:MM:SS
-          int sp4 = rest.indexOf(' ', sp3 + 1);
-          String timeStr = rest.substring(sp3 + 1, sp4);
-          int c1 = timeStr.indexOf(':'); int c2 = timeStr.indexOf(':', c1 + 1);
-          int hh = timeStr.substring(0, c1).toInt();
-          int mm = timeStr.substring(c1 + 1, c2).toInt();
-          int ss = timeStr.substring(c2 + 1).toInt();
-          t.tm_mday = day; t.tm_mon = mon; t.tm_year = year - 1900; t.tm_hour = hh; t.tm_min = mm; t.tm_sec = ss; t.tm_isdst = 0;
-          // HTTP Date is GMT/UTC; convert to epoch using UTC timezone
-          // Provide a local timegm replacement by temporarily switching TZ to UTC
-          char oldTz[64]; oldTz[0] = '\0';
-          const char* envTz = getenv("TZ");
-          if (envTz) { strncpy(oldTz, envTz, sizeof(oldTz) - 1); oldTz[sizeof(oldTz) - 1] = '\0'; }
-          setenv("TZ", "UTC0", 1); tzset();
-          parsed = mktime(&t);
-          if (oldTz[0] != '\0') { setenv("TZ", oldTz, 1); } else { unsetenv("TZ"); }
-          tzset();
-        }
-        line = "";
-      } else if (c != '\r') {
-        line += c;
-      }
-    }
-    if (!client.connected()) break;
-    delay(5);
-  }
-  client.stop();
-  return false;
-}
+// (Removed legacy HTTP time sync)
