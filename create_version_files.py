@@ -10,8 +10,8 @@ from pathlib import Path
 
 # Define your buoys (matching your exact format)
 BUOYS = [
-    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy-vatna"},
-    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy-grinde"},
+    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy_vatna"},
+    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy_grinde"},
 ]
 
 # Current firmware version (update this when you release new firmware)

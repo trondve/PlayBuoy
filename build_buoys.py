@@ -4,8 +4,8 @@ import shutil
 
 # Define your buoys (matching your exact format)
 BUOYS = [
-    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy-vatna"},
-    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy-grinde"},
+    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy_vatna"},
+    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy_grinde"},
 ]
 
 def build_multiple_buoys(source, target, env):
@@ -22,7 +22,7 @@ def build_multiple_buoys(source, target, env):
     if os.path.exists(firmware_path):
         # Copy to each buoy's filename
         for buoy in BUOYS:
-            target_path = f"{output_dir}/playbuoy-{buoy['id']}.bin"
+            target_path = f"{output_dir}/playbuoy_{buoy['id']}.bin"
             shutil.copy(firmware_path, target_path)
             size = os.path.getsize(target_path)
             print(f"✅ Created: {target_path} ({size:,} bytes)")

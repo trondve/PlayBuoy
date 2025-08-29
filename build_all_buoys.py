@@ -13,8 +13,8 @@ from pathlib import Path
 
 # Define your buoys (matching your exact format)
 BUOYS = [
-    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy-vatna"},
-    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy-grinde"},
+    {"id": "vatna", "name": "Vatnakvamsvatnet", "node_id": "playbuoy_vatna"},
+    {"id": "grinde", "name": "Litla Grindevatnet", "node_id": "playbuoy_grinde"},
     # Add more buoys as needed
 ]
 
@@ -110,7 +110,7 @@ def build_firmware(buoy):
             output_dir = "firmware"
             os.makedirs(output_dir, exist_ok=True)
             
-            target_bin = f"{output_dir}/playbuoy-{buoy['id']}.bin"
+            target_bin = f"{output_dir}/playbuoy_{buoy['id']}.bin"
             shutil.copy(source_bin, target_bin)
             
             # Get file size
