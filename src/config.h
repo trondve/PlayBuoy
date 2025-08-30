@@ -1,7 +1,7 @@
 // Configuration - Update these values for your specific setup
 #define NODE_ID "playbuoy_vatna"
 #define NAME "Vatnakvamsvatnet"
-#define FIRMWARE_VERSION "1.0.0"
+#define FIRMWARE_VERSION "1.1.1"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
 // API Configuration
