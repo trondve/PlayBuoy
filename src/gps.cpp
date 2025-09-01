@@ -214,7 +214,8 @@ static bool gnssEngineRunning() {
 
 static void gnssConfigure() {
   sendAT("AT+CGNSPWR=0");
-  sendAT("AT+CGNSMOD=1");
+  // Enable GPS, GLONASS, BeiDou; disable Galileo
+  sendAT("AT+CGNSMOD=1,1,0,1");
   sendAT("AT+CGNSCFG=1");
   sendAT("AT+CGPIO=0,48,1,1");
   sendAT("AT+SGPIO=0,4,1,1");
@@ -222,23 +223,24 @@ static void gnssConfigure() {
 
 static bool gnssStart() {
   SerialMon.println("=== GNSS POWER ON ===");
+  // Ensure GPS power pin is set just before GNSS start to avoid early power-on
+  extern void powerOnGPS();
+  powerOnGPS();
+  delay(5000);
   gnssConfigure();
   sendAT("AT+CGNSPWR=1");
   delay(300);
   for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-
   SerialMon.println("GNSS not running; trying opposite SGPIO polarity...");
   sendAT("AT+CGNSPWR=0"); delay(150);
   sendAT("AT+SGPIO=0,4,1,0"); delay(150);
   sendAT("AT+CGNSPWR=1");
   for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-
   SerialMon.println("Still not running; trying CGPIO control...");
   sendAT("AT+CGNSPWR=0"); delay(150);
   sendAT("AT+CGPIO=4,1,1"); delay(150);
   sendAT("AT+CGNSPWR=1");
   for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-
 configured_nmea:
   sendAT("AT+CGNSNMEA=511");
   sendAT("AT+CGNSRTMS=1000");

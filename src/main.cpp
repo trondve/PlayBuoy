@@ -57,6 +57,7 @@ static bool g_modemReady = false;
 static bool g_3v3RailPowered = false;
 static bool g_sensorsPowered = false;
 static bool g_gpsPinHigh = false;
+static bool g_sensorsInitialized = false;
 
 // Forward declaration for functions defined later
 void powerOnModem();
@@ -296,43 +297,11 @@ void setup() {
   configTzTime(TIMEZONE, NTP_SERVER);
   SerialMon.println("RTC timezone configured (CET/CEST)");
   
-  // Do not overwrite RTC with a fixed default; retain time across deep sleep.
 
-  // One-time multi-GNSS config at boot (non-intrusive if already set)
-  ensureModemReady();
-  modem.sendAT("+CGNSMOD=1,1,1,1");
-  modem.waitResponse(1000);
-
-  // Defer modem power-on and serial init until needed (GPS or network)
-
-  // Measure battery early to avoid sensor bus activity influencing ADC
-  if (!beginPowerMonitor()) SerialMon.println("Power monitor not detected.");
-
-  // Adaptive battery measurement based on battery level
-  int batteryReadings = 12; // Default for medium battery
-  float voltage = readBatteryVoltage(); // Quick initial reading
-  if (!isnan(voltage)) {
-    if (voltage > 4.0f) {
-      batteryReadings = 8;   // High battery: fewer readings
-      SerialMon.println("=== BATTERY MEASUREMENT (~1.3 MINUTES) - HIGH BATTERY ===");
-    } else if (voltage > 3.5f) {
-      batteryReadings = 12;  // Medium battery: standard readings
-      SerialMon.println("=== BATTERY MEASUREMENT (~2 MINUTES) - MEDIUM BATTERY ===");
-    } else {
-      batteryReadings = 16;  // Low battery: more readings for accuracy
-      SerialMon.println("=== BATTERY MEASUREMENT (~2.7 MINUTES) - LOW BATTERY ===");
-    }
-  } else {
-    SerialMon.println("=== BATTERY MEASUREMENT (~2 MINUTES) - DEFAULT ===");
-  }
-  
-  float stableBatteryVoltage = readBatteryVoltageEnhanced(/*totalReadings*/batteryReadings, /*delayBetweenReadingsMs*/10000, /*quickReadsPerGroup*/3, /*minValidGroups*/4);
-  if (isnan(stableBatteryVoltage)) {
-    SerialMon.println("Enhanced measurement insufficient, falling back to quiet windows");
-    stableBatteryVoltage = readBatteryVoltage();
-  }
+  // Measure battery early using the new method and store as stable value
+  if (!beginPowerMonitor()) SerialMon.println("Power monitor init failed.");
+  float stableBatteryVoltage = readBatteryVoltage();
   setStableBatteryVoltage(stableBatteryVoltage);
-  // Update RTC snapshot values for visibility in logs
   rtcState.lastBatteryVoltage = stableBatteryVoltage;
   float tempC = getWaterTemperature();
   if (!isnan(tempC)) {
@@ -347,30 +316,6 @@ void setup() {
   if (handleUndervoltageProtection()) {
     // Device will deep sleep if battery critically low
   }
-
-  // Initialize the rest of sensors after battery measurement (less interference)
-  // Note: Sensors will be powered on when needed during wave data collection
-  // After sensors are initialized, capture first valid temp into RTC snapshot
-  {
-    // Power on 3.3V rail and sensors temporarily for initial temperature reading
-    powerOn3V3Rail();
-    delay(5000);  // 5 second delay as requested
-    powerOnSensors();
-    
-    if (!beginSensors()) SerialMon.println("Sensor init failed.");
-    
-    float t = getWaterTemperature();
-    if (!isnan(t)) rtcState.lastWaterTemp = t;
-    
-    // Power off sensors and 3.3V rail after initial reading
-    powerOffSensors();
-    delay(5000);  // 5 second delay as requested
-    powerOff3V3Rail();
-  }
-  
-  // OTA check will happen in loop() after cellular connection is established
-  
-  // (Removed verbose time optimization banner)
 }
 
 void loop() {
@@ -392,8 +337,8 @@ void loop() {
   // OPTIMIZED: Reduced from 5 minutes to 3 minutes for wave data collection
   SerialMon.println("=== Starting wave data collection with power management (3 minutes) ===");
   
-  // Check voltage before high-power operation to prevent brownout
-  float voltage = readBatteryVoltage();
+  // Check voltage before high-power operation using stable reading
+  float voltage = getStableBatteryVoltage();
   if (!isnan(voltage)) {
     if (voltage < 3.2f) {
       SerialMon.printf("WARNING: Low voltage (%.2fV) before wave data collection\n", voltage);
@@ -409,6 +354,12 @@ void loop() {
   powerOn3V3Rail();
   delay(5000);  // 5 second delay as requested
   powerOnSensors();
+  if (!g_sensorsInitialized) {
+    if (!beginSensors()) SerialMon.println("Sensor init failed.");
+    g_sensorsInitialized = true;
+    float t0 = getWaterTemperature();
+    if (!isnan(t0)) rtcState.lastWaterTemp = t0;
+  }
   
   esp_task_wdt_reset();
   recordWaveData();
@@ -432,10 +383,12 @@ void loop() {
   if (shouldGetNewGpsFix) {
     bool isFirstFix = (rtcState.lastGpsFixTime == 0);
     
-    // Set GPS power pin HIGH, wait 5 seconds, enable GNSS, wait 5 seconds, power on GPS module
-    powerOnGPS();
-    delay(5000);  // 5 second delay as requested
-    
+    // Bring up modem and configure GNSS just before NTP/XTRA/GPS flow to save power
+    ensureModemReady();
+    // Enable GPS, GLONASS, BeiDou; disable Galileo
+    modem.sendAT("+CGNSMOD=1,1,0,1");
+    modem.waitResponse(1000);
+
     fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);

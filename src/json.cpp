@@ -47,14 +47,7 @@ String buildJsonPayload(
 
   doc["temp"] = waterTemp;
   doc["battery"] = batteryVoltage;
-  // Include pre-calibrated (raw) voltage and calibration factor
-  {
-    float f = getBatteryCalibrationFactor();
-    float preCal = batteryVoltage;
-    if (f > 1e-6f) preCal = batteryVoltage / f;
-    doc["battery_precal"] = preCal;
-    doc["battery_cal_factor"] = f;
-  }
+  // Calibration factor removed; using direct measured value
 
   // Flag invalid temperature
   if (isnan(waterTemp)) {

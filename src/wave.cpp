@@ -295,13 +295,6 @@ void recordWaveData() {
     SerialMon.println("Attempting IMU initialization...");
     if (!initMPU6500()) {
       SerialMon.println("ERROR: Failed to initialize IMU; wave data will be zeros");
-      SerialMon.println("Please check:");
-      SerialMon.println("1. I2C connections (SDA=21, SCL=22)");
-      SerialMon.println("2. Power supply (3.3V) - ensure 3.3V rail is powered on");
-      SerialMon.println("3. GY-91 module is properly connected");
-      SerialMon.println("4. No short circuits or loose connections");
-      SerialMon.println("5. Try power cycling the ESP32 and GY-91");
-      SerialMon.println("6. Check if sensors are powered on via power management");
       s_lastHs = 0.0f; s_lastTp = 0.0f; s_lastWaves = 0; s_headingSum = 0.0f; s_headingCount = 0;
       return;
     } else {
