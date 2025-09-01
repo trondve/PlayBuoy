@@ -29,7 +29,6 @@ void checkBatteryChargeState() {
   if (!isCharging && voltage > (CHARGE_THRESHOLD + CHARGE_HYSTERESIS)) {
     isCharging = true;
     rtcState.chargingProblemDetected = false;
-    SerialMon.println("Charging detected.");
   } else if (isCharging && voltage < (CHARGE_THRESHOLD - CHARGE_HYSTERESIS)) {
     isCharging = false;
     SerialMon.println("Charging lost.");
@@ -39,7 +38,6 @@ void checkBatteryChargeState() {
 
 bool handleUndervoltageProtection() {
   float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
-  SerialMon.printf("Battery voltage: %.2f V\n", voltage);
 
   // Undervoltage protection (compile-time optional)
 #ifdef BATTERY_CRITICAL_VOLTAGE
@@ -201,7 +199,7 @@ int determineSleepDuration(int batteryPercent) {
   SerialMon.printf("Summer season detected (month %d)\n", month);
   // May–September: use battery-based logic
   if (batteryPercent > 80) {
-    SerialMon.printf("Summer mode: battery >80%%, sleeping 1 hours\n");
+    SerialMon.printf("Summer mode: battery >80%%, sleeping 3 hours\n");
     return 3;          // minimum 3 hours
   }
   if (batteryPercent > 70) return 6;          // 6 hours
