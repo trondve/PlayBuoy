@@ -14,7 +14,6 @@ String buildJsonPayload(
   const char* nodeId,
   const char* name,                
   const char* firmwareVersion,
-  float heading,
   uint32_t uptime,           // <-- new
   String resetReason,        // <-- new
   // New: modem/network diagnostics
@@ -22,7 +21,10 @@ String buildJsonPayload(
   String apn,
   String ip,
   int signalQuality,
-  // New: RTC snapshot values
-  float rtcBatteryVoltage,
-  float rtcWaterTemp
+  // Keep only rtcWaterTemp in RTC snapshot
+  float rtcWaterTemp,
+  // New fields for server
+  int hoursToSleep,
+  uint32_t nextWakeUtc,
+  float batteryChangeSinceLast
 );

@@ -19,15 +19,16 @@ String buildJsonPayload(
   const char* nodeId,
   const char* name,
   const char* firmwareVersion,
-  float heading,
   uint32_t uptime,
   String resetReason,
   String operatorName,
   String apn,
   String ip,
   int signalQuality,
-  float rtcBatteryVoltage,
-  float rtcWaterTemp
+  float rtcWaterTemp,
+  int hoursToSleep,
+  uint32_t nextWakeUtc,
+  float batteryChangeSinceLast
 ) {
   StaticJsonDocument<1024> doc;
 
@@ -62,15 +63,18 @@ String buildJsonPayload(
     tide["current_height"] = tideHeight;
   }
 
-  doc["heading"] = heading;
-  doc["heading_valid"] = !isnan(heading);
+  // Removed heading fields
 
   doc["uptime"] = uptime;
   doc["reset_reason"] = resetReason;
 
-  // RTC snapshot values for visibility
+  // New fields
+  doc["hours_to_sleep"] = hoursToSleep;
+  doc["next_wake_utc"] = nextWakeUtc;
+  doc["battery_change_since_last"] = batteryChangeSinceLast;
+
+  // RTC snapshot values for visibility (keep waterTemp only)
   JsonObject rtc = doc.createNestedObject("rtc");
-  rtc["batteryVoltage"] = rtcBatteryVoltage;
   rtc["waterTemp"] = rtcWaterTemp;
 
   // Modem/network diagnostics

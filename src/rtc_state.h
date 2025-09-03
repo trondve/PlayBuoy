@@ -39,7 +39,9 @@ typedef struct {
   char lastUnsentJson[512];         // Buffer for last unsent JSON payload
   bool hasUnsentData;               // Flag if there is unsent data
 
-
+  // Sleep planning snapshot (for wake reason context)
+  uint16_t lastSleepHours;          // Planned sleep hours before last deep sleep
+  uint32_t lastNextWakeUtc;         // Planned next wake epoch
 
 } rtc_state_t;
 

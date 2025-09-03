@@ -21,6 +21,8 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .chargingProblemDetected = false,
   .lastUnsentJson = {0},
   .hasUnsentData = false,
+  .lastSleepHours = 0,
+  .lastNextWakeUtc = 0,
 
 };
 

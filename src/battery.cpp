@@ -209,13 +209,13 @@ int determineSleepDuration(int batteryPercent) {
   if (batteryPercent > 30) return 168;        // 7 days (168 hours)
   if (batteryPercent > 20) return 720;        // 1 month (720 hours)
   if (batteryPercent > 15) return 1460;       // 2 month (1460 hours)
-  if (batteryPercent > 10) return 2180;        // 3 month (2180 hours)
+  if (batteryPercent > 10) return 2180;       // 3 month (2180 hours)
   return 2;                               
 }
 
-// New function to log battery voltage and estimated percentage
+// Function to log battery voltage and estimated percentage
 void logBatteryStatus() {
-  float voltage = getStableBatteryVoltage(); // Use stable voltage instead of measuring
+  float voltage = getStableBatteryVoltage(); 
   int percent = estimateBatteryPercent(voltage);
   SerialMon.printf("Battery voltage: %.2f V, approx %d%%\n", voltage, percent);
 }

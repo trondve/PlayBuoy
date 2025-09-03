@@ -58,6 +58,7 @@ static bool g_3v3RailPowered = false;
 static bool g_sensorsPowered = false;
 static bool g_gpsPinHigh = false;
 static bool g_sensorsInitialized = false;
+static float g_prevBatteryVoltage = 0.0f;
 
 // Forward declaration for functions defined later
 void powerOnModem();
@@ -237,17 +238,38 @@ void syncRtcWithGps(uint32_t gpsEpoch) {
 }
 
 String getResetReasonString() {
-  esp_reset_reason_t reason = esp_reset_reason();
-  switch (reason) {
+  esp_reset_reason_t rr = esp_reset_reason();
+  if (rr == ESP_RST_DEEPSLEEP) {
+    esp_sleep_wakeup_cause_t wc = esp_sleep_get_wakeup_cause();
+    switch (wc) {
+      case ESP_SLEEP_WAKEUP_TIMER: {
+        if (rtcState.lastSleepHours > 0) {
+          return String("WokeUpFromTimerSleep(") + String((int)rtcState.lastSleepHours) + String("h)");
+        }
+        return String("WokeUpFromTimerSleep");
+      }
+      case ESP_SLEEP_WAKEUP_EXT0: return "WokeUpFromGpioSleep(EXT0)";
+      case ESP_SLEEP_WAKEUP_EXT1: return "WokeUpFromGpioSleep(EXT1)";
+      case ESP_SLEEP_WAKEUP_TOUCHPAD: return "WokeUpFromTouchSleep";
+      case ESP_SLEEP_WAKEUP_ULP: return "WokeUpFromUlP";
+      case ESP_SLEEP_WAKEUP_GPIO: return "WokeUpFromGpioSleep";
+      case ESP_SLEEP_WAKEUP_UART: return "WokeUpFromUart";
+      case ESP_SLEEP_WAKEUP_WIFI: return "WokeUpFromWifi";
+      case ESP_SLEEP_WAKEUP_COCPU: return "WokeUpFromCoCPU";
+      case ESP_SLEEP_WAKEUP_ALL: return "WokeUpFromAll";
+      case ESP_SLEEP_WAKEUP_UNDEFINED: return "WokeUpFromUndefined";
+      default: return "WokeUpFromUnknown";
+    }
+  }
+  switch (rr) {
     case ESP_RST_POWERON: return "PowerOn";
-    case ESP_RST_EXT: return "External";
-    case ESP_RST_SW: return "Software";
-    case ESP_RST_PANIC: return "Panic";
+    case ESP_RST_EXT: return "ExternalReset";
+    case ESP_RST_SW: return "SoftwareReset";
+    case ESP_RST_PANIC: return "PanicReset";
     case ESP_RST_INT_WDT: return "IntWDT";
     case ESP_RST_TASK_WDT: return "TaskWDT";
     case ESP_RST_WDT: return "WDT";
-    case ESP_RST_DEEPSLEEP: return "DeepSleep";
-    case ESP_RST_BROWNOUT: return "Brownout";
+    case ESP_RST_BROWNOUT: return "BrownoutRecovery";
     case ESP_RST_SDIO: return "SDIO";
     default: return "Unknown";
   }
@@ -301,6 +323,7 @@ void setup() {
   // Measure battery early using the new method and store as stable value
   if (!beginPowerMonitor()) SerialMon.println("Power monitor init failed.");
   float stableBatteryVoltage = readBatteryVoltage();
+  g_prevBatteryVoltage = rtcState.lastBatteryVoltage; // capture previous persisted value
   setStableBatteryVoltage(stableBatteryVoltage);
   rtcState.lastBatteryVoltage = stableBatteryVoltage;
   float tempC = getWaterTemperature();
@@ -470,6 +493,15 @@ void loop() {
     SerialMon.printf("Using RTC timestamp (UTC epoch): %lu\n", currentTimestamp);
   }
 
+  // Compute planned sleep and next wake based on current state/time
+  int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());
+  int sleepHours = determineSleepDuration(batteryPercent);
+#if DEBUG_NO_DEEP_SLEEP
+  sleepHours = 3;
+#endif
+  uint32_t nextWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : 0) + (uint32_t)sleepHours * 3600UL;
+  float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
+
   String json = buildJsonPayload(
     fix.latitude,
     fix.longitude,
@@ -483,12 +515,13 @@ void loop() {
     NODE_ID,
     NAME,
     FIRMWARE_VERSION,
-    getHeadingDegrees(),
     uptime,           // <-- new
     resetReason,       // <-- new
     String(""), String(""), String(""), 0, // net fields will be set later when connected
-    rtcState.lastBatteryVoltage,
-    rtcState.lastWaterTemp
+    rtcState.lastWaterTemp,
+    sleepHours,
+    nextWakeUtc,
+    batteryDelta
   );
 
   // (Initial JSON suppressed; final JSON will be printed before upload)
@@ -572,6 +605,8 @@ void loop() {
       String op = modem.getOperator();
       String ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
       int rssi = modem.getSignalQuality();
+      // Refresh next wake with possibly updated timestamp
+      nextWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : 0) + (uint32_t)sleepHours * 3600UL;
       json = buildJsonPayload(
         fix.latitude,
         fix.longitude,
@@ -585,15 +620,16 @@ void loop() {
         NODE_ID,
         NAME,
         FIRMWARE_VERSION,
-        getHeadingDegrees(),
         uptime,
         resetReason,
         op,
         String(NETWORK_PROVIDER),
         ipStr,
         rssi,
-        rtcState.lastBatteryVoltage,
-        rtcState.lastWaterTemp
+        rtcState.lastWaterTemp,
+        sleepHours,
+        nextWakeUtc,
+        batteryDelta
       );
       SerialMon.println("Final JSON (with network diagnostics):");
       SerialMon.println(json);
@@ -622,13 +658,6 @@ void loop() {
       storeUnsentJson(json);
     }
   }
-  int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());  // Use stable voltage
-  int sleepHours = determineSleepDuration(batteryPercent);
-#if DEBUG_NO_DEEP_SLEEP
-  // Force 3-hour cycle during debugging
-  sleepHours = 3;
-#endif
-
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
   delay(100);
 
@@ -638,6 +667,10 @@ void loop() {
   
   // Before sleep: power down modem/GPS/Cellular data completely to conserve power
   powerOffModem();
+
+  // Store planned sleep/wake info in RTC for next boot's wake reason context
+  rtcState.lastSleepHours = (uint16_t)sleepHours;
+  rtcState.lastNextWakeUtc = nextWakeUtc;
 
 #if DEBUG_NO_DEEP_SLEEP
   SerialMon.println("DEBUG_NO_DEEP_SLEEP active: staying awake and delaying instead of deep sleep.");
