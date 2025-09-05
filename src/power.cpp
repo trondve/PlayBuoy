@@ -23,7 +23,7 @@ static uint16_t readAnalogRawAverage(int pin, int samples) {
 }
 
 static float method1_user_formula(uint16_t raw) {
-  float v = ((float)raw / 4095.0f) * 2.0f * 3.3f * (1100.0f / 1000.0f);
+  float v = ((float)raw / 4095.0f) * 2.0f * 3.3f * (1110.0f / 1000.0f);
   return v;
 }
 

@@ -414,8 +414,11 @@ void loop() {
 
     fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {
+      // Check drift against previous position before overwriting it
+      if (rtcState.lastGpsFixTime > 1000000000) {
+        checkAnchorDrift(fix.latitude, fix.longitude);
+      }
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);
-      checkAnchorDrift(fix.latitude, fix.longitude);
       if (fix.fixTimeEpoch > 1000000000) {
         syncRtcWithGps(fix.fixTimeEpoch);
       }
@@ -659,6 +662,14 @@ void loop() {
     }
   }
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
+  if (nextWakeUtc >= 24 * 3600) {
+    struct tm tm_utc;
+    time_t t = (time_t)nextWakeUtc;
+    gmtime_r(&t, &tm_utc);
+    char whenBuf[32];
+    strftime(whenBuf, sizeof(whenBuf), "%d/%m/%y - %H:%M", &tm_utc);
+    SerialMon.printf("Next wake (UTC): %s\n", whenBuf);
+  }
   delay(100);
 
   // Before sleep: cut power to 3.3V rail to disable GY-91 LED, wait 2 seconds

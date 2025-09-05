@@ -41,7 +41,6 @@ static float distanceBetween(float lat1, float lon1, float lat2, float lon2) {
   return distance;
 }
 
-#define ANCHOR_DRIFT_THRESHOLD 3
 #define ANCHOR_DRIFT_DISTANCE_THRESHOLD 50.0f
 
 void rtcStateBegin() {
@@ -81,17 +80,9 @@ void updateLastGpsFix(float lat, float lon, uint32_t epochSec) {
 
 void checkAnchorDrift(float currentLat, float currentLon) {
   float dist = distanceBetween(currentLat, currentLon, rtcState.lastGpsLat, rtcState.lastGpsLon);
-  bool driftDetectedNow = dist > ANCHOR_DRIFT_DISTANCE_THRESHOLD;
-
-  if (driftDetectedNow) {
-    rtcState.anchorDriftCounter++;
-    if (rtcState.anchorDriftCounter >= ANCHOR_DRIFT_THRESHOLD) {
-      rtcState.anchorDriftDetected = true;
-    }
-  } else {
-    rtcState.anchorDriftCounter = 0;
-    rtcState.anchorDriftDetected = false;
-  }
+  // Immediate detection: mark alert if distance exceeds threshold on this wake
+  rtcState.anchorDriftDetected = (dist > ANCHOR_DRIFT_DISTANCE_THRESHOLD);
+  rtcState.anchorDriftCounter = rtcState.anchorDriftDetected ? 1 : 0;
 
   SerialMon.printf("Anchor drift check: distance=%.2f m, counter=%d, alert=%s\n",
                    dist, rtcState.anchorDriftCounter,

@@ -1,0 +1,112 @@
+22:05:55.355 > [37me[37mts Jul 29 2019 12:21:46
+22:05:55.356 > 
+22:05:55.356 > rst:0x1 (POWERON_RESET),boot:0x13 (S[37mP[37mI_FAST_FLASH_BOOT)
+22:05:55.362 > configsip: 0, SPIWP:0xee
+22:05:55.362 > clk_drv:0x00,q_dr[37mv[37m:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+22:05:55.366 > mode:DIO[37m,[37m clock div:2
+22:05:55.373 > load:0x3fff0030,len:1184
+22:05:55.373 > load:0x40078000,len:132[37m3[37m2
+22:05:55.377 > load:0x40080400,len:3028
+22:05:55.377 > entry 0x400805e4
+22:05:58.649 > [37mW[37makeup reason: Undefined (Power On / Reset)
+22:05:58.649 > RTC timezone config[37mu[37mred (CET/CEST)
+22:05:58.656 > 
+22:05:58.656 > Starting battery voltage measurement..
+22:05:58.656 > Pin: [37mG[37mPIO35, ADC: 12-bit, Atten: 11 dB
+22:05:58.661 > Stabilizing for 2 s before fir[37ms[37mt burst...
+22:06:00.760 > [37mB[37murst V[1]: 0.000 V  INVALID
+22:06:01.864 > [37mB[37murst V[2]: 0.000 V  INVALID
+22:06:02.968 > [37mB[37murst V[3]: 0.000 V  INVALID
+22:06:04.072 > [37mB[37murst V[4]: 0.000 V  INVALID
+22:06:05.177 > [37mB[37murst V[5]: 0.000 V  INVALID
+22:06:05.177 > Median (5): 0.000 V  INVALID
+22:06:05.177 > Measur[37me[37mment set complete.
+22:06:06.893 > [37m=[37m== END BATTERY MEASUREMENT ===
+22:06:06.893 > Battery voltage: 0.00 V, approx[37m [37m0%
+22:06:06.898 > WARNING: Battery undervoltage detected!
+22:06:06.898 > Current voltage: 0.[37m0[37m00 V (threshold: 3.00 V)
+22:06:06.903 > Continuing operation - no deep sleep t[37mr[37miggered.
+22:06:06.910 > === Starting wave data collection with power manageme[37mn[37mt (3 minutes) ===
+22:06:06.915 > WARNING: Low voltage (0.00V) before wave dat[37ma[37m collection
+22:06:06.919 > Consider reducing power consumption or delaying ope[37mr[37mation
+22:06:06.926 > Powering on 3.3V rail...
+22:06:06.926 > 3.3V rail powered on.
+22:06:11.920 > [37mP[37mowering on sensors...
+22:06:11.920 > Sensors powered on.
+22:06:11.920 > Initializing sensor[37ms...
+22:06:12.004 > [37mS[37mensors initialized
+22:06:12.509 > [37m=[37m== Starting wave data collection (3 minutes) ===
+22:06:12.509 > Attempting IM[37mU[37m initialization...
+22:06:12.510 > Initializing MPU6500 directly...
+22:06:12.510 > Failed to[37m [37mreset MPU6500
+22:06:12.520 > ERROR: Failed to initialize IMU; wave data will [37mb[37me zeros
+22:06:12.524 > ---- Wave Stats (last window) ----
+22:06:12.524 > Samples: 0 @ 10.0 [37mH[37mz, Waves detected: 0
+22:06:12.531 > Hs (sig. height):    0.000 m
+22:06:12.531 > Tp (period): [37m [37m       0.00 s
+22:06:12.538 > Power proxy:         0.000 kW/m
+22:06:12.538 > Sea state:       [37m [37m   No waves (Perfect conditions)
+22:06:12.542 > WARNING: MPU6500 data not avai[37ml[37mable - wave readings may be zero
+22:06:12.547 > -----------------------------[37m-[37m----
+22:06:12.554 > Powering off sensors...
+22:06:12.554 > Sensors powered off.
+22:06:17.552 > [37mP[37mowering off 3.3V rail...
+22:06:17.552 > 3.3V rail powered off.
+22:06:17.552 > === Wave data[37m [37mcollection complete ===
+22:06:17.559 > Starting GNSS fix procedure...
+22:06:17.559 > Starti[37mn[37mg modem power sequence...
+22:06:22.860 > [37mP[37mower sequence complete. Waiting for modem...
+22:06:29.874 > [37m=[37m== PDP with APN "telenor.smart" ===
+22:06:29.903 > [37mA[37mT+CGDCONT=1,"IP","telenor.smart"[37m[37m
+22:06:29.922 > OK
+22:06:29.949 > [37mA[37mT+CNACT=1,"telenor.smart"[37m[37m
+22:06:29.982 > OK
+22:06:30.005 > [37mA[37mT+CNACT?[37m[37m
+22:06:30.012 > +CNACT: 2,"0.0.0.0"
+22:06:30.012 > 
+22:06:30.012 > OK
+22:06:30.635 > [37m[37m
+22:06:30.637 > +APP PDP: ACTIVE
+22:06:30.642 > [37mA[37mT+CNACT=1,"telenor.smart"
+22:06:30.642 > ERROR
+22:06:30.670 > [37mA[37mT+CNACT?[37m[37m
+22:06:30.684 > +CNACT: 1,"10.60.189.229"
+22:06:30.684 > 
+22:06:30.684 > OK
+22:06:30.684 > PDP ACTIVE ✅  IP: 10.60.189[37m.[37m229
+22:06:30.687 > === NTP SYNC (no.pool.ntp.org) ===
+22:06:30.706 > [37mA[37mT+CNTPCID=1
+22:06:30.706 > OK
+22:06:30.740 > [37mA[37mT+CNTP="no.pool.ntp.org",0
+22:06:30.740 > OK
+22:06:30.760 > [37mA[37mT+CNTP
+22:06:30.760 > OK
+22:06:30.795 > [37mA[37mT+CCLK?
+22:06:30.795 > +CCLK: "25/09/03,22:06:29+00"
+22:06:30.795 > 
+22:06:30.795 > OK
+22:06:30.795 > CCLK raw: 
+22:06:30.795 > AT+CC[37mL[37mK?
+22:06:30.802 > +CCLK: "25/09/03,22:06:29+00"
+22:06:30.802 > 
+22:06:30.802 > OK
+22:06:30.802 > 
+22:06:30.802 > RTC set from NTP vi[37ma[37m modem: 1756937189 (UTC)
+22:06:30.809 > XTRA is fresh enough; skipping downloa[37md[37m.
+22:06:30.829 > [37m[37m
+22:06:30.830 > +CNTP: 61
+22:06:30.832 > [37mA[37mT+CNACT=0,0[37m[37m
+22:06:30.838 > ERROR
+22:06:30.862 > [37mA[37mT+CNACT=0[37m[37m
+22:06:30.867 > OK
+22:06:31.288 > [37m[37m
+22:06:31.288 > +APP PDP: DEACTIVE
+22:06:31.288 > [37mA[37mT+CGACT=0,1
+22:06:31.294 > OK
+22:06:31.719 > [37mA[37mT+CGATT=0[37m[37m
+22:06:32.136 > OK
+22:06:32.559 > [37mA[37mT+CIPSHUT
+22:06:32.559 > SHUT OK
+22:06:40.962 > [37m=[37m== GNSS POWER ON ===
+22:06:40.962 > Setting GPS power pin HIGH...
+22:06:40.962 > GPS power [37mp[37min set HIGH.
