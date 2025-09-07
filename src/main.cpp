@@ -669,12 +669,12 @@ void loop() {
 
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
   if (rtcState.lastNextWakeUtc >= 24 * 3600) {
-    struct tm tm_utc;
+    struct tm tm_local;
     time_t t = (time_t)rtcState.lastNextWakeUtc;
-    gmtime_r(&t, &tm_utc);
+    localtime_r(&t, &tm_local);
     char whenBuf[32];
-    strftime(whenBuf, sizeof(whenBuf), "%d/%m/%y - %H:%M", &tm_utc);
-    SerialMon.printf("Next wake (UTC): %s\n", whenBuf);
+    strftime(whenBuf, sizeof(whenBuf), "%d/%m/%y - %H:%M", &tm_local);
+    SerialMon.printf("Next wake (Europe/Oslo): %s\n", whenBuf);
   }
   delay(100);
 
