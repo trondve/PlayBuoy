@@ -107,31 +107,33 @@ void powerOnModem() {
   pinMode(MODEM_DTR, OUTPUT);
   pinMode(MODEM_RI, INPUT);
   
-  // Power sequence (matching your working test)
+  // Softer power sequence: keep DTR HIGH (sleep), avoid extra RST pulsing
+  digitalWrite(MODEM_DTR, HIGH);
   digitalWrite(MODEM_POWER_ON, LOW);
   digitalWrite(MODEM_RST, LOW);
   digitalWrite(MODEM_PWRKEY, HIGH);
-  digitalWrite(MODEM_DTR, HIGH);
   delay(100);
-  
+
   digitalWrite(MODEM_POWER_ON, HIGH);
   delay(1000);
-  
+
+  // Single reset line release, no pulse train
   digitalWrite(MODEM_RST, HIGH);
   delay(100);
-  digitalWrite(MODEM_RST, LOW);
-  delay(100);
-  digitalWrite(MODEM_RST, HIGH);
-  delay(3000);
-  
+
+  // Boot with PWRKEY low>=1s then high
   digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1000);
+  delay(1200);
   digitalWrite(MODEM_PWRKEY, HIGH);
-  
+
+  // Keep modem asleep (DTR HIGH) and idle longer before UART/attach
+  SerialMon.println("Power sequence complete. Settling modem...");
+  delay(7000);
+}
+
+// Ensure modem is awake before registration/attach (DTR LOW)
+void wakeModemForNetwork() {
   digitalWrite(MODEM_DTR, LOW);
-  
-  SerialMon.println("Power sequence complete. Waiting for modem...");
-  delay(5000);
 }
 
 void powerOffModem() {
@@ -661,10 +663,14 @@ void loop() {
       storeUnsentJson(json);
     }
   }
+  // Store planned sleep/wake info in RTC for next boot's wake reason context
+  rtcState.lastSleepHours = (uint16_t)sleepHours;
+  rtcState.lastNextWakeUtc = nextWakeUtc;
+
   SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
-  if (nextWakeUtc >= 24 * 3600) {
+  if (rtcState.lastNextWakeUtc >= 24 * 3600) {
     struct tm tm_utc;
-    time_t t = (time_t)nextWakeUtc;
+    time_t t = (time_t)rtcState.lastNextWakeUtc;
     gmtime_r(&t, &tm_utc);
     char whenBuf[32];
     strftime(whenBuf, sizeof(whenBuf), "%d/%m/%y - %H:%M", &tm_utc);
@@ -678,10 +684,6 @@ void loop() {
   
   // Before sleep: power down modem/GPS/Cellular data completely to conserve power
   powerOffModem();
-
-  // Store planned sleep/wake info in RTC for next boot's wake reason context
-  rtcState.lastSleepHours = (uint16_t)sleepHours;
-  rtcState.lastNextWakeUtc = nextWakeUtc;
 
 #if DEBUG_NO_DEEP_SLEEP
   SerialMon.println("DEBUG_NO_DEEP_SLEEP active: staying awake and delaying instead of deep sleep.");

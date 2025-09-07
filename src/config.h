@@ -1,7 +1,7 @@
 // Configuration - Update these values for your specific setup
 #define NODE_ID "playbuoy_grinde"
 #define NAME "Litla Grindevatnet"
-#define FIRMWARE_VERSION "1.2.1"
+#define FIRMWARE_VERSION "1.2.0"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
 // API Configuration

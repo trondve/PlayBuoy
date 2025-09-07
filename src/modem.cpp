@@ -20,13 +20,19 @@ extern void powerOnModem();
 extern void powerOffModem();
 
 // Connection timeout
-static const unsigned long NETWORK_TIMEOUT_MS = 30000;
+static const unsigned long NETWORK_TIMEOUT_MS = 60000;
 
 //
 // Connect to NB-IoT or LTE-M network using given APN
 //
 bool connectToNetwork(const char* apn) {
   const int maxRetries = 3;
+  // Pre-cycle the modem once at entry to mirror the known-good path of attempt 2
+  SerialMon.println("Pre-cycling modem before first registration attempt...");
+  powerOffModem();
+  delay(2000);
+  powerOnModem();
+  delay(3000);
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     SerialMon.printf("Connecting to cellular network (attempt %d/%d)...\n", attempt + 1, maxRetries);
 
@@ -35,6 +41,10 @@ bool connectToNetwork(const char* apn) {
     modem.init();
     // Guard: give UART/modem a moment before first AT test
     delay(4000);
+
+    // Prefer LTE-M (CAT-M1) as primary RAT (no band/operator locks)
+    modem.sendAT("+CNMP=38"); // LTE-M
+    modem.waitResponse(1000);
     
     // Test basic communication first
     SerialMon.println("Testing AT communication...");
@@ -59,13 +69,37 @@ bool connectToNetwork(const char* apn) {
 
     // Use modem defaults (matches previously working configuration)
 
+    // Brief settle after GNSS teardown and RAT setup before network registration
+    delay(2500);
+    // Wake modem for network operations (drop DTR)
+    extern void wakeModemForNetwork();
+    wakeModemForNetwork();
+    delay(150);
+    // Log current registration status
+    modem.sendAT("+CEREG?");
+    modem.waitResponse(1000);
     // Wait for network registration
     SerialMon.println("Waiting for network registration...");
     esp_task_wdt_reset(); // Reset watchdog before network wait
     if (!modem.waitForNetwork(NETWORK_TIMEOUT_MS)) {
       SerialMon.println(" Network registration failed.");
+      // Delay CSQ read; immediate reads often return 99 even when camping
+      delay(800);
       SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
       SerialMon.println("Operator: " + modem.getOperator());
+      // Fallback: try NB-IoT once if LTE-M fails first (no band/operator locks)
+      static bool triedNBIoT = false;
+      if (!triedNBIoT) {
+        triedNBIoT = true;
+        SerialMon.println("Trying NB-IoT fallback (AT+CNMP=51)...");
+        modem.sendAT("+CNMP=51"); // NB-IoT only
+        modem.waitResponse(1000);
+        if (modem.waitForNetwork(NETWORK_TIMEOUT_MS)) {
+          SerialMon.println(" Network registered on NB-IoT.");
+        } else {
+          SerialMon.println(" NB-IoT fallback failed.");
+        }
+      }
       
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
@@ -78,8 +112,31 @@ bool connectToNetwork(const char* apn) {
     }
 
     SerialMon.println(" Network registered.");
+    // Let CSQ stabilize briefly
+    delay(500);
     SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
     SerialMon.println("Operator: " + modem.getOperator());
+
+    // RAT check: print AT+CPSI? so we can verify LTE-M vs NB-IoT in logs
+    SerialMon.println("RAT check (AT+CPSI?):");
+    modem.sendAT("+CPSI?");
+    {
+      unsigned long t0 = millis();
+      String line;
+      while (millis() - t0 < 1500) {
+        while (Serial1.available()) {
+          char c = (char)Serial1.read();
+          if (c == '\n') {
+            line.trim();
+            if (line.length()) SerialMon.println(line);
+            line = "";
+          } else if (c != '\r') {
+            line += c;
+          }
+        }
+        delay(10);
+      }
+    }
 
     // Check if network is connected
     if (!modem.isNetworkConnected()) {
