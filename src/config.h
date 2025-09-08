@@ -1,7 +1,7 @@
 // Configuration - Update these values for your specific setup
 #define NODE_ID "playbuoy_grinde"
 #define NAME "Litla Grindevatnet"
-#define FIRMWARE_VERSION "1.2.0"
+#define FIRMWARE_VERSION "1.2.1"
 #define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
 
 // API Configuration
@@ -29,6 +29,15 @@
 
 // Power/ADC calibration
 #define BATTERY_CALIBRATION_FACTOR 0.454398f
+
+// Critical battery guard (deep sleep when low)
+#define ENABLE_CRITICAL_GUARD 1
+#define BATTERY_CRITICAL_PERCENT 20          // deep sleep at or below 20%
+#define BATTERY_CRITICAL_VOLTAGE 3.633f      // ~20% OCV threshold
+
+// Modem timing/shutdown feature flags
+#define ENABLE_GENTLE_MODEM_TIMING 1
+#define ENABLE_CPOWD_SHUTDOWN 1
 
 
 // Optional SIM PIN (leave empty if not required)

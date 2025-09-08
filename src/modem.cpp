@@ -39,18 +39,18 @@ bool connectToNetwork(const char* apn) {
     // Initialize modem
     SerialMon.println("Initializing modem...");
     modem.init();
-    // Guard: give UART/modem a moment before first AT test
-    delay(4000);
+    // Guard: give UART/modem a moment before first AT test (conservative)
+    delay(5000);
 
     // Prefer LTE-M (CAT-M1) as primary RAT (no band/operator locks)
     modem.sendAT("+CNMP=38"); // LTE-M
     modem.waitResponse(1000);
     
-    // Test basic communication first
+    // Test basic communication first (conservative pacing)
     SerialMon.println("Testing AT communication...");
     if (!modem.testAT()) {
       // One soft retry before deciding to power-cycle
-      delay(2000);
+      delay(300);
       if (!modem.testAT()) {
         SerialMon.println(" AT communication failed");
         if (attempt < maxRetries - 1) {
@@ -58,7 +58,7 @@ bool connectToNetwork(const char* apn) {
           powerOffModem();
           delay(2000);
           powerOnModem();
-          delay(3000);
+          delay(4000);
         }
         continue;
       }
@@ -69,8 +69,8 @@ bool connectToNetwork(const char* apn) {
 
     // Use modem defaults (matches previously working configuration)
 
-    // Brief settle after GNSS teardown and RAT setup before network registration
-    delay(2500);
+    // Brief settle after GNSS teardown and RAT setup before network registration (conservative)
+    delay(3000);
     // Wake modem for network operations (drop DTR)
     extern void wakeModemForNetwork();
     wakeModemForNetwork();
@@ -123,7 +123,7 @@ bool connectToNetwork(const char* apn) {
     {
       unsigned long t0 = millis();
       String line;
-      while (millis() - t0 < 1500) {
+      while (millis() - t0 < 2000) {
         while (Serial1.available()) {
           char c = (char)Serial1.read();
           if (c == '\n') {

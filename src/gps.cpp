@@ -75,7 +75,8 @@ static bool bringUpPDP(const char* apn) {
         }
       }
     }
-    delay(600);
+    // Conservative cadence between PDP attempts
+    delay(1200);
   }
   return false;
 }
@@ -328,10 +329,13 @@ static void gnssSmoke60s() {
 void gpsEnd() { gnssStop(); }
 
 static void syncTimeAndMaybeApplyXTRA() {
+  // In minimal mode we may skip time/XTRA later via a guard in main; this function remains unchanged otherwise
   ClockInfo nowCi{};
   // Try primary, then secondary APN
   bool pdp = bringUpPDP(APN_PRIMARY) || bringUpPDP(APN_SECONDARY);
   if (pdp) {
+    // Conservative idle after PDP up before CNTP
+    delay(1500);
     if (doNTPSync(&nowCi)) {
       // Set ESP32 RTC from modem time (convert local time + tz to UTC epoch)
       if (nowCi.valid) {

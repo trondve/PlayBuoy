@@ -4,12 +4,19 @@
 #include "rtc_state.h"
 #include <time.h>
 
+// Forward declarations from main.cpp
+extern void powerOff3V3Rail();
+extern void powerOffModem();
+
 #define SerialMon Serial
 
 #define CHARGE_THRESHOLD       3.7f
 #define CHARGE_HYSTERESIS      0.03f
 
-#define BATTERY_CRITICAL_VOLTAGE 3.00f  // Re-enabled but will only print voltage, not sleep
+// Thresholds are configured in config.h
+#ifndef BATTERY_CRITICAL_VOLTAGE
+#define BATTERY_CRITICAL_VOLTAGE 3.633f
+#endif
 #define BATTERY_UNDERVOLTAGE_SLEEP_HOURS 168
 
 static bool isCharging = false;
@@ -40,12 +47,36 @@ bool handleUndervoltageProtection() {
   float voltage = getStableBatteryVoltage();  // Use stable voltage instead of measuring
 
   // Undervoltage protection (compile-time optional)
-#ifdef BATTERY_CRITICAL_VOLTAGE
-  if (voltage < BATTERY_CRITICAL_VOLTAGE) {
-    SerialMon.println("WARNING: Battery undervoltage detected!");
-    SerialMon.printf("Current voltage: %.3f V (threshold: %.2f V)\n", voltage, BATTERY_CRITICAL_VOLTAGE);
-    SerialMon.println("Continuing operation - no deep sleep triggered.");
-    return true;
+#if ENABLE_CRITICAL_GUARD
+  int pct = estimateBatteryPercent(voltage);
+  if (pct <= BATTERY_CRITICAL_PERCENT || voltage <= BATTERY_CRITICAL_VOLTAGE) {
+    SerialMon.println("CRITICAL: Battery too low — entering deep sleep.");
+    SerialMon.printf("Current: %d%% / %.3f V (<= %d%% or <= %.3f V)\n",
+                     pct, voltage, BATTERY_CRITICAL_PERCENT, BATTERY_CRITICAL_VOLTAGE);
+    // Decide a conservative sleep window using existing policy
+    int sleepHours = determineSleepDuration(pct);
+    // Compute next wake epoch from current RTC time
+    uint32_t now = (uint32_t)time(NULL);
+    uint32_t nextWake = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepHours * 3600UL;
+    rtcState.lastSleepHours = (uint16_t)sleepHours;
+    rtcState.lastNextWakeUtc = nextWake;
+    // Print local next wake for convenience
+    if (rtcState.lastNextWakeUtc >= 24 * 3600) {
+      struct tm tm_local;
+      time_t t = (time_t)rtcState.lastNextWakeUtc;
+      localtime_r(&t, &tm_local);
+      char whenBuf[32];
+      strftime(whenBuf, sizeof(whenBuf), "%d/%m/%y - %H:%M", &tm_local);
+      SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
+      SerialMon.printf("Next wake (Europe/Oslo): %s\n", whenBuf);
+    }
+    // Ensure rails and modem are off
+    powerOff3V3Rail();
+    powerOffModem();
+    // Sleep
+    esp_sleep_enable_timer_wakeup((uint64_t)sleepHours * 3600ULL * 1000000ULL);
+    esp_deep_sleep_start();
+    return true; // not reached
   }
 #endif
   return false;
@@ -165,52 +196,37 @@ int determineSleepDuration(int batteryPercent) {
 
   if (isWinterSeason(month)) {
     SerialMon.printf("Winter season detected (month %d)\n", month);
-    
-    // More conservative winter strategy as requested
-    if (batteryPercent >= 70) {
-      // Wake up once daily at noon
-      int hoursToNoon = 12 - hour;
-      if (hoursToNoon <= 0) {
-        hoursToNoon += 24;  // Next day at noon
-      }
-      SerialMon.printf("Winter mode: battery %d%% (>=70%%), waking daily at noon, sleeping %d hours\n", batteryPercent, hoursToNoon);
-      return hoursToNoon;
-    } else if (batteryPercent >= 60) {
-      SerialMon.printf("Winter mode: battery %d%% (60-69%%), sleeping 48 hours (2 days)\n", batteryPercent);
-      return 48;   // 2 days
-    } else if (batteryPercent >= 50) {
-      SerialMon.printf("Winter mode: battery %d%% (50-59%%), sleeping 168 hours (7 days)\n", batteryPercent);
-      return 168;  // 7 days
-    } else if (batteryPercent >= 40) {
-      SerialMon.printf("Winter mode: battery %d%% (40-49%%), sleeping 336 hours (14 days)\n", batteryPercent);
-      return 336;  // 14 days
-    } else if (batteryPercent >= 30) {
-      SerialMon.printf("Winter mode: battery %d%% (30-39%%), sleeping 720 hours (30 days)\n", batteryPercent);
-      return 720;  // 30 days
-    } else if (batteryPercent >= 20) {
-      SerialMon.printf("Winter mode: battery %d%% (20-29%%), sleeping 1440 hours (60 days)\n", batteryPercent);
-      return 1440; // 60 days
-    } else {
-      SerialMon.printf("Winter mode: battery %d%% (<20%%), sleeping 2160 hours (90 days)\n", batteryPercent);
-      return 2160; // 90 days (hibernate-like)
-    }
+    // Winter mapping
+    if (batteryPercent > 55) return 24;         // 24 hours
+    if (batteryPercent > 50) return 36;         // 36 hours  
+    if (batteryPercent > 45) return 48;         // 2 day (48 hours)
+    if (batteryPercent > 40) return 72;         // 3 day (72 hours)
+    if (batteryPercent > 35) return 168;        // 7 days (168 hours)
+    if (batteryPercent > 30) return 336;        // 14 days (336 hours)
+    if (batteryPercent > 25) return 720;        // 1 month (720 hours)
+    if (batteryPercent > 20) return 1460;       // 2 month (1460 hours)
+    return 2180;                                 // 3 month (2180 hours)
   }
 
   SerialMon.printf("Summer season detected (month %d)\n", month);
-  // May–September: use battery-based logic
+  // Summer mapping
   if (batteryPercent > 80) {
     SerialMon.printf("Summer mode: battery >80%%, sleeping 3 hours\n");
-    return 3;          // minimum 3 hours
+    return 3;
   }
+  if (batteryPercent > 75) return 4;          // 4 hours
   if (batteryPercent > 70) return 6;          // 6 hours
+  if (batteryPercent > 65) return 9;          // 9 hours
   if (batteryPercent > 60) return 12;         // 12 hours
-  if (batteryPercent > 50) return 24;         // 24 hours  
-  if (batteryPercent > 40) return 48;         // 2 day (48 hours)
-  if (batteryPercent > 30) return 168;        // 7 days (168 hours)
-  if (batteryPercent > 20) return 720;        // 1 month (720 hours)
-  if (batteryPercent > 15) return 1460;       // 2 month (1460 hours)
-  if (batteryPercent > 10) return 2180;       // 3 month (2180 hours)
-  return 2;                               
+  if (batteryPercent > 55) return 24;         // 24 hours
+  if (batteryPercent > 50) return 36;         // 36 hours  
+  if (batteryPercent > 45) return 48;         // 2 day (48 hours)
+  if (batteryPercent > 40) return 72;         // 3 day (72 hours)
+  if (batteryPercent > 35) return 168;        // 7 days (168 hours)
+  if (batteryPercent > 30) return 336;        // 14 days (336 hours)
+  if (batteryPercent > 25) return 720;        // 1 month (720 hours)
+  if (batteryPercent > 20) return 1460;       // 2 month (1460 hours)
+  return 2180;                                 // 3 month (2180 hours)
 }
 
 // Function to log battery voltage and estimated percentage

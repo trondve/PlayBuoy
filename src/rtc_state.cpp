@@ -79,6 +79,13 @@ void updateLastGpsFix(float lat, float lon, uint32_t epochSec) {
 }
 
 void checkAnchorDrift(float currentLat, float currentLon) {
+  // If we don't have a previous anchor stored, inform and return
+  if (rtcState.lastGpsFixTime <= 1000000000) {
+    SerialMon.println("Anchor drift check: No previous anchor");
+    rtcState.anchorDriftDetected = false;
+    rtcState.anchorDriftCounter = 0;
+    return;
+  }
   float dist = distanceBetween(currentLat, currentLon, rtcState.lastGpsLat, rtcState.lastGpsLon);
   // Immediate detection: mark alert if distance exceeds threshold on this wake
   rtcState.anchorDriftDetected = (dist > ANCHOR_DRIFT_DISTANCE_THRESHOLD);

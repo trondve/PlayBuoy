@@ -117,29 +117,51 @@ void powerOnModem() {
   digitalWrite(MODEM_POWER_ON, HIGH);
   delay(1000);
 
-  // Single reset line release, no pulse train
+  // Keep reset released (no pulse train for normal bring-up)
   digitalWrite(MODEM_RST, HIGH);
   delay(100);
 
-  // Boot with PWRKEY low>=1s then high
+  // Boot with PWRKEY low ~2.0s then high (conservative)
   digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1200);
+  delay(2000);
   digitalWrite(MODEM_PWRKEY, HIGH);
 
-  // Keep modem asleep (DTR HIGH) and idle longer before UART/attach
+  // Keep modem asleep (DTR HIGH) and idle longer before UART/attach (conservative 10 s)
   SerialMon.println("Power sequence complete. Settling modem...");
-  delay(7000);
+  delay(10000);
 }
 
 // Ensure modem is awake before registration/attach (DTR LOW)
 void wakeModemForNetwork() {
+  // Conservative: ensure a definite wake edge and small settle
+  digitalWrite(MODEM_DTR, HIGH);
+  delay(50);
   digitalWrite(MODEM_DTR, LOW);
+  delay(150);
 }
 
 void powerOffModem() {
   SerialMon.println("Powering off modem...");
   
-  // Power off sequence
+  // Try graceful shutdown first (optional)
+#if ENABLE_CPOWD_SHUTDOWN
+  // Send CPOWD via raw AT if available
+  extern HardwareSerial Serial1;
+  Serial1.println("AT+CPOWD=1");
+  unsigned long t0 = millis();
+  bool normalDown = false;
+  while (millis() - t0 < 8000) {
+    while (Serial1.available()) {
+      String line = Serial1.readStringUntil('\n');
+      line.trim();
+      if (line.indexOf("NORMAL POWER DOWN") >= 0) { normalDown = true; break; }
+    }
+    if (normalDown) break;
+    delay(50);
+  }
+  if (!normalDown) {
+#endif
+  // Power off sequence (fallback)
   digitalWrite(MODEM_PWRKEY, LOW);
   delay(1000);
   digitalWrite(MODEM_PWRKEY, HIGH);
@@ -151,6 +173,14 @@ void powerOffModem() {
   
   g_modemReady = false;
   SerialMon.println("Modem powered off.");
+#if ENABLE_CPOWD_SHUTDOWN
+  } else {
+    digitalWrite(MODEM_POWER_ON, LOW);
+    digitalWrite(MODEM_DTR, HIGH);
+    g_modemReady = false;
+    SerialMon.println("Modem powered off (CPOWD).");
+  }
+#endif
 }
 
 // Power management functions for 3.3V rail
@@ -416,10 +446,8 @@ void loop() {
 
     fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {
-      // Check drift against previous position before overwriting it
-      if (rtcState.lastGpsFixTime > 1000000000) {
-        checkAnchorDrift(fix.latitude, fix.longitude);
-      }
+      // Always log drift (or no-previous-anchor) before overwriting stored anchor
+      checkAnchorDrift(fix.latitude, fix.longitude);
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);
       if (fix.fixTimeEpoch > 1000000000) {
         syncRtcWithGps(fix.fixTimeEpoch);
