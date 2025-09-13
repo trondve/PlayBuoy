@@ -1,0 +1,36 @@
+22:18:45.314 > [37me[37mts Jul 29 2019 12:21:46
+22:18:45.314 > 
+22:18:45.314 > rst:0x1 (POWERON_RESET),boot:0x13 (S[37mP[37mI_FAST_FLASH_BOOT)
+22:18:45.319 > configsip: 0, SPIWP:0xee
+22:18:45.319 > clk_drv:0x00,q_dr[37mv[37m:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+22:18:45.325 > mode:DIO[37m,[37m clock div:2
+22:18:45.331 > load:0x3fff0030,len:1184
+22:18:45.331 > load:0x40078000,len:132[37m3[37m2
+22:18:45.335 > load:0x40080400,len:3028
+22:18:45.335 > entry 0x400805e4
+22:18:48.798 > [37mW[37makeup reason: Undefined (Power On / Reset)
+22:18:48.799 > RTC timezone config[37mu[37mred (CET/CEST)
+22:18:48.804 > 
+22:18:48.804 > Starting battery voltage measurement..
+22:18:48.804 > Pin: [37mG[37mPIO35, ADC: 12-bit, Atten: 11 dB
+22:18:48.810 > Stabilizing for 2 s before fir[37mst burst...
+22:18:50.914 > [37mB[37murst V[1]: 0.000 V  INVALID
+22:18:52.017 > [37mB[37murst V[2]: 0.000 V  INVALID
+22:18:53.119 > [37mB[37murst V[3]: 0.000 V  INVALID
+22:18:54.221 > [37mB[37murst V[4]: 0.000 V  INVALID
+22:18:55.325 > [37mB[37murst V[5]: 0.000 V  INVALID
+22:18:55.326 > Median (5): 0.000 V  INVALID
+22:18:55.326 > Measur[37me[37mment set complete.
+22:18:57.034 > [37m=[37m== END BATTERY MEASUREMENT ===
+22:18:57.041 > Battery voltage: 0.00 V, approx[37m [37m0%
+22:18:57.041 > CRITICAL: Battery too low — entering deep sleep.
+22:18:57.041 > Current:[37m [37m0% / 0.000 V (<= 20% or <= 3.633 V)
+22:19:07.049 > [37mR[37mTC time check: now=20, retry=10
+22:19:07.049 > RTC not valid, using fallback m[37mo[37mnth: 8 (August)
+22:19:17.049 > [37mR[37mTC not valid, using fallback hour: 10
+22:19:17.049 > Sleep calculation: month[37m=[37m8, hour=10, battery=0%, timezone=CET
+22:19:17.055 > Summer season detected (mo[37mn[37mth 8)
+22:19:17.062 > Sleeping for 2180 hour(s)...
+22:19:17.062 > Next wake (Europe/Oslo): 01/[37m0[37m4/70 - 22:00
+22:19:17.067 > 3.3V rail already powered off.
+22:19:17.067 > Powering off modem[37m.[37m..

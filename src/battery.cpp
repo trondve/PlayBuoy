@@ -4,9 +4,7 @@
 #include "rtc_state.h"
 #include <time.h>
 
-// Forward declarations from main.cpp
-extern void powerOff3V3Rail();
-extern void powerOffModem();
+// Power helpers are declared in power.h
 
 #define SerialMon Serial
 
@@ -57,7 +55,8 @@ bool handleUndervoltageProtection() {
     int sleepHours = determineSleepDuration(pct);
     // Compute next wake epoch from current RTC time
     uint32_t now = (uint32_t)time(NULL);
-    uint32_t nextWake = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepHours * 3600UL;
+    uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepHours * 3600UL;
+    uint32_t nextWake = adjustNextWakeUtcForQuietHours(candidate);
     rtcState.lastSleepHours = (uint16_t)sleepHours;
     rtcState.lastNextWakeUtc = nextWake;
     // Print local next wake for convenience
@@ -73,8 +72,13 @@ bool handleUndervoltageProtection() {
     // Ensure rails and modem are off
     powerOff3V3Rail();
     powerOffModem();
-    // Sleep
-    esp_sleep_enable_timer_wakeup((uint64_t)sleepHours * 3600ULL * 1000000ULL);
+    // Configure pins/subsystems for minimum leakage
+    preparePinsAndSubsystemsForDeepSleep();
+    // Sleep for the exact number of seconds until nextWake
+    uint32_t sleepSec = 0;
+    now = (uint32_t)time(NULL);
+    if (nextWake > now) sleepSec = nextWake - now;
+    esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
     esp_deep_sleep_start();
     return true; // not reached
   }

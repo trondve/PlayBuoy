@@ -7,6 +7,13 @@
 #include <esp_system.h>
 #include <math.h>
 #include <algorithm>
+#include <Wire.h>
+#include <WiFi.h>
+extern "C" {
+  #include "esp_bt.h"
+}
+#include "driver/gpio.h"
+#include "esp_sleep.h"
 
 
 
@@ -69,6 +76,57 @@ void powerOnSensors();
 void powerOffSensors();
 void powerOnGPS();
 void powerOffGPS();
+
+// Put buses/pins into low-leakage state before deep sleep
+void preparePinsAndSubsystemsForDeepSleep() {
+  // Defensive radio off (WiFi/Bluetooth)
+  WiFi.mode(WIFI_OFF);
+  btStop();
+
+  // I2C high-Z
+  Wire.end();
+  pinMode(21, INPUT);    // SDA
+  pinMode(22, INPUT);    // SCL
+
+  // OneWire line idle (assumes external pull-up present)
+  pinMode(13, INPUT);
+
+  // Modem UART and control lines to high-Z to avoid back-powering
+  pinMode(MODEM_TX, INPUT);
+  pinMode(MODEM_RX, INPUT);
+  pinMode(MODEM_PWRKEY, INPUT);
+  pinMode(MODEM_RST, INPUT);
+  pinMode(MODEM_POWER_ON, INPUT);
+  pinMode(MODEM_DTR, INPUT);
+  pinMode(MODEM_RI, INPUT);
+
+  // Ensure switched 3V3 rail stays LOW across deep sleep
+  pinMode(POWER_3V3_ENABLE, OUTPUT);
+  digitalWrite(POWER_3V3_ENABLE, LOW);
+  gpio_hold_dis(GPIO_NUM_25);
+  gpio_hold_en(GPIO_NUM_25);
+  gpio_deep_sleep_hold_en();
+
+  // Power domains: keep RTC memories, drop RTC peripherals
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_ON);
+}
+
+// Adjust next wake UTC to avoid 00:00-05:59 local; push to 06:00 if inside window
+uint32_t adjustNextWakeUtcForQuietHours(uint32_t candidateUtc) {
+  time_t cand = (time_t)candidateUtc;
+  struct tm lt;
+  localtime_r(&cand, &lt);   // uses configTzTime timezone
+  if (lt.tm_hour >= 0 && lt.tm_hour < 6) {
+    lt.tm_hour = 6;
+    lt.tm_min = 0;
+    lt.tm_sec = 0;
+    time_t adj = mktime(&lt); // mktime interprets struct tm as local time, returns UTC epoch
+    return (uint32_t)adj;
+  }
+  return candidateUtc;
+}
 
 void ensureModemReady() {
   if (g_modemReady) {
@@ -321,6 +379,10 @@ void setup() {
     SerialMon.println("================================");
   }
 
+  // Release any deep-sleep holds from previous cycle before driving pins
+  gpio_deep_sleep_hold_dis();
+  gpio_hold_dis(GPIO_NUM_25);
+
   // Initialize power management pins
   pinMode(POWER_3V3_ENABLE, OUTPUT);
   digitalWrite(POWER_3V3_ENABLE, LOW);  // Start with 3.3V rail off
@@ -532,7 +594,9 @@ void loop() {
 #if DEBUG_NO_DEEP_SLEEP
   sleepHours = 3;
 #endif
-  uint32_t nextWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : 0) + (uint32_t)sleepHours * 3600UL;
+  uint32_t nowUtc = (uint32_t)time(NULL);
+  uint32_t candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
+  uint32_t nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
   String json = buildJsonPayload(
@@ -638,8 +702,10 @@ void loop() {
       String op = modem.getOperator();
       String ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
       int rssi = modem.getSignalQuality();
-      // Refresh next wake with possibly updated timestamp
-      nextWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : 0) + (uint32_t)sleepHours * 3600UL;
+      // Refresh next wake after potential time update and apply quiet-hours adjustment
+      nowUtc = (uint32_t)time(NULL);
+      candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
+      nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
       json = buildJsonPayload(
         fix.latitude,
         fix.longitude,
@@ -725,7 +791,12 @@ void loop() {
     remainingMs -= d;
   }
 #else
-  esp_sleep_enable_timer_wakeup((uint64_t)sleepHours * 3600ULL * 1000000ULL);
+  // Prepare all pins/subsystems for minimum leakage, then sleep
+  preparePinsAndSubsystemsForDeepSleep();
+  uint32_t sleepSec = 0;
+  nowUtc = (uint32_t)time(NULL);
+  if (nextWakeUtc > nowUtc) sleepSec = nextWakeUtc - nowUtc;
+  esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
   esp_deep_sleep_start();
 #endif
 }

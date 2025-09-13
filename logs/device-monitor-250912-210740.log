@@ -1,0 +1,17 @@
+21:07:40.068 > [37me[37mts Jul 29 2019 12:21:46
+21:07:40.069 > 
+21:07:40.069 > rst:0x1 (POWERON_RESET),boot:0x13 (S[37mP[37mI_FAST_FLASH_BOOT)
+21:07:40.074 > configsip: 0, SPIWP:0xee
+21:07:40.074 > clk_drv:0x00,q_dr[37mv[37m:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+21:07:40.079 > mode:DIO[37m,[37m clock div:2
+21:07:40.084 > load:0x3fff0030,len:1184
+21:07:40.084 > load:0x40078000,len:132[37m3[37m2
+21:07:40.090 > load:0x40080400,len:3028
+21:07:40.090 > entry 0x400805e4
+21:07:43.550 > [37mW[37makeup reason: Undefined (Power On / Reset)
+21:07:43.550 > RTC timezone config[37mu[37mred (CET/CEST)
+21:07:43.559 > 
+21:07:43.559 > Starting battery voltage measurement..
+21:07:43.559 > Pin: [37mG[37mPIO35, ADC: 12-bit, Atten: 11 dB
+21:07:43.563 > Stabilizing for 2 s before fir[37ms[37mt burst...
+21:07:45.668 > [37mB[37murst V[1]: 0.000 V  INVALID
