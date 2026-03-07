@@ -25,9 +25,21 @@ This project is inspired by the "Smart Buoy" series:
 ### Logos
 
 Project logos are stored in `assets/logos/`:
-- `playbuoy-logo-light.png` - Light background version
-- `playbuoy-logo-dark.png` - Dark background version
-- `playbuoy-logo-dark-alt.png` - Dark background alternate version
+- `logo.png` - Full-size logo with background
+- `logo-transparent.png` - Full-size logo with transparent background
+- `logo-transparent.svg` - SVG version with transparent background
+- `logo-128.png` - 128px thumbnail with background
+- `logo-128-transparent.png` - 128px thumbnail with transparent background
+- `logo-64.png` - 64px icon with background
+- `logo-64-transparent.png` - 64px icon with transparent background
+
+### 3D Print Files
+
+STL/3MF/OBJ files for the buoy enclosure are stored in `assets/STL/`:
+- `top.stl` / `top.3mf` - Upper dome (solar panel cutouts, antenna hole)
+- `top_tight.stl` / `top_tight.obj` / `top_tight.mtl` - Tighter-fit upper dome variant
+- `bottom.stl` / `bottom.3mf` - Lower hull (submerged half, anchor ring)
+- `logo_curved.stl` - Curved logo emboss for the buoy surface
 
 ## Hardware
 
