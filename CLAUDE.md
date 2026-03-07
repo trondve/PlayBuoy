@@ -41,6 +41,63 @@ STL/3MF/OBJ files for the buoy enclosure are stored in `assets/STL/`:
 - `bottom.stl` / `bottom.3mf` - Lower hull (submerged half, anchor ring)
 - `logo_curved.stl` - Curved logo emboss for the buoy surface
 
+## Component Documentation
+
+All datasheets, manuals, and reference examples are in `docs/components/`:
+
+### LilyGo T-SIM7000G — `docs/components/Lilygo/`
+- `T-SIM7000G-200415.pdf` — Board schematic/datasheet
+- `T-SIM7000G-S3-Standard_Rev1.0.pdf` — S3 variant reference
+- `SIM7000_A7608_A7670_ESP32.png` — Pin map diagram
+- `GPS Antenna Specifications.pdf` — GPS antenna spec
+- `LTE Antenna Specifications.pdf` — LTE antenna spec
+- `SIM7000/` — Full SIM7000G AT command manuals and application notes (see below)
+- `sim7000-esp32/REAMDE.MD` — LilyGo T-SIM7000G board README (pin definitions, getting started)
+- `sim7000g-s3-standard/REAMDE.MD` — S3 variant README
+- `Examples/` — Official LilyGo Arduino examples:
+  - `ATdebug/` — Raw AT command debug sketch
+  - `DeepSleep/` — Deep sleep example (important for power management)
+  - `GPS_BuiltIn/`, `GPS_BuiltInEx/`, `GPS_Acceleration/`, `ModemGpsStream/` — GPS examples
+  - `HttpClient/`, `HttpsClient/`, `HttpsBuiltlnGet/Post/Put/` — HTTP/HTTPS examples
+  - `HttpsOTAUpgrade/` — OTA firmware update example
+  - `ModemPowerOff/`, `ModemSleep/` — Modem power management examples
+  - `ReadBattery/`, `PowerMonitoring/` — Battery/ADC examples
+  - `ModemFileSystem/` — Modem filesystem (for XTRA storage)
+- `TinyGSM/` — TinyGSM library source and examples (used in this project)
+- `TinyGPSPlus/` — TinyGPS++ library source and examples
+
+### SIM7000G — `docs/components/Lilygo/SIM7000/` and `docs/components/SIM7000G/`
+- `SIM7000 Series_AT Command Manual_V1.06.pdf` — **Primary AT command reference** (use this for all modem AT commands)
+- `SIM7000 Series_AT Command Manual_V1.04.pdf` — Older version (in SIM7000G/ folder)
+- `SIM7000 Hardware Design_V1.07.pdf` — Hardware design guide
+- `SIM7000 Series_GNSS_Application Note_V1.03.pdf` — **GNSS/GPS AT commands** (CGNSPWR, CGNSINF, XTRA, etc.)
+- `SIM7000 Series_FS_Application Note_V1.01.pdf` — Filesystem commands (AT+HTTPTOFS for XTRA download)
+- `SIM7000 Series_MQTT(S)_Application Note_V1.02.pdf` — MQTT support
+- `SIM7000 Series_LBS_Application Note_V1.01.pdf` — Location-based services
+- Chinese-language app notes for HTTP(S), NTP, TCP/IP, FTP, PING, SSL
+
+### GY-91 (MPU-9250/MPU-6500 + BMP280) — `docs/components/GY-91/`
+- Four screenshots of key register maps and configuration details for the IMU
+- Use these when working on wave measurement code (accelerometer ranges, DLPF settings, sample rate divider)
+
+### DS18B20 — `docs/components/DS18B20/`
+- `scan4.pdf` — DS18B20 datasheet (temperature probe used for water temperature)
+
+### Key references for common tasks
+| Task | Where to look |
+|------|--------------|
+| AT commands (modem) | `docs/components/Lilygo/SIM7000/SIM7000 Series_AT Command Manual_V1.06.pdf` |
+| GNSS/GPS AT commands | `docs/components/Lilygo/SIM7000/SIM7000 Series_GNSS_Application Note_V1.03.pdf` |
+| XTRA file download | `docs/components/Lilygo/SIM7000/SIM7000 Series_FS_Application Note_V1.01.pdf` |
+| Deep sleep / pin hold | `docs/components/Lilygo/Examples/DeepSleep/DeepSleep.ino` |
+| Modem power off | `docs/components/Lilygo/Examples/ModemPowerOff/ModemPowerOff.ino` |
+| Battery ADC reading | `docs/components/Lilygo/Examples/ReadBattery/ReadBattery.ino` |
+| GPS streaming | `docs/components/Lilygo/Examples/GPS_BuiltIn/GPS_BuiltIn.ino` |
+| OTA firmware update | `docs/components/Lilygo/Examples/HttpsOTAUpgrade/HttpsOTAUpgrade.ino` |
+| Board pin map | `docs/components/Lilygo/SIM7000_A7608_A7670_ESP32.png` |
+| IMU register config | `docs/components/GY-91/` (screenshots) |
+| Temperature sensor | `docs/components/DS18B20/scan4.pdf` |
+
 ## Hardware
 
 ### Main Board
