@@ -231,7 +231,7 @@ static WaveStats analyzeWaves(const float* xbuf, uint32_t n, float fs) {
         uint32_t dt = i - lastUp;
         if (dt >= MIN_SAMPLES && dt <= MAX_SAMPLES_WAVE) {
           float H = localMax - localMin;
-          if (H > 0.8f) H = 0.0f;
+          if (H > 0.5f) H = 0.0f; // small lake: waves >50cm are noise
           float T = dt / fs;
           if (wc < MAX_WAVES && H > MIN_WAVE_HEIGHT) waves[wc++] = {H, T};
         }
@@ -245,7 +245,7 @@ static WaveStats analyzeWaves(const float* xbuf, uint32_t n, float fs) {
   }
 
   if (wc == 0) return {0.0f, 0.0f, 0.0f, 0};
-  for (uint16_t i = 0; i < wc; ++i) if (waves[i].H > 5.0f) return {0.0f, 0.0f, 0.0f, 0};
+  for (uint16_t i = 0; i < wc; ++i) if (waves[i].H > 1.0f) return {0.0f, 0.0f, 0.0f, 0}; // abort if any wave >1m (noise)
 
   uint16_t K = (uint16_t)max<uint16_t>(1, wc / 3);
   float Hlist[MAX_WAVES], Tlist[MAX_WAVES];
