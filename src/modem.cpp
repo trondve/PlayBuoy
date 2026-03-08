@@ -39,8 +39,8 @@ bool connectToNetwork(const char* apn) {
     // Initialize modem
     SerialMon.println("Initializing modem...");
     modem.init();
-    // Guard: give UART/modem a moment before first AT test (conservative)
-    delay(5000);
+    // Brief settle after init before AT commands
+    delay(2000);
 
     // Prefer LTE-M (CAT-M1) as primary RAT (no band/operator locks)
     modem.sendAT("+CNMP=38"); // LTE-M

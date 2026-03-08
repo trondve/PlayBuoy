@@ -184,9 +184,9 @@ void powerOnModem() {
   delay(2000);
   digitalWrite(MODEM_PWRKEY, HIGH);
 
-  // Keep modem asleep (DTR HIGH) and idle longer before UART/attach (conservative 10 s)
+  // Modem ready for AT commands within ~5s after PWRKEY release (datasheet)
   SerialMon.println("Power sequence complete. Settling modem...");
-  delay(10000);
+  delay(6000);
 }
 
 // Ensure modem is awake before registration/attach (DTR LOW)
@@ -465,9 +465,9 @@ void loop() {
     }
   }
   
-  // Power on 3.3V rail, wait 5 seconds, then power on sensors
+  // Power on 3.3V rail, wait for stabilization, then power on sensors
   powerOn3V3Rail();
-  delay(5000);  // 5 second delay as requested
+  delay(500);  // 500ms — rail stabilizes in <10ms, DS18B20/I2C need <100ms
   powerOnSensors();
   if (!g_sensorsInitialized) {
     if (!beginSensors()) SerialMon.println("Sensor init failed.");
@@ -481,9 +481,9 @@ void loop() {
   esp_task_wdt_reset();
   logWaveStats();
   
-  // Power off sensors, wait 5 seconds, then power off 3.3V rail
+  // Power off sensors, then power off 3.3V rail
   powerOffSensors();
-  delay(5000);  // 5 second delay as requested
+  delay(500);  // 500ms settle before rail off
   powerOff3V3Rail();
   
   SerialMon.println("=== Wave data collection complete ===");
@@ -524,11 +524,11 @@ void loop() {
       fix.fixTimeEpoch = rtcState.lastGpsFixTime;
       fix.success = false;
     }
-    // Turn off GNSS, wait 5 seconds, set GPS power pin back to LOW, wait 5 seconds
+    // Turn off GNSS, set GPS power pin back to LOW
     gpsEnd();
-    delay(5000);  // 5 second delay as requested
+    delay(1000);
     powerOffGPS();
-    delay(5000);  // 5 second delay as requested
+    delay(1000);
     
     // Re-establish cellular data connection for firmware updates and JSON upload
     SerialMon.println("Re-establishing cellular data connection for upload...");
