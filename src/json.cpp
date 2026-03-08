@@ -29,7 +29,7 @@ String buildJsonPayload(
   uint32_t nextWakeUtc,
   float batteryChangeSinceLast
 ) {
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<2048> doc;
 
   doc["nodeId"] = nodeId;
   doc["name"] = name;
