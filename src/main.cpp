@@ -415,15 +415,13 @@ void setup() {
   
 
   // Measure battery early using the new method and store as stable value
+  // NOTE: Do NOT read temperature here — the 3V3 rail is off, DS18B20 is unpowered.
+  // Temperature is read later in loop() after powering the 3V3 rail and initializing sensors.
   if (!beginPowerMonitor()) SerialMon.println("Power monitor init failed.");
   float stableBatteryVoltage = readBatteryVoltage();
   g_prevBatteryVoltage = rtcState.lastBatteryVoltage; // capture previous persisted value
   setStableBatteryVoltage(stableBatteryVoltage);
   rtcState.lastBatteryVoltage = stableBatteryVoltage;
-  float tempC = getWaterTemperature();
-  if (!isnan(tempC)) {
-    rtcState.lastWaterTemp = tempC;
-  }
   SerialMon.println("=== END BATTERY MEASUREMENT ===");
 
   checkBatteryChargeState();
@@ -606,14 +604,14 @@ void loop() {
     computeWavePeriod(),
     computeWaveDirection(),
     computeWavePower(computeWaveHeight(), computeWavePeriod()),
-    getWaterTemperature(),
+    rtcState.lastWaterTemp,  // Use stored temp — 3V3 rail is off, DS18B20 unpowered
     getStableBatteryVoltage(),  // Use stable voltage instead of measuring during upload
     currentTimestamp,  // Use current RTC time instead of last GPS time
     NODE_ID,
     NAME,
     FIRMWARE_VERSION,
-    uptime,           // <-- new
-    resetReason,       // <-- new
+    uptime,
+    resetReason,
     String(""), String(""), String(""), 0, // net fields will be set later when connected
     rtcState.lastWaterTemp,
     sleepHours,
@@ -713,7 +711,7 @@ void loop() {
         computeWavePeriod(),
         computeWaveDirection(),
         computeWavePower(computeWaveHeight(), computeWavePeriod()),
-        getWaterTemperature(),
+        rtcState.lastWaterTemp,  // Use stored temp — 3V3 rail is off, DS18B20 unpowered
         getStableBatteryVoltage(),
         currentTimestamp,
         NODE_ID,
