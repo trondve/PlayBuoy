@@ -44,6 +44,9 @@ static float dispBuf[MAX_SAMPLES];
 static float aHeaveBuf[MAX_SAMPLES];
 static uint32_t dispCount = 0;
 
+// Gravity tracker state (reset each recordWaveData call)
+static float g_lp_x = 0.0f, g_lp_y = 0.0f, g_lp_z = 9.80665f;
+
 // Last computed results for public getters
 static float s_lastHs = 0.0f;
 static float s_lastTp = 0.0f;
@@ -284,8 +287,13 @@ void recordWaveData() {
     }
   }
 
-  // Reset buffers/state
-  dispCount = 0; hp_y_prev = hp_x_prev = lp_y_prev = 0.0f; hp_y_prev_d = hp_x_prev_d = lp_y_prev_d = 0.0f;
+  // Reset all filter state to avoid stale data from previous boot/call
+  dispCount = 0;
+  hp_y_prev = hp_x_prev = lp_y_prev = 0.0f;
+  hp_y_prev_d = hp_x_prev_d = lp_y_prev_d = 0.0f;
+  g_lp_x = 0.0f; g_lp_y = 0.0f; g_lp_z = 9.80665f; // reset gravity tracker
+  filterInitialized = false; // force Mahony filter re-init
+  ensureFilterInitialized();
   float v = 0.0f, x = 0.0f;
   float prev_a = 0.0f, prev_v = 0.0f;
   s_headingSum = 0.0f; s_headingCount = 0;
@@ -318,7 +326,6 @@ void recordWaveData() {
     const float dt = 1.0f / FS_HZ;
     const float RC = 1.0f / (2.0f * PI * G_TRACK_FC_HZ);
     const float alpha = dt / (RC + dt);
-    static float g_lp_x = 0.0f, g_lp_y = 0.0f, g_lp_z = 9.80665f;
     g_lp_x = (1.0f - alpha) * g_lp_x + alpha * ax;
     g_lp_y = (1.0f - alpha) * g_lp_y + alpha * ay;
     g_lp_z = (1.0f - alpha) * g_lp_z + alpha * az;
