@@ -30,7 +30,7 @@ float getWaterTemperature() {
     if (temp != -127.0f && temp != 85.0f && !isnan(temp) && temp > -30.0f && temp < 60.0f) {
       return temp;
     }
-    delay(100);
+    delay(800); // Must cover full 12-bit conversion time (750ms)
   }
   // If all retries fail or value is out of range, return NAN
   return NAN;
