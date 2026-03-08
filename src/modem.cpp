@@ -252,20 +252,38 @@ bool sendJsonToServer(const char* server, uint16_t port, const char* endpoint, c
 
     client.print(request);
 
+    // Read response and parse HTTP status code
     unsigned long timeout = millis();
     bool gotResponse = false;
+    int httpStatus = 0;
+    bool statusParsed = false;
     while (client.connected() && millis() - timeout < 10000) {
       if (client.available()) {
         String line = client.readStringUntil('\n');
         SerialMon.println(line);
         gotResponse = true;
+        // Parse status code from first HTTP response line (e.g. "HTTP/1.1 200 OK")
+        if (!statusParsed) {
+          line.trim();
+          if (line.startsWith("HTTP/1.")) {
+            int sp = line.indexOf(' ');
+            if (sp > 0) {
+              httpStatus = line.substring(sp + 1).toInt();
+              statusParsed = true;
+              SerialMon.printf("HTTP status code: %d\n", httpStatus);
+            }
+          }
+        }
       }
     }
 
     client.stop();
 
-    if (gotResponse) {
+    if (gotResponse && httpStatus >= 200 && httpStatus < 300) {
       return true;
+    } else if (gotResponse) {
+      SerialMon.printf("Server returned HTTP %d (attempt %d/%d).\n", httpStatus, attempt + 1, maxRetries);
+      delay(2000);
     } else {
       SerialMon.printf("No response from server (attempt %d/%d).\n", attempt + 1, maxRetries);
       delay(2000);
