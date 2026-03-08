@@ -793,9 +793,10 @@ void loop() {
 #else
   // Prepare all pins/subsystems for minimum leakage, then sleep
   preparePinsAndSubsystemsForDeepSleep();
-  uint32_t sleepSec = 0;
+  uint32_t sleepSec = 300; // minimum 5 minutes to prevent reboot loops
   nowUtc = (uint32_t)time(NULL);
   if (nextWakeUtc > nowUtc) sleepSec = nextWakeUtc - nowUtc;
+  if (sleepSec < 300) sleepSec = 300; // enforce minimum sleep floor
   esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
   esp_deep_sleep_start();
 #endif

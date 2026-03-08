@@ -74,10 +74,11 @@ bool handleUndervoltageProtection() {
     powerOffModem();
     // Configure pins/subsystems for minimum leakage
     preparePinsAndSubsystemsForDeepSleep();
-    // Sleep for the exact number of seconds until nextWake
-    uint32_t sleepSec = 0;
+    // Sleep for the exact number of seconds until nextWake (minimum 5 minutes)
+    uint32_t sleepSec = 300;
     now = (uint32_t)time(NULL);
     if (nextWake > now) sleepSec = nextWake - now;
+    if (sleepSec < 300) sleepSec = 300; // enforce minimum sleep floor
     esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
     esp_deep_sleep_start();
     return true; // not reached
