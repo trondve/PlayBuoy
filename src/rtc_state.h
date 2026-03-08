@@ -65,7 +65,6 @@ void checkAnchorDrift(float currentLat, float currentLon);
 //
 // Power and temperature monitoring
 //
-void checkBatteryChargeState();
 void checkTemperatureAnomalies();
 
 //
