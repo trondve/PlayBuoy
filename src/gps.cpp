@@ -345,11 +345,17 @@ static void syncTimeAndMaybeApplyXTRA() {
         struct timeval tv; tv.tv_sec = epochUtc; tv.tv_usec = 0;
         settimeofday(&tv, nullptr);
         SerialMon.printf("RTC set from NTP via modem: %lu (UTC)\n", (unsigned long)epochUtc);
+      } else {
+        SerialMon.println("XTRA skipped: NTP returned invalid clock data (CCLK parse failed)");
       }
       if (nowCi.valid && shouldDownloadXTRA(nowCi)) {
         if (downloadAndApplyXTRA()) markXTRAJustApplied(nowCi);
       }
+    } else {
+      SerialMon.println("XTRA skipped: NTP sync failed (no valid CCLK within 90s)");
     }
+  } else {
+    SerialMon.println("XTRA skipped: PDP connection failed (no data connectivity)");
   }
   tearDownPDP();
 }
