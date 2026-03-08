@@ -168,7 +168,7 @@ Each wake cycle follows this sequence:
 2. Log wake reason (timer, power-on, brownout, watchdog, etc.)
 3. Release deep-sleep GPIO holds
 4. Measure battery voltage early (before powering anything, for a clean reading)
-5. Check critical battery - if <= 20% or <= 3.633V, skip everything and deep sleep
+5. Check critical battery - if <= 25% or <= 3.70V, skip everything and deep sleep
 6. Power on 3.3V rail -> wait 5s -> initialize sensors
 7. Record wave data for 3 minutes (accelerometer sampling at 10 Hz)
 8. Power off sensors -> wait 5s -> power off 3.3V rail

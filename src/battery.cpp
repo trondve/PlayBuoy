@@ -13,7 +13,7 @@
 
 // Thresholds are configured in config.h
 #ifndef BATTERY_CRITICAL_VOLTAGE
-#define BATTERY_CRITICAL_VOLTAGE 3.633f
+#define BATTERY_CRITICAL_VOLTAGE 3.70f
 #endif
 #define BATTERY_UNDERVOLTAGE_SLEEP_HOURS 168
 
