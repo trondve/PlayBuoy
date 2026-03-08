@@ -11,7 +11,6 @@ typedef struct {
   uint32_t fixTimeEpoch;  // GPS-provided time (optional, if supported)
 } GpsFixResult;
 
-void gpsBegin();                         // Enables GPS module
 GpsFixResult getGpsFix(uint16_t timeoutSec = 1800);  // Attempts fix within timeout (30 minutes default)
 void gpsEnd();                           // Optional: powers down GPS to save power
 

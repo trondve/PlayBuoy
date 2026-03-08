@@ -36,26 +36,5 @@ float getWaterTemperature() {
   return NAN;
 }
 
-// Stubbed magnetometer calibration state to keep interfaces stable
-struct MagCalData { float offsetX; float offsetY; float offsetZ; bool valid; };
-RTC_DATA_ATTR MagCalData magCal = {0, 0, 0, false};
-static bool calibrating = false;
-void startMagCalibration() { calibrating = true; }
-void finishMagCalibration() { calibrating = false; magCal.valid = false; }
-bool loadMagCalibration() { return false; }
-bool saveMagCalibration() { return true; }
-void applyMagCalibration(float& mx, float& my, float& mz) { (void)mx; (void)my; (void)mz; }
-
 // Heading not provided in the new wave pipeline (no magnetometer). Return NAN.
 float getHeadingDegrees() { return NAN; }
-
-float getRelativeAltitude() {
-  // Use barometric pressure for relative altitude (if BMP280 present).
-  // Not used in the new wave pipeline; return 0 for now.
-  return 0.0f;
-}
-
-float readTideHeight() {
-  // Use relative altitude as a proxy for tide/water level
-  return getRelativeAltitude();
-}

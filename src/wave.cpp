@@ -2,7 +2,6 @@
 #include "wave.h"
 #include "sensors.h"
 #include "config.h"
-#include "battery.h"
 #include "esp_task_wdt.h"
 #include <Wire.h>
 #include <MahonyAHRS.h>
@@ -10,10 +9,6 @@
 #include <algorithm>
 
 #define SerialMon Serial
-
-// Forward declarations from battery.cpp
-float readBatteryVoltage();
-int estimateBatteryPercent(float);
 
 // Sampling configuration (aligned with working config)
 static const float FS_HZ = 10.0f;           // IMU sample rate
@@ -264,19 +259,6 @@ static WaveStats analyzeWaves(const float* xbuf, uint32_t n, float fs) {
   float Tp = sumT / K;
   float P = 0.49f * Hs * Hs * Tp; // deep-water power proxy
   return {Hs, Tp, P, wc};
-}
-
-// Determine sampling duration dynamically using battery percent (existing policy)
-static int getSampleDurationMs() {
-#if DEBUG_NO_DEEP_SLEEP
-  return 1000;
-#else
-  float voltage = getStableBatteryVoltage();
-  int percent = estimateBatteryPercent(voltage);
-  if (percent > 60) return 120000;
-  if (percent > 40) return  90000;
-  return 60000;
-#endif
 }
 
 static void ensureFilterInitialized() {

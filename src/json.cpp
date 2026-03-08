@@ -2,7 +2,6 @@
 #include <ArduinoJson.h>
 #include "rtc_state.h"
 #include "config.h"
-#include "sensors.h"
 #include "power.h"
 #include <time.h>
 
@@ -55,12 +54,6 @@ String buildJsonPayload(
     doc["temp_valid"] = false;
   } else {
     doc["temp_valid"] = true;
-  }
-
-  float tideHeight = readTideHeight();
-  if (!isnan(tideHeight)) {
-    JsonObject tide = doc.createNestedObject("tide");
-    tide["current_height"] = tideHeight;
   }
 
   // Removed heading fields

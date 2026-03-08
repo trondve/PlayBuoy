@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 
-bool beginSensors();
 void recordWaveData();
 
 float computeWaveHeight();

@@ -73,7 +73,6 @@ void checkTemperatureAnomalies();
 //
 void markUploadSuccess();
 void markUploadFailed();
-void markFirmwareUpdateAttempted();
 void clearFirmwareUpdateAttempted();
 
 // Data buffering helpers

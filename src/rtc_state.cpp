@@ -113,12 +113,6 @@ void markUploadFailed() {
   SerialMon.println("Upload marked as failure.");
 }
 
-// Mark that a firmware update attempt was started
-void markFirmwareUpdateAttempted() {
-  rtcState.firmwareUpdateAttempted = true;
-  SerialMon.println("Firmware update attempt flagged.");
-}
-
 // Clear the firmware update attempt flag after successful update
 void clearFirmwareUpdateAttempted() {
   rtcState.firmwareUpdateAttempted = false;
