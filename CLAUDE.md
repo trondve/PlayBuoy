@@ -284,30 +284,30 @@ If last GPS fix is < 24 hours old, skip GPS entirely and reuse stored coordinate
 
 ### High Severity
 1. **GPIO 4 pin conflict:** MODEM_PWRKEY and GPS_POWER_PIN are both GPIO 4. powerOnGPS() holds it HIGH, interfering with the modem PWRKEY sequence and vice versa.
-2. **Potential reboot loop:** If nextWakeUtc <= nowUtc (due to time drift or long processing), sleepSec stays 0, causing immediate wake from deep sleep.
+2. ~~**Potential reboot loop:**~~ **FIXED (2026-03-08):** Added 300-second minimum sleep floor in both main.cpp and battery.cpp.
 3. **Credentials in repo:** config.h contains API_KEY and is tracked in git despite being in .gitignore.
 
 ### Medium Severity
-4. **sendJsonToServer treats any HTTP response as success:** Doesn't check status code (4xx, 5xx treated as success).
-5. **JSON buffer too small:** StaticJsonDocument<1024> may overflow with all nested objects.
+4. ~~**sendJsonToServer treats any HTTP response as success:**~~ **FIXED (2026-03-08):** Now parses HTTP status code, only returns true for 2xx responses.
+5. ~~**JSON buffer too small:**~~ **FIXED (2026-03-08):** Increased StaticJsonDocument from 1024 to 2048 bytes.
 6. **triedNBIoT is static inside function:** Once NB-IoT is tried, it's never tried again in the same boot.
 7. **build_all_buoys.py has hardcoded Windows path:** Line 129 references `C:\\Users\\trond\\.platformio\\penv\\Scripts\\platformio.exe` which won't work on other systems.
 
 ### Low Severity / Unused Code
-8. **gpsBegin() declared but not implemented** (gps.h:14)
-9. **getSampleDurationMs() defined but never called** (wave.cpp:270) - hardcoded 180000ms used instead
-10. **markFirmwareUpdateAttempted() never called** (rtc_state.cpp:117)
-11. **All magnetometer calibration functions are stubs** (sensors.cpp:43-47)
-12. **getRelativeAltitude() and readTideHeight() always return 0** (sensors.cpp:52-60)
+8. ~~**gpsBegin() declared but not implemented**~~ **FIXED (2026-03-08 earlier session):** Removed.
+9. ~~**getSampleDurationMs() defined but never called**~~ **FIXED (2026-03-08 earlier session):** Removed.
+10. ~~**markFirmwareUpdateAttempted() never called**~~ **FIXED (2026-03-08 earlier session):** Removed.
+11. ~~**All magnetometer calibration functions are stubs**~~ **FIXED (2026-03-08 earlier session):** Removed.
+12. ~~**getRelativeAltitude() and readTideHeight() always return 0**~~ **FIXED (2026-03-08 earlier session):** Removed.
 13. **lastSolarChargeTime never written to** (rtc_state.h:15)
-14. **checkBatteryChargeState() declared in both battery.h and rtc_state.h** (duplicate)
-15. **getCurrentHour() called but return value unused** in determineSleepDuration() (battery.cpp:188)
+14. ~~**checkBatteryChargeState() declared in both battery.h and rtc_state.h**~~ **FIXED (2026-03-08 earlier session):** Removed duplicate from rtc_state.h.
+15. ~~**getCurrentHour() called but return value unused**~~ **FIXED (2026-03-08):** Removed unused call from determineSleepDuration().
 16. **Fallback month hardcoded to August 2025** (battery.cpp:148-149)
-17. **beginSensors() declared in both wave.h and sensors.h** (duplicate)
-18. **Forward declarations in wave.cpp duplicate header declarations** (wave.cpp:15-16)
-19. **Junk .py file at root** containing `less` command help text (accidental creation)
-20. **Adafruit BMP280 Library dependency unused** (platformio.ini)
-21. **config.h.example missing several defines** present in config.h (USE_CUSTOM_DNS, DNS_PRIMARY, DNS_SECONDARY, BATTERY_CALIBRATION_FACTOR, ENABLE_CRITICAL_GUARD, BATTERY_CRITICAL_PERCENT, BATTERY_CRITICAL_VOLTAGE, ENABLE_GENTLE_MODEM_TIMING, ENABLE_CPOWD_SHUTDOWN, SIM_PIN)
+17. ~~**beginSensors() declared in both wave.h and sensors.h**~~ **FIXED (2026-03-08 earlier session):** Already resolved.
+18. ~~**Forward declarations in wave.cpp duplicate header declarations**~~ **FIXED (2026-03-08 earlier session):** Cleaned up.
+19. ~~**Junk .py file at root**~~ **FIXED (2026-03-08 earlier session):** Deleted.
+20. ~~**Adafruit BMP280 Library dependency unused**~~ **FIXED (2026-03-08 earlier session):** Removed from platformio.ini.
+21. ~~**config.h.example missing several defines**~~ **FIXED (2026-03-08 earlier session):** All defines added.
 22. **update_firmware_version.py references create_version_files.py** which doesn't exist
 
 ## Reference Files (confirmed working code)
@@ -827,3 +827,28 @@ The SIM7000G datasheet specifies typical peak current of 2A during LTE transmiss
 - **Connection attempt count**: Log how many attempts were required for successful network registration. An increasing trend indicates network or modem degradation.
 - **CEREG status**: Log the network registration status code. Code 1 = home network, 5 = roaming. If roaming is detected, it could indicate the buoy has moved or cell coverage has changed.
 - **Modem uptime / error recovery count**: Count how many times the modem had to be power-cycled within a boot cycle. This would surface hardware degradation.
+
+---
+
+### Implemented Fixes (2026-03-08, second session)
+
+The following fixes from the code review were implemented:
+
+1. **Sleep schedule redesigned** for 18650 battery health (40-60% optimal storage, max 80% daily, min 20%). Summer: 2h at >80%, 3h at >70%, 6h at >60%. Winter: 12h at >80%, 24h at >60%. Portable across deployment locations.
+2. **Minimum sleep floor** (300 seconds) added to prevent reboot loops when `nextWakeUtc <= nowUtc`.
+3. **Temperature read bug fixed**: Removed `getWaterTemperature()` call from `setup()` (3V3 rail off, DS18B20 unpowered). Both JSON builds now use stored `rtcState.lastWaterTemp` instead of re-reading with rail off.
+4. **JSON document size** increased from `StaticJsonDocument<1024>` to `<2048>`.
+5. **HTTP status code check** added to `sendJsonToServer()` — only 2xx responses treated as success.
+6. **DS18B20 retry delay** increased from 100ms to 800ms (covers 12-bit conversion time of 750ms).
+7. **Wave filter state reset** at start of each `recordWaveData()` call — IIR filters, gravity tracker, and Mahony filter all re-initialized.
+8. **Wave height thresholds tightened** for small lake: per-wave cap 0.8m -> 0.5m, abort threshold 5.0m -> 1.0m.
+9. **APN consolidated** across modules: `gps.cpp` now uses `NETWORK_PROVIDER` from config.h as primary (was hardcoded "telenor.smart").
+10. **Timing delays reduced** by ~25 seconds per boot: 3V3 rail 5s->500ms, sensor-off 5s->500ms, modem settle 10s->6s, modem.init 5s->2s, GPS-off 5s+5s->1s+1s.
+11. **PWRKEY power-off pulse** increased from 1000ms to 1300ms (SIM7000G spec minimum: 1200ms).
+12. **XTAL power domain** turned off during deep sleep (`ESP_PD_DOMAIN_XTAL OFF`) to save ~250uA.
+13. **Critical battery thresholds** increased from 3.633V/20% to 3.70V/25% for aged-cell protection.
+14. **OTA double body-stripping** fixed: replaced fragile two-phase header/body read with single-buffer approach.
+15. **XTRA skip reason** now logged explicitly when PDP fails, NTP times out, or clock data is invalid.
+
+**Not implemented (by owner's decision):**
+- WDT reset in GPS fix loop: Owner prefers GPS to fail and retry next boot rather than run forever on low battery in bad weather.
