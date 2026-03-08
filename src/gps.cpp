@@ -14,9 +14,9 @@
 extern HardwareSerial Serial1;  // Configured in main as SerialAT
 #define SerialAT Serial1
 
-// Config
-static const char* APN_PRIMARY   = "telenor.smart";
-static const char* APN_SECONDARY = "telenor";
+// Config — use NETWORK_PROVIDER from config.h as primary APN for consistency
+static const char* APN_PRIMARY   = NETWORK_PROVIDER;
+static const char* APN_SECONDARY = "telenor.smart";
 static const char* NTP_HOST      = "no.pool.ntp.org";
 static const char* XTRA_URL      = "http://trondve.ddns.net/xtra3grc.bin";
 static const char* XTRA_FS_DST   = "/customer/xtra3grc.bin";
