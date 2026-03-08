@@ -219,11 +219,11 @@ void powerOffModem() {
   }
   if (!normalDown) {
 #endif
-  // Power off sequence (fallback)
+  // Power off sequence (fallback) — datasheet requires PWRKEY LOW >= 1.2s
   digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1000);
+  delay(1300);  // 1.3s LOW pulse (spec minimum: 1.2s)
   digitalWrite(MODEM_PWRKEY, HIGH);
-  delay(1500); // Hold high for at least 1.2s to power off SIM7000G
+  delay(1500);
   
   // Also power down the power control pin
   digitalWrite(MODEM_POWER_ON, LOW);
