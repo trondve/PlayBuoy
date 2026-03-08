@@ -107,10 +107,11 @@ void preparePinsAndSubsystemsForDeepSleep() {
   gpio_hold_en(GPIO_NUM_25);
   gpio_deep_sleep_hold_en();
 
-  // Power domains: keep RTC memories, drop RTC peripherals
+  // Power domains: keep RTC memories, drop everything else
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_ON);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL,         ESP_PD_OPTION_OFF); // save ~250uA
 }
 
 // Adjust next wake UTC to avoid 00:00-05:59 local; push to 06:00 if inside window
