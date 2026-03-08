@@ -185,8 +185,7 @@ bool isWinterSeason(int month) {
 
 int determineSleepDuration(int batteryPercent) {
   int month = getCurrentMonth(); // 1=Jan, ..., 12=Dec
-  int hour = getCurrentHour();   // 0-23
-  
+
   // Get timezone info for debug output
   time_t now;
   struct tm timeinfo;
@@ -194,43 +193,53 @@ int determineSleepDuration(int batteryPercent) {
   localtime_r(&now, &timeinfo);
   bool isDST = timeinfo.tm_isdst > 0;
   const char* tzName = isDST ? "CEST" : "CET";
-  
-  SerialMon.printf("Sleep calculation: month=%d, hour=%d, battery=%d%%, timezone=%s\n", 
-                   month, hour, batteryPercent, tzName);
+
+  SerialMon.printf("Sleep calculation: month=%d, battery=%d%%, timezone=%s\n",
+                   month, batteryPercent, tzName);
+
+  // Sleep schedule designed around 18650 lithium-ion battery health:
+  // - Optimal storage range: 40-60% (preserve this range when possible)
+  // - Daily charge should not exceed 80% (discharge actively above 80%)
+  // - Never discharge below 20% to prevent battery damage
+  // - Critical guard at 25% provides safety margin for aged cells
+  //
+  // Portable: works in sunny southern Europe AND far-north long winters.
+  // Water temperature can change significantly in 3-6 hours in peak summer.
 
   if (isWinterSeason(month)) {
     SerialMon.printf("Winter season detected (month %d)\n", month);
-    // Winter mapping
-    if (batteryPercent > 55) return 24;         // 24 hours
-    if (batteryPercent > 50) return 36;         // 36 hours  
-    if (batteryPercent > 45) return 48;         // 2 day (48 hours)
-    if (batteryPercent > 40) return 72;         // 3 day (72 hours)
-    if (batteryPercent > 35) return 168;        // 7 days (168 hours)
-    if (batteryPercent > 30) return 336;        // 14 days (336 hours)
-    if (batteryPercent > 25) return 720;        // 1 month (720 hours)
-    if (batteryPercent > 20) return 1460;       // 2 month (1460 hours)
-    return 2180;                                 // 3 month (2180 hours)
+    // Winter: minimal solar harvest, conserve battery.
+    // Even above 80% we report every 12h to slowly discharge toward healthy range.
+    if (batteryPercent > 80) return 12;         // 12 hours — discharge toward healthy range
+    if (batteryPercent > 70) return 24;         // 24 hours
+    if (batteryPercent > 60) return 24;         // 24 hours — still some margin
+    if (batteryPercent > 50) return 48;         // 2 days
+    if (batteryPercent > 40) return 72;         // 3 days — entering optimal storage range
+    if (batteryPercent > 35) return 168;        // 1 week
+    if (batteryPercent > 30) return 336;        // 2 weeks
+    if (batteryPercent > 25) return 720;        // 1 month
+    return 2160;                                 // 3 months — near critical, hibernate
   }
 
   SerialMon.printf("Summer season detected (month %d)\n", month);
-  // Summer mapping
+  // Summer: solar harvest available, more frequent reporting.
+  // Above 80%: report aggressively to discharge toward healthy range AND
+  //   capture temperature changes (can shift 2-3C in a few hours).
+  // 60-80%: active reporting zone, sustainable with solar.
+  // 40-60%: optimal storage — moderate reporting, let solar maintain this range.
+  // Below 40%: conservation — battery needs to recharge.
   if (batteryPercent > 80) {
-    SerialMon.printf("Summer mode: battery >80%%, sleeping 3 hours\n");
-    return 3;
+    SerialMon.printf("Summer mode: battery >80%%, sleeping 2 hours (discharge toward healthy range)\n");
+    return 2;                                   // 2 hours — actively discharge + frequent temp updates
   }
-  if (batteryPercent > 75) return 4;          // 4 hours
-  if (batteryPercent > 70) return 6;          // 6 hours
-  if (batteryPercent > 65) return 9;          // 9 hours
-  if (batteryPercent > 60) return 12;         // 12 hours
-  if (batteryPercent > 55) return 24;         // 24 hours
-  if (batteryPercent > 50) return 36;         // 36 hours  
-  if (batteryPercent > 45) return 48;         // 2 day (48 hours)
-  if (batteryPercent > 40) return 72;         // 3 day (72 hours)
-  if (batteryPercent > 35) return 168;        // 7 days (168 hours)
-  if (batteryPercent > 30) return 336;        // 14 days (336 hours)
-  if (batteryPercent > 25) return 720;        // 1 month (720 hours)
-  if (batteryPercent > 20) return 1460;       // 2 month (1460 hours)
-  return 2180;                                 // 3 month (2180 hours)
+  if (batteryPercent > 70) return 3;          // 3 hours — good solar, capture temp changes
+  if (batteryPercent > 60) return 6;          // 6 hours — sustainable equilibrium for most climates
+  if (batteryPercent > 50) return 9;          // 9 hours — in optimal storage range, moderate reporting
+  if (batteryPercent > 40) return 12;         // 12 hours — bottom of optimal range, conserve
+  if (batteryPercent > 35) return 24;         // 24 hours — below optimal, needs recharge
+  if (batteryPercent > 30) return 48;         // 2 days
+  if (batteryPercent > 25) return 72;         // 3 days
+  return 168;                                  // 1 week — near critical, let solar recover
 }
 
 // Function to log battery voltage and estimated percentage

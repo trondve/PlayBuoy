@@ -193,26 +193,40 @@ Sleep duration depends on **season** (month) and **battery percentage**.
 - **Winter:** October through April (months 10, 11, 12, 1, 2, 3, 4)
 - **Summer:** May through September (months 5, 6, 7, 8, 9)
 
+### Battery Health Design Principles
+The sleep schedule is designed around 18650 lithium-ion battery health:
+- **Optimal storage range:** 40-60% (preserve this range when possible)
+- **Daily charge should not exceed 80%** (actively discharge above 80%)
+- **Never discharge below 20%** to prevent battery damage
+- **Critical guard at 25%** provides safety margin for aged cells under peak modem load
+
+The schedule is designed to be portable across deployment locations (sunny southern Europe to far-north Norway).
+
 ### Summer Schedule (May-September)
-| Battery % | Sleep Duration |
-|-----------|---------------|
-| > 80% | 3 hours |
-| > 75% | 4 hours |
-| > 70% | 6 hours |
-| > 65% | 9 hours |
-| > 60% | 12 hours |
-| > 55% | 24 hours |
-| > 50% | 36 hours |
-| > 45% | 48 hours (2 days) |
-| > 40% | 72 hours (3 days) |
-| > 35% | 168 hours (1 week) |
-| > 30% | 336 hours (2 weeks) |
-| > 25% | 720 hours (~1 month) |
-| > 20% | 1460 hours (~2 months) |
-| <= 20% | 2180 hours (~3 months) |
+| Battery % | Sleep Duration | Rationale |
+|-----------|---------------|-----------|
+| > 80% | 2 hours | Actively discharge toward healthy range + frequent temp updates |
+| > 70% | 3 hours | Good solar harvest, capture temperature changes |
+| > 60% | 6 hours | Sustainable equilibrium for most climates |
+| > 50% | 9 hours | In optimal storage range, moderate reporting |
+| > 40% | 12 hours | Bottom of optimal range, conserve |
+| > 35% | 24 hours | Below optimal, needs solar recharge |
+| > 30% | 48 hours (2 days) | Low battery, conservation mode |
+| > 25% | 72 hours (3 days) | Very low, let solar recover |
+| <= 25% | 168 hours (1 week) | Near critical, maximum conservation |
 
 ### Winter Schedule (October-April)
-Starts at 24 hours even at >55% battery. Below 55%, same as summer.
+| Battery % | Sleep Duration | Rationale |
+|-----------|---------------|-----------|
+| > 80% | 12 hours | Discharge toward healthy range despite low solar |
+| > 70% | 24 hours | Daily check-in |
+| > 60% | 24 hours | Still some margin, daily reporting |
+| > 50% | 48 hours (2 days) | Conserve for winter survival |
+| > 40% | 72 hours (3 days) | Entering optimal storage, minimal drain |
+| > 35% | 168 hours (1 week) | Low, deep conservation |
+| > 30% | 336 hours (2 weeks) | Very low |
+| > 25% | 720 hours (~1 month) | Near critical |
+| <= 25% | 2160 hours (~3 months) | Hibernate until spring |
 
 ### Quiet Hours
 If the computed wake time falls between 00:00-05:59 local time (Europe/Oslo), it's pushed to 06:00. Saves battery on uploads nobody sees at night.
