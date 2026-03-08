@@ -69,23 +69,19 @@ static String httpGetTinyGsm(const char* url) {
   req += "Connection: close\r\n\r\n";
   client.print(req);
 
-  unsigned long t0 = millis(); String headers;
-  while (millis() - t0 < 15000 && client.connected()) {
-    while (client.available()) {
-      char c = client.read();
-      headers += c;
-      if (headers.endsWith("\r\n\r\n")) goto headers_done;
-    }
+  // Read entire response (headers + body) into one buffer, then split once
+  String raw; unsigned long t0 = millis();
+  while (millis() - t0 < 20000) {
+    while (client.available()) raw += (char)client.read();
+    if (!client.connected()) break;
     delay(5);
   }
-headers_done:
-  String body; unsigned long t1 = millis();
-  while (millis() - t1 < 20000) {
-    while (client.available()) body += (char)client.read();
-    if (!client.connected()) break; delay(5);
-  }
   client.stop();
-  int p = body.indexOf("\r\n\r\n"); if (p >= 0) body = body.substring(p + 4);
+  // Split at first \r\n\r\n to separate headers from body
+  String body;
+  int p = raw.indexOf("\r\n\r\n");
+  if (p >= 0) body = raw.substring(p + 4);
+  else body = raw; // no header terminator found, use entire response
   body.trim();
   SerialMon.printf("HTTP body: '%s'\n", body.c_str());
   return body;
