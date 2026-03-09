@@ -340,7 +340,7 @@ Root files:
 
 **OTA (ota.cpp):** Functional. No integrity check (consider SHA-256 hash). Graceful modem shutdown (CPOWD) now called before ESP.restart().
 
-**JSON/Upload (modem.cpp, json.cpp):** Solid. JSON built twice (once early, once with network info) — could optimize to build once.
+**JSON/Upload (modem.cpp, json.cpp):** Solid. JSON now built once after network connect attempt, with network diagnostics if available.
 
 ### OCV Table Assessment
 OCV table replaced (2026-03-09) with standard 18650 discharge curve data. The old table overestimated SoC in the 5-60% range. New table correctly maps 3.733V to ~41% (was 35%), with proper flat plateau in the 3.6-3.8V region (30-70%). For best accuracy, measure the actual installed cells' discharge curve.
@@ -357,12 +357,11 @@ All timings verified safe against SIM7000G datasheet. Tightest margin: PWRKEY po
 ## Future Improvements (Priority Order)
 
 1. **Fix anchor drift** — accumulate across boots, use GPS speed-over-ground
-2. **Build once JSON** — defer JSON construction until after network is up
-3. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py
-4. **OTA integrity check** — SHA-256 hash verification before applying firmware
-5. **Remove Mahony filter** — redundant with gravity tracker, saves CPU/flash
-6. **GPS SOG for drift detection** — CGNSINF field 6 gives speed in km/h
-7. **Log GPS HDOP and TTF** — quality metrics for fix accuracy
+2. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py
+3. **OTA integrity check** — SHA-256 hash verification before applying firmware
+4. **Remove Mahony filter** — redundant with gravity tracker, saves CPU/flash
+5. **GPS SOG for drift detection** — CGNSINF field 6 gives speed in km/h
+6. **Log GPS HDOP and TTF** — quality metrics for fix accuracy
 
 ## Build System
 

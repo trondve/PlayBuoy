@@ -600,29 +600,8 @@ void loop() {
   uint32_t nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
-  String json = buildJsonPayload(
-    fix.latitude,
-    fix.longitude,
-    computeWaveHeight(),
-    computeWavePeriod(),
-    computeWaveDirection(),
-    computeWavePower(computeWaveHeight(), computeWavePeriod()),
-    rtcState.lastWaterTemp,  // Use stored temp — 3V3 rail is off, DS18B20 unpowered
-    getStableBatteryVoltage(),  // Use stable voltage instead of measuring during upload
-    currentTimestamp,  // Use current RTC time instead of last GPS time
-    NODE_ID,
-    NAME,
-    FIRMWARE_VERSION,
-    uptime,
-    resetReason,
-    String(""), String(""), String(""), 0, // net fields will be set later when connected
-    rtcState.lastWaterTemp,
-    sleepHours,
-    nextWakeUtc,
-    batteryDelta
-  );
-
-  // (Initial JSON suppressed; final JSON will be printed before upload)
+  // JSON is built once, after network connect attempt (see below)
+  String json;
   // Print a human-friendly current local date/time
   time_t nowTs = time(NULL);
   if (nowTs >= 24 * 3600) {
@@ -694,46 +673,51 @@ void loop() {
        }
     }
     
+    // Build JSON once with network info if available, empty strings if not
+    String op = "", ipStr = "";
+    int rssi = 0;
     if (networkConnected) {
-      // If we synced time from network just above, prefer to rebuild currentTimestamp now
+      // Refresh timestamp from network-synced RTC
       uint32_t ts = time(NULL);
       if (ts >= 24 * 3600) {
         currentTimestamp = ts;
       }
-      // Rebuild JSON so it includes updated timestamp and network diagnostics
-      String op = modem.getOperator();
-      String ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
-      int rssi = modem.getSignalQuality();
-      // Refresh next wake after potential time update and apply quiet-hours adjustment
-      nowUtc = (uint32_t)time(NULL);
-      candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
-      nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
-      json = buildJsonPayload(
-        fix.latitude,
-        fix.longitude,
-        computeWaveHeight(),
-        computeWavePeriod(),
-        computeWaveDirection(),
-        computeWavePower(computeWaveHeight(), computeWavePeriod()),
-        rtcState.lastWaterTemp,  // Use stored temp — 3V3 rail is off, DS18B20 unpowered
-        getStableBatteryVoltage(),
-        currentTimestamp,
-        NODE_ID,
-        NAME,
-        FIRMWARE_VERSION,
-        uptime,
-        resetReason,
-        op,
-        String(NETWORK_PROVIDER),
-        ipStr,
-        rssi,
-        rtcState.lastWaterTemp,
-        sleepHours,
-        nextWakeUtc,
-        batteryDelta
-      );
-      SerialMon.println("Final JSON (with network diagnostics):");
-      SerialMon.println(json);
+      op = modem.getOperator();
+      ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
+      rssi = modem.getSignalQuality();
+    }
+    // Refresh next wake after potential time update and apply quiet-hours adjustment
+    nowUtc = (uint32_t)time(NULL);
+    candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
+    nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
+    json = buildJsonPayload(
+      fix.latitude,
+      fix.longitude,
+      computeWaveHeight(),
+      computeWavePeriod(),
+      computeWaveDirection(),
+      computeWavePower(computeWaveHeight(), computeWavePeriod()),
+      rtcState.lastWaterTemp,
+      getStableBatteryVoltage(),
+      currentTimestamp,
+      NODE_ID,
+      NAME,
+      FIRMWARE_VERSION,
+      uptime,
+      resetReason,
+      op,
+      networkConnected ? String(NETWORK_PROVIDER) : String(""),
+      ipStr,
+      rssi,
+      rtcState.lastWaterTemp,
+      sleepHours,
+      nextWakeUtc,
+      batteryDelta
+    );
+    SerialMon.println("JSON payload:");
+    SerialMon.println(json);
+
+    if (networkConnected) {
       SerialMon.println("=== CRITICAL: Attempting JSON upload ===");
       bool success = sendJsonToServer(
         API_SERVER,
@@ -749,10 +733,10 @@ void loop() {
         markUploadFailed();
         storeUnsentJson(json);
       }
-      
+
       // Tear down cellular data after JSON upload and firmware check, wait 2 seconds
       SerialMon.println("Tearing down cellular data after upload...");
-      delay(2000);  // 2 second delay as requested
+      delay(2000);
     } else {
       SerialMon.println("Network connection failed.");
       markUploadFailed();
