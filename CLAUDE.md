@@ -238,8 +238,10 @@ Root files:
 | `temp` | float | Water temperature (°C) |
 | `temp_trend` | float | Temperature change over last 5 readings (°C, + = warming) |
 | `battery` | float | Battery voltage (V) |
+| `battery_percent` | int | Estimated SoC from OCV table (0-100%) |
 | `temp_valid` | bool | Whether temperature reading is valid |
 | `uptime` | uint32 | Seconds since boot |
+| `boot_count` | uint32 | RTC-persisted boot counter (increments each wake) |
 | `reset_reason` | string | Why the device booted |
 | `hours_to_sleep` | int | Planned sleep duration |
 | `next_wake_utc` | uint32 | Planned next wake epoch |
@@ -253,8 +255,8 @@ Root files:
 | `net.signal` | int | Signal quality (CSQ 0-31) |
 | `alerts.anchorDrift` | bool | Anchor drift detected (>50m) |
 | `alerts.chargingIssue` | bool | No charge detected (not fully implemented) |
-| `alerts.tempSpike` | bool | Temperature anomaly (not fully implemented) |
-| `alerts.overTemp` | bool | Over-temperature alert (not fully implemented) |
+| `alerts.tempSpike` | bool | >2°C change from previous reading |
+| `alerts.overTemp` | bool | Water temperature exceeds 35°C |
 | `alerts.uploadFailed` | bool | Previous upload failed |
 
 ## Known Issues
@@ -300,6 +302,16 @@ Root files:
 - Removed dead `firmwareUpdateAttempted` flag, check, and clear function
 - Added `DEBUG_NO_DEEP_SLEEP` to config.h.example
 
+### New Metrics Added
+- **Temperature trend** (`temp_trend`): Tracks last 5 readings in RTC, reports °C change (oldest to newest)
+- **Temperature anomalies**: Detects >2°C spike between readings, over-temp >35°C (alerts in JSON)
+- **Buoy tilt** (`buoy.tilt`): Mean angle from vertical during wave sampling (degrees)
+- **Acceleration RMS** (`buoy.accel_rms`): Heave acceleration RMS (m/s²), proxy for sea state
+- **GPS HDOP** (`gps.hdop`): Horizontal dilution of precision from CGNSINF
+- **GPS TTF** (`gps.ttf`): Time-to-fix in seconds
+- **Boot count** (`boot_count`): RTC-persisted counter, increments each wake
+- **Battery percent** (`battery_percent`): SoC estimated from OCV table
+
 ### Measurement Approach Review
 
 **Battery (power.cpp):** Solid. Median-of-five with burst averaging is optimal for ESP32 ADC noise. Improvement: use `esp_adc_cal` API for hardware-calibrated nonlinearity correction (50-150mV improvement possible).
@@ -329,8 +341,7 @@ All timings verified safe against SIM7000G datasheet. Tightest margin: PWRKEY po
 ## Future Improvements (Priority Order)
 
 1. **Spectral wave analysis** — FFT-based instead of time-domain double integration
-2. **Implement temperature anomaly detection** — compare against previous readings in RTC
-3. **Fix anchor drift** — accumulate across boots, use GPS speed-over-ground
+2. **Fix anchor drift** — accumulate across boots, use GPS speed-over-ground
 4. **esp_adc_cal API** — hardware-calibrated ADC for better battery voltage accuracy
 5. **Build once JSON** — defer JSON construction until after network is up
 6. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py

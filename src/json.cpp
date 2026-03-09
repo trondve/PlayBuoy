@@ -3,6 +3,7 @@
 #include "rtc_state.h"
 #include "config.h"
 #include "power.h"
+#include "battery.h"
 #include "wave.h"
 #include <time.h>
 
@@ -54,12 +55,12 @@ String buildJsonPayload(
   doc["temp"] = waterTemp;
   doc["temp_trend"] = getTemperatureTrend(); // °C change over last 5 readings
   doc["battery"] = batteryVoltage;
+  doc["battery_percent"] = estimateBatteryPercent(batteryVoltage);
 
   doc["temp_valid"] = !isnan(waterTemp);
 
-  // Removed heading fields
-
   doc["uptime"] = uptime;
+  doc["boot_count"] = rtcState.bootCounter;
   doc["reset_reason"] = resetReason;
 
   // New fields
