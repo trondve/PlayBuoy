@@ -39,7 +39,7 @@ static bool filterInitialized = false;
 static Mahony filter;
 
 // Wave buffers/state
-static const uint32_t MAX_SAMPLES = 3000; // up to 300 s @ 10 Hz (5 minutes)
+static const uint32_t MAX_SAMPLES = 1800; // 180 s @ 10 Hz (3 minutes)
 static float dispBuf[MAX_SAMPLES];
 static uint32_t dispCount = 0;
 
@@ -214,7 +214,7 @@ static WaveStats analyzeWaves(const float* xbuf, uint32_t n, float fs) {
   const float MIN_WAVE_HEIGHT = 0.015f;
 
   struct Wave { float H; float T; };
-  static const uint16_t MAX_WAVES = 256;
+  static const uint16_t MAX_WAVES = 128;
   Wave waves[MAX_WAVES];
   uint16_t wc = 0;
 
