@@ -334,7 +334,7 @@ Root files:
 **JSON/Upload (modem.cpp, json.cpp):** Solid. JSON built twice (once early, once with network info) — could optimize to build once.
 
 ### OCV Table Assessment
-The OCV table overestimates SoC in the 5-60% range vs standard 18650 curves. At 3.733V the table reports 35% but standard cells are ~50-55%. This gives conservative behavior (triggers longer sleep earlier). For accuracy, measure the actual installed cells' discharge curve.
+OCV table replaced (2026-03-09) with standard 18650 discharge curve data. The old table overestimated SoC in the 5-60% range. New table correctly maps 3.733V to ~41% (was 35%), with proper flat plateau in the 3.6-3.8V region (30-70%). For best accuracy, measure the actual installed cells' discharge curve.
 
 ### Battery Threshold Assessment
 3.70V / 25% critical guard is safe. SIM7000G minimum operating voltage 3.4V + 0.15V drop under 2A peak = 3.55V required resting voltage. 3.70V provides 150mV headroom for aged cells.
