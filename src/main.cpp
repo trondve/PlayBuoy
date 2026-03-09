@@ -55,8 +55,6 @@ extern "C" {
 #define SerialMon Serial
 #define SerialAT Serial1
 
-#define GPS_FIX_TIMEOUT_SEC 60
-
 TinyGsm modem(SerialAT);
 
 // Track modem power/serial state to avoid powering early and to save battery

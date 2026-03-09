@@ -12,7 +12,6 @@ typedef struct {
 
   // Battery and power monitoring
   float lastBatteryVoltage;          // Last measured battery voltage
-  uint32_t lastSolarChargeTime;      // millis() timestamp when solar charge was last detected
 
   // GPS state for anchor drift detection
   float lastGpsLat;                  // Last known GPS latitude

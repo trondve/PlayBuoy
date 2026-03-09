@@ -7,7 +7,6 @@
 RTC_DATA_ATTR rtc_state_t rtcState = {
   .bootCounter = 0,
   .lastBatteryVoltage = 0.0f,
-  .lastSolarChargeTime = 0,
   .lastGpsLat = 0.0f,
   .lastGpsLon = 0.0f,
   .lastGpsFixTime = 0,

@@ -35,6 +35,3 @@ float getWaterTemperature() {
   // If all retries fail or value is out of range, return NAN
   return NAN;
 }
-
-// Heading not provided in the new wave pipeline (no magnetometer). Return NAN.
-float getHeadingDegrees() { return NAN; }

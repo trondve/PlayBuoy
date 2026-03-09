@@ -41,8 +41,12 @@ static Mahony filter;
 // Wave buffers/state
 static const uint32_t MAX_SAMPLES = 3000; // up to 300 s @ 10 Hz (5 minutes)
 static float dispBuf[MAX_SAMPLES];
-static float aHeaveBuf[MAX_SAMPLES];
 static uint32_t dispCount = 0;
+
+// Running heave acceleration stats (computed incrementally, no buffer needed)
+static double s_heaveAbsSum = 0.0;
+static double s_heaveSqSum = 0.0;
+static uint32_t s_heaveStatCount = 0;
 
 // Gravity tracker state (reset each recordWaveData call)
 static float g_lp_x = 0.0f, g_lp_y = 0.0f, g_lp_z = 9.80665f;
@@ -51,8 +55,6 @@ static float g_lp_x = 0.0f, g_lp_y = 0.0f, g_lp_z = 9.80665f;
 static float s_lastHs = 0.0f;
 static float s_lastTp = 0.0f;
 static uint16_t s_lastWaves = 0;
-static float s_headingSum = 0.0f;
-static uint32_t s_headingCount = 0;
 
 // I2C helpers
 static inline bool i2cWrite(uint8_t reg, uint8_t val) {
@@ -280,7 +282,7 @@ void recordWaveData() {
     SerialMon.println("Attempting IMU initialization...");
     if (!initMPU6500()) {
       SerialMon.println("ERROR: Failed to initialize IMU; wave data will be zeros");
-      s_lastHs = 0.0f; s_lastTp = 0.0f; s_lastWaves = 0; s_headingSum = 0.0f; s_headingCount = 0;
+      s_lastHs = 0.0f; s_lastTp = 0.0f; s_lastWaves = 0;
       return;
     } else {
       SerialMon.println("IMU initialized successfully!");
@@ -289,6 +291,7 @@ void recordWaveData() {
 
   // Reset all filter state to avoid stale data from previous boot/call
   dispCount = 0;
+  s_heaveAbsSum = 0.0; s_heaveSqSum = 0.0; s_heaveStatCount = 0;
   hp_y_prev = hp_x_prev = lp_y_prev = 0.0f;
   hp_y_prev_d = hp_x_prev_d = lp_y_prev_d = 0.0f;
   g_lp_x = 0.0f; g_lp_y = 0.0f; g_lp_z = 9.80665f; // reset gravity tracker
@@ -296,7 +299,6 @@ void recordWaveData() {
   ensureFilterInitialized();
   float v = 0.0f, x = 0.0f;
   float prev_a = 0.0f, prev_v = 0.0f;
-  s_headingSum = 0.0f; s_headingCount = 0;
 
   // Run for a fixed 3-minute window (optimized from 5 minutes)
   const uint32_t sampleMs = (uint32_t)(180000UL);
@@ -351,15 +353,12 @@ void recordWaveData() {
 
     if (dispCount < MAX_SAMPLES) {
       dispBuf[dispCount] = x;
-      aHeaveBuf[dispCount] = a_heave;
       dispCount++;
     }
-
-    // Sample heading sparsely for direction label
-    if ((tick % 10) == 0) {
-      float hdg = getHeadingDegrees();
-      if (!isnan(hdg)) { s_headingSum += hdg; s_headingCount++; }
-    }
+    // Track heave acceleration stats incrementally (saves 12KB RAM vs buffer)
+    s_heaveAbsSum += fabsf(a_heave);
+    s_heaveSqSum += (double)a_heave * (double)a_heave;
+    s_heaveStatCount++;
 
     tick++;
   }
@@ -386,14 +385,12 @@ void recordWaveData() {
   uint32_t settle = (uint32_t)(FS_HZ * 5.0f);
   if (settle >= dispCount) settle = dispCount / 5;
   const float* xbuf = dispBuf + settle;
-  const float* abuf = aHeaveBuf + settle;
   uint32_t nuse = dispCount - settle;
 
-  // Gating on acceleration RMS (calm sea)
-  float rms_a = 0.0f;
-  if (nuse > 1) { double ss = 0.0; for (uint32_t i = 0; i < nuse; ++i) ss += (double)abuf[i] * (double)abuf[i]; rms_a = sqrtf((float)(ss / (double)nuse)); }
-  float maxAbsA = 0.0f; for (uint32_t i = 0; i < nuse; ++i) { float av = fabsf(abuf[i]); if (av > maxAbsA) maxAbsA = av; }
-  if (rms_a < 0.01f && maxAbsA < 0.04f) { s_lastHs = 0.0f; s_lastTp = 0.0f; s_lastWaves = 0; return; }
+  // Gating on acceleration RMS using incrementally computed stats (no buffer needed)
+  float rms_a = (s_heaveStatCount > 0) ? sqrtf((float)(s_heaveSqSum / (double)s_heaveStatCount)) : 0.0f;
+  float meanAbsA = (s_heaveStatCount > 0) ? (float)(s_heaveAbsSum / (double)s_heaveStatCount) : 0.0f;
+  if (rms_a < 0.01f && meanAbsA < 0.005f) { s_lastHs = 0.0f; s_lastTp = 0.0f; s_lastWaves = 0; return; }
 
   // DC removal + gentle band-pass on displacement
   double meanX = 0.0; for (uint32_t i = 0; i < nuse; ++i) meanX += xbuf[i]; meanX /= (double)nuse;
@@ -407,20 +404,10 @@ void recordWaveData() {
   s_lastHs = ws.Hs_m; s_lastTp = ws.Tp_s; s_lastWaves = ws.wavesCount;
 }
 
-// Direction label based on average heading during sampling
-static String directionFromAverage(float avgDeg) {
-  const char* dirs[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
-  int idx = (int)((avgDeg + 22.5f) / 45.0f) % 8;
-  return String(dirs[idx]);
-}
-
 float computeWaveHeight() { return s_lastHs; }
 float computeWavePeriod() { return s_lastTp; }
 String computeWaveDirection() {
-  if (s_headingCount == 0) return String("N/A");
-  float avg = s_headingSum / (float)s_headingCount;
-  if (avg < 0.0f) avg += 360.0f; if (avg >= 360.0f) avg -= 360.0f;
-  return directionFromAverage(avg);
+  return String("N/A"); // Magnetometer non-functional in sealed enclosure
 }
 float computeWavePower(float height, float period) {
   return 0.49f * height * height * period; // deep-water proxy
@@ -442,19 +429,10 @@ void logWaveStats() {
   else seaState = "Too large waves (storm)";
   SerialMon.printf("Sea state:           %s\n", seaState);
   
-  // Diagnostic: average |a_heave| over the window segment used
-  if (dispCount > 0) {
-    uint32_t settle = (uint32_t)(FS_HZ * 5.0f);
-    if (settle >= dispCount) settle = dispCount / 5;
-    uint32_t nuse = dispCount - settle;
-    if (nuse > 0) {
-      double sumAbs = 0.0;
-      for (uint32_t i = settle; i < dispCount; ++i) {
-        sumAbs += fabsf(aHeaveBuf[i]);
-      }
-      float meanAbsA = (float)(sumAbs / (double)nuse);
-      SerialMon.printf("Heave |a| mean:      %.4f m/s²\n", meanAbsA);
-    }
+  // Diagnostic: average |a_heave| from incremental stats
+  if (s_heaveStatCount > 0) {
+    float meanAbsA = (float)(s_heaveAbsSum / (double)s_heaveStatCount);
+    SerialMon.printf("Heave |a| mean:      %.4f m/s²\n", meanAbsA);
   }
   
   if (!imuInitialized) {

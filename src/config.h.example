@@ -28,9 +28,6 @@
 #define TIMEZONE "UTC0"
 
 // Power/ADC calibration
-// Calibration factor for battery voltage ADC measurement.
-// Adjust empirically by measuring with a multimeter. Default is 0.454398 for T-SIM7000G.
-#define BATTERY_CALIBRATION_FACTOR 0.454398f
 
 // Critical battery guard (device enters deep sleep when battery drops below threshold)
 #define ENABLE_CRITICAL_GUARD 1
