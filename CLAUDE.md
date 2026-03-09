@@ -221,7 +221,8 @@ Root files:
 - NTP sync → XTRA download (if >7 days stale) → GNSS start → 60s NMEA smoke test → fix polling
 - **60s smoke test** (`gnssSmoke60s`): Streams NMEA sentences while polling CGNSINF every second. Lets the GNSS engine warm up and acquire satellites before the main fix loop. Exits early if a fix is obtained during this phase.
 - 3 GPIO polarity variants tried for GNSS power (hardware revision compatibility)
-- PDP teardown after GPS, re-established for upload
+- PDP teardown after NTP/XTRA before GNSS start (required — SIM7000G shares radio between data and GPS)
+- After GNSS fix, main.cpp re-establishes cellular via `connectToNetwork()` for upload
 
 ### Modem Timings (verified safe against SIM7000G datasheet)
 | Operation | Duration | Spec |
@@ -335,7 +336,7 @@ Root files:
 
 **Wave Data (wave.cpp):** Now uses FFT spectral analysis. 1024-point FFT on heave acceleration, displacement PSD via 1/(2πf)⁴, Hs = 4·√m₀. Eliminates drift from double integration and the DISP_AMP_SCALE fudge factor. The Mahony filter is still included but redundant (gravity tracker does orientation independently).
 
-**GPS (gps.cpp):** NTP→XTRA→GNSS is correct per SIM7000G app notes. Dynamic timeout is well-designed. Minor: double PDP setup/teardown costs ~20-30s.
+**GPS (gps.cpp):** NTP→XTRA→GNSS is correct per SIM7000G app notes. Dynamic timeout is well-designed. The double PDP setup/teardown (~20-30s) is necessary — SIM7000G shares the radio between cellular data and GNSS, so PDP must be torn down before GNSS and re-established after for upload.
 
 **OTA (ota.cpp):** Functional. No integrity check (consider SHA-256 hash). No graceful modem shutdown before ESP.restart().
 
