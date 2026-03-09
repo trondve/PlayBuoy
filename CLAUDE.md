@@ -207,11 +207,14 @@ Root files:
 ### Wave Measurement (wave.cpp)
 - MPU-6500/9250 direct I2C at 10 Hz, ±2g, ±250 dps, DLPF ~44Hz
 - Mahony AHRS + slow gravity tracker (0.02 Hz LP)
-- Heave acceleration → IIR bandpass (0.28-1.0 Hz) → trapezoidal integration
-- Linear detrend → DC removal → band-pass displacement → zero-upcrossing analysis
-- Hs = mean of top 1/3 wave heights, Tp = their mean period
-- Wave caps: 0.5m per wave, 1.0m abort (current small-lake defaults — increase for ocean deployments)
-- `DISP_AMP_SCALE = 1.75` empirical correction
+- **FFT spectral analysis** (replaces time-domain double integration):
+  - Collects 3 min heave acceleration, uses last 1024 samples for 1024-point FFT
+  - Hanning window → FFT → acceleration PSD → displacement PSD via 1/(2πf)⁴
+  - Hs = 4·√m₀ (standard oceanographic definition, m₀ = spectral zeroth moment)
+  - Tp = 1/f_peak (period of peak displacement spectral density)
+  - Wave band: 0.05–1.0 Hz (periods 1–20s)
+  - No more `DISP_AMP_SCALE` fudge factor — spectral method is drift-free
+- Sanity caps: Hs > 2.0m treated as noise (adjust for ocean deployments)
 - Also computes: mean tilt (degrees from vertical), acceleration RMS
 
 ### GPS (gps.cpp)
@@ -282,7 +285,7 @@ Root files:
 6. **Fallback month hardcoded to August** (battery.cpp getCurrentMonth)
 
 ### Not Working / Needs Improvement
-- **Wave height (Hs):** Unreliable due to double-integration drift. Needs spectral (FFT) approach.
+- **Wave height (Hs):** Now uses FFT spectral analysis (Hs = 4·√m₀). Needs field validation against known wave conditions.
 - **Wave direction:** Always "N/A" — magnetometer broken in sealed enclosure.
 - **Anchor drift detection:** Fixed (2026-03-09) — counter now accumulates across boots, resets only when buoy returns within threshold.
 - **Temperature anomaly detection:** Implemented (2026-03-09) — detects >2°C spikes between readings, over-temp >35°C.
@@ -329,7 +332,7 @@ Root files:
 
 **Water Temperature (sensors.cpp):** Good. 12-bit DS18B20 with 3 retries. Now explicitly sets 12-bit resolution and `setWaitForConversion(true)` so `requestTemperatures()` blocks until conversion is complete.
 
-**Wave Data (wave.cpp):** Weakest area. Time-domain double integration has fundamental drift. The `DISP_AMP_SCALE = 1.75` fudge confirms amplitude loss. Spectral (FFT) approach would be more robust — divide acceleration FFT by -ω² for displacement spectrum. The Mahony filter is redundant (gravity tracker does orientation independently).
+**Wave Data (wave.cpp):** Now uses FFT spectral analysis. 1024-point FFT on heave acceleration, displacement PSD via 1/(2πf)⁴, Hs = 4·√m₀. Eliminates drift from double integration and the DISP_AMP_SCALE fudge factor. The Mahony filter is still included but redundant (gravity tracker does orientation independently).
 
 **GPS (gps.cpp):** NTP→XTRA→GNSS is correct per SIM7000G app notes. Dynamic timeout is well-designed. Minor: double PDP setup/teardown costs ~20-30s.
 
@@ -351,14 +354,13 @@ All timings verified safe against SIM7000G datasheet. Tightest margin: PWRKEY po
 
 ## Future Improvements (Priority Order)
 
-1. **Spectral wave analysis** — FFT-based instead of time-domain double integration
-2. **Fix anchor drift** — accumulate across boots, use GPS speed-over-ground
-3. **Build once JSON** — defer JSON construction until after network is up
-4. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py
-5. **OTA integrity check** — SHA-256 hash verification before applying firmware
-6. **Remove Mahony filter** — redundant with gravity tracker, saves CPU/flash
-7. **GPS SOG for drift detection** — CGNSINF field 6 gives speed in km/h
-8. **Log GPS HDOP and TTF** — quality metrics for fix accuracy
+1. **Fix anchor drift** — accumulate across boots, use GPS speed-over-ground
+2. **Build once JSON** — defer JSON construction until after network is up
+3. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py
+4. **OTA integrity check** — SHA-256 hash verification before applying firmware
+5. **Remove Mahony filter** — redundant with gravity tracker, saves CPU/flash
+6. **GPS SOG for drift detection** — CGNSINF field 6 gives speed in km/h
+7. **Log GPS HDOP and TTF** — quality metrics for fix accuracy
 
 ## Build System
 
