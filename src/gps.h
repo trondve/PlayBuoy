@@ -8,7 +8,9 @@ typedef struct {
   float latitude;
   float longitude;
   float accuracy;
+  float hdop;             // Horizontal dilution of precision (lower = better)
   uint32_t fixTimeEpoch;  // GPS-provided time (optional, if supported)
+  uint16_t ttfSeconds;    // Time-to-fix in seconds (0 if no fix)
 } GpsFixResult;
 
 GpsFixResult getGpsFix(uint16_t timeoutSec = 1800);  // Attempts fix within timeout (30 minutes default)

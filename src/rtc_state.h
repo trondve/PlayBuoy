@@ -17,6 +17,8 @@ typedef struct {
   float lastGpsLat;                  // Last known GPS latitude
   float lastGpsLon;                  // Last known GPS longitude
   uint32_t lastGpsFixTime;           // Unix epoch timestamp of last GPS fix
+  float lastGpsHdop;                 // HDOP from last fix (lower = better)
+  uint16_t lastGpsTtf;              // Time-to-fix in seconds
 
   // Water temperature monitoring
   float lastWaterTemp;               // Last recorded water temperature

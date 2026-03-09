@@ -71,6 +71,11 @@ String buildJsonPayload(
   JsonObject rtc = doc.createNestedObject("rtc");
   rtc["waterTemp"] = rtcWaterTemp;
 
+  // GPS diagnostics
+  JsonObject gps = doc.createNestedObject("gps");
+  gps["hdop"] = rtcState.lastGpsHdop;
+  gps["ttf"] = rtcState.lastGpsTtf;
+
   // Modem/network diagnostics
   JsonObject net = doc.createNestedObject("net");
   net["operator"] = operatorName;

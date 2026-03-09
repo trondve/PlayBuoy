@@ -245,6 +245,8 @@ Root files:
 | `next_wake_utc` | uint32 | Planned next wake epoch |
 | `battery_change_since_last` | float | Voltage delta from previous boot |
 | `rtc.waterTemp` | float | RTC-stored water temperature |
+| `gps.hdop` | float | GPS horizontal dilution of precision (lower = better) |
+| `gps.ttf` | uint16 | GPS time-to-fix in seconds |
 | `net.operator` | string | Cellular operator name |
 | `net.apn` | string | APN used |
 | `net.ip` | string | Assigned IP address |

@@ -252,11 +252,11 @@ static void gnssStop() {
   sendAT("AT+CGNSPWR=0");
 }
 
-static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uint32_t* outEpoch) {
+static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uint32_t* outEpoch, float* outHdop = nullptr) {
   int p = inf.indexOf("+CGNSINF:"); if (p < 0) return false;
   int start = inf.indexOf(':', p); if (start < 0) return false; start++;
-  // Split by commas
-  int field = 0; bool run=false, hasFix=false; double lat=0, lon=0; String ts;
+  // CGNSINF fields: 0=run, 1=fix, 2=utc, 3=lat, 4=lon, 5=alt, 6=speed, 7=course, 8=fixmode, 9=reserved, 10=HDOP
+  int field = 0; bool run=false, hasFix=false; double lat=0, lon=0; float hdop=99.0f; String ts;
   String token; token.reserve(32);
   for (int i = start; i <= (int)inf.length(); ++i) {
     char c = (i == (int)inf.length()) ? ',' : inf[i];
@@ -267,10 +267,11 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
         case 2: ts = token; break; // YYYYMMDDhhmmss.sss
         case 3: lat = token.toDouble(); break;
         case 4: lon = token.toDouble(); break;
+        case 10: { token.trim(); if (token.length() > 0) hdop = token.toFloat(); } break;
         default: break;
       }
       token = ""; field++;
-      if (field > 8) break;
+      if (field > 11) break;
     } else {
       token += c;
     }
@@ -278,8 +279,8 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
   if (!(run && hasFix)) return false;
   if (outLat) *outLat = (float)lat;
   if (outLon) *outLon = (float)lon;
+  if (outHdop) *outHdop = hdop;
   if (outEpoch && ts.length() >= 14) {
-    // Parse UTC time: YYYYMMDDhhmmss
     struct tm t{};
     t.tm_year = ts.substring(0,4).toInt() - 1900;
     t.tm_mon  = ts.substring(4,6).toInt() - 1;
@@ -361,7 +362,8 @@ static void syncTimeAndMaybeApplyXTRA() {
 }
 
 GpsFixResult getGpsFix(uint16_t timeoutSec) {
-  GpsFixResult result{}; result.success = false; result.accuracy = 0; result.fixTimeEpoch = 0; result.latitude = result.longitude = 0;
+  GpsFixResult result{}; result.success = false; result.accuracy = 0; result.hdop = 99.0f; result.fixTimeEpoch = 0; result.latitude = result.longitude = 0; result.ttfSeconds = 0;
+  uint32_t gnssStartTime = millis(); // Track time-to-fix
 
   // Ensure time and XTRA freshness before GNSS
   syncTimeAndMaybeApplyXTRA();
@@ -383,10 +385,12 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
   while ((millis() - start) < timeoutSec * 1000UL) {
     String inf;
     if (sendAT("AT+CGNSINF", &inf, 1500, /*echo*/false)) {
-      float lat, lon; uint32_t epoch;
-      if (parseCgnsInfFix(inf, &lat, &lon, &epoch)) {
+      float lat, lon, hdop; uint32_t epoch;
+      if (parseCgnsInfFix(inf, &lat, &lon, &epoch, &hdop)) {
         result.success = true; result.latitude = lat; result.longitude = lon; result.fixTimeEpoch = epoch;
-        SerialMon.println("GPS Fix acquired!");
+        result.hdop = hdop;
+        result.ttfSeconds = (uint16_t)((millis() - gnssStartTime) / 1000);
+        SerialMon.printf("GPS Fix acquired! HDOP=%.1f TTF=%us\n", hdop, result.ttfSeconds);
         break;
       }
     }

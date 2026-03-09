@@ -506,6 +506,8 @@ void loop() {
       // Always log drift (or no-previous-anchor) before overwriting stored anchor
       checkAnchorDrift(fix.latitude, fix.longitude);
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);
+      rtcState.lastGpsHdop = fix.hdop;
+      rtcState.lastGpsTtf = fix.ttfSeconds;
       if (fix.fixTimeEpoch > 1000000000) {
         syncRtcWithGps(fix.fixTimeEpoch);
       }
