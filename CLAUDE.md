@@ -165,7 +165,7 @@ src/
   modem.cpp/h       - Cellular connection, HTTP POST upload
   ota.cpp/h         - OTA firmware updates with version comparison
   power.cpp/h       - ADC battery voltage (median-of-five)
-  rtc_state.cpp/h   - RTC-persisted state, anchor drift, upload buffering
+  rtc_state.cpp/h   - RTC-persisted state, anchor drift, temp history, upload buffering
   sensors.cpp/h     - DS18B20 temperature, I2C init
   utils.cpp/h       - Wake reason logging
   wave.cpp/h        - Wave data collection (IMU, Mahony, IIR, zero-upcrossing)
@@ -233,6 +233,7 @@ Root files:
 | `wave.direction` | string | Wave direction (currently always "N/A") |
 | `wave.power` | float | Wave power proxy (kW/m) |
 | `temp` | float | Water temperature (°C) |
+| `temp_trend` | float | Temperature change over last 5 readings (°C, + = warming) |
 | `battery` | float | Battery voltage (V) |
 | `temp_valid` | bool | Whether temperature reading is valid |
 | `uptime` | uint32 | Seconds since boot |
@@ -265,7 +266,7 @@ Root files:
 - **Wave height (Hs):** Unreliable due to double-integration drift. Needs spectral (FFT) approach.
 - **Wave direction:** Always "N/A" — magnetometer broken in sealed enclosure.
 - **Anchor drift detection:** Resets counter on every GPS fix, only detects within single boot.
-- **Temperature anomaly detection:** `checkTemperatureAnomalies()` is a stub.
+- **Temperature anomaly detection:** Implemented (2026-03-09) — detects >2°C spikes between readings, over-temp >35°C.
 - **Charging problem detection:** Flag exists but detection logic incomplete.
 
 ### Working Well

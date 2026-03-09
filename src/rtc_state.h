@@ -20,7 +20,9 @@ typedef struct {
 
   // Water temperature monitoring
   float lastWaterTemp;               // Last recorded water temperature
-  bool tempSpikeDetected;            // Flag for sudden temperature spike
+  float tempHistory[5];              // Last 5 temperature readings for trend analysis
+  uint8_t tempHistoryCount;          // Number of valid entries in tempHistory (0-5)
+  bool tempSpikeDetected;            // Flag for sudden temperature spike (>2°C change)
   bool overTempDetected;             // Flag for temperature exceeding threshold
 
   // Upload status
@@ -61,9 +63,11 @@ void updateLastGpsFix(float lat, float lon, uint32_t epochSec);
 void checkAnchorDrift(float currentLat, float currentLon);
 
 //
-// Power and temperature monitoring
+// Temperature monitoring
 //
 void checkTemperatureAnomalies();
+void pushTemperatureHistory(float temp);  // Add reading to history ring
+float getTemperatureTrend();              // Returns °C/hour rate of change (+ = warming)
 
 //
 // Upload status and firmware update flags

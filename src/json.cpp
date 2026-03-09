@@ -46,15 +46,10 @@ String buildJsonPayload(
   wave["power"] = wavePower;
 
   doc["temp"] = waterTemp;
+  doc["temp_trend"] = getTemperatureTrend(); // °C change over last 5 readings
   doc["battery"] = batteryVoltage;
-  // Calibration factor removed; using direct measured value
 
-  // Flag invalid temperature
-  if (isnan(waterTemp)) {
-    doc["temp_valid"] = false;
-  } else {
-    doc["temp_valid"] = true;
-  }
+  doc["temp_valid"] = !isnan(waterTemp);
 
   // Removed heading fields
 

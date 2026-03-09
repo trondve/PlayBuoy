@@ -11,6 +11,8 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .lastGpsLon = 0.0f,
   .lastGpsFixTime = 0,
   .lastWaterTemp = 0.0f,
+  .tempHistory = {NAN, NAN, NAN, NAN, NAN},
+  .tempHistoryCount = 0,
   .tempSpikeDetected = false,
   .overTempDetected = false,
   .lastUploadFailed = false,
@@ -93,9 +95,63 @@ void checkAnchorDrift(float currentLat, float currentLon) {
                    rtcState.anchorDriftDetected ? "YES" : "NO");
 }
 
-// Stub: Detects sudden water temperature spikes or over temperature alerts
+void pushTemperatureHistory(float temp) {
+  if (isnan(temp)) return;
+  // Shift history: oldest falls off [0], newest goes to end
+  uint8_t maxEntries = 5;
+  if (rtcState.tempHistoryCount < maxEntries) {
+    rtcState.tempHistory[rtcState.tempHistoryCount] = temp;
+    rtcState.tempHistoryCount++;
+  } else {
+    for (uint8_t i = 0; i < maxEntries - 1; i++) {
+      rtcState.tempHistory[i] = rtcState.tempHistory[i + 1];
+    }
+    rtcState.tempHistory[maxEntries - 1] = temp;
+  }
+}
+
+float getTemperatureTrend() {
+  // Returns approximate °C per reading interval (positive = warming)
+  // Uses simple difference between newest and oldest valid readings
+  if (rtcState.tempHistoryCount < 2) return 0.0f;
+  float oldest = NAN, newest = NAN;
+  for (uint8_t i = 0; i < rtcState.tempHistoryCount; i++) {
+    if (!isnan(rtcState.tempHistory[i])) { oldest = rtcState.tempHistory[i]; break; }
+  }
+  for (int i = rtcState.tempHistoryCount - 1; i >= 0; i--) {
+    if (!isnan(rtcState.tempHistory[i])) { newest = rtcState.tempHistory[i]; break; }
+  }
+  if (isnan(oldest) || isnan(newest)) return 0.0f;
+  return newest - oldest;
+}
+
 void checkTemperatureAnomalies() {
-  SerialMon.println("Checking temperature anomalies...");
+  float currentTemp = rtcState.lastWaterTemp;
+  if (isnan(currentTemp)) {
+    SerialMon.println("Temp anomaly check: no valid temperature");
+    return;
+  }
+  // Check spike: >2°C change from previous reading
+  if (rtcState.tempHistoryCount >= 2) {
+    float prev = rtcState.tempHistory[rtcState.tempHistoryCount - 2];
+    if (!isnan(prev)) {
+      float delta = fabsf(currentTemp - prev);
+      rtcState.tempSpikeDetected = (delta > 2.0f);
+      if (rtcState.tempSpikeDetected) {
+        SerialMon.printf("TEMP SPIKE: %.1f°C change (%.1f -> %.1f)\n", delta, prev, currentTemp);
+      }
+    }
+  }
+  // Check over-temp: >35°C is unusual for a Norwegian lake
+  rtcState.overTempDetected = (currentTemp > 35.0f);
+  if (rtcState.overTempDetected) {
+    SerialMon.printf("OVER-TEMP: %.1f°C exceeds 35°C threshold\n", currentTemp);
+  }
+  float trend = getTemperatureTrend();
+  SerialMon.printf("Temp anomaly check: current=%.1f°C, trend=%.2f°C, spike=%s, overTemp=%s\n",
+                   currentTemp, trend,
+                   rtcState.tempSpikeDetected ? "YES" : "NO",
+                   rtcState.overTempDetected ? "YES" : "NO");
 }
 
 // Mark that the last data upload succeeded

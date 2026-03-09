@@ -467,7 +467,10 @@ void loop() {
     if (!beginSensors()) SerialMon.println("Sensor init failed.");
     g_sensorsInitialized = true;
     float t0 = getWaterTemperature();
-    if (!isnan(t0)) rtcState.lastWaterTemp = t0;
+    if (!isnan(t0)) {
+      rtcState.lastWaterTemp = t0;
+      pushTemperatureHistory(t0);
+    }
   }
   
   esp_task_wdt_reset();
