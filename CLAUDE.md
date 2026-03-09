@@ -192,7 +192,9 @@ Root files:
 ### Battery Measurement (power.cpp)
 - GPIO 35, 12-bit ADC, 11dB attenuation
 - 5 bursts × 50 averaged samples, 1s between bursts, median-of-five
-- Formula: `(raw / 4095.0) * 2.0 * 3.3 * (1110.0 / 1000.0)`
+- Uses `esp_adc_cal` API for hardware-calibrated ADC→mV conversion (eFuse Two Point or Vref)
+- Battery voltage = ADC mV × 2.0 (100K/100K divider ratio)
+- Old formula `(raw / 4095.0) * 2.0 * 3.3 * (1110.0 / 1000.0)` replaced — the 1110/1000 empirical fudge is no longer needed with proper calibration
 - Measured before powering anything (open-circuit voltage)
 - Critical guard: 3.70V / 25% → deep sleep
 
@@ -322,7 +324,7 @@ Root files:
 
 ### Measurement Approach Review
 
-**Battery (power.cpp):** Solid. Median-of-five with burst averaging is optimal for ESP32 ADC noise. Improvement: use `esp_adc_cal` API for hardware-calibrated nonlinearity correction (50-150mV improvement possible).
+**Battery (power.cpp):** Solid. Median-of-five with burst averaging is optimal for ESP32 ADC noise. Now uses `esp_adc_cal` API for hardware-calibrated nonlinearity correction (50-150mV improvement). Logs calibration source (eFuse Two Point, Vref, or Default).
 
 **Water Temperature (sensors.cpp):** Good. 12-bit DS18B20 with 3 retries and 800ms delay covers conversion time. Minor: call `setWaitForConversion(true)` explicitly.
 
@@ -350,13 +352,12 @@ All timings verified safe against SIM7000G datasheet. Tightest margin: PWRKEY po
 
 1. **Spectral wave analysis** — FFT-based instead of time-domain double integration
 2. **Fix anchor drift** — accumulate across boots, use GPS speed-over-ground
-4. **esp_adc_cal API** — hardware-calibrated ADC for better battery voltage accuracy
-5. **Build once JSON** — defer JSON construction until after network is up
-6. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py
-7. **OTA integrity check** — SHA-256 hash verification before applying firmware
-8. **Remove Mahony filter** — redundant with gravity tracker, saves CPU/flash
-9. **GPS SOG for drift detection** — CGNSINF field 6 gives speed in km/h
-10. **Log GPS HDOP and TTF** — quality metrics for fix accuracy
+3. **Build once JSON** — defer JSON construction until after network is up
+4. **Portable build script** — remove hardcoded Windows path in build_all_buoys.py
+5. **OTA integrity check** — SHA-256 hash verification before applying firmware
+6. **Remove Mahony filter** — redundant with gravity tracker, saves CPU/flash
+7. **GPS SOG for drift detection** — CGNSINF field 6 gives speed in km/h
+8. **Log GPS HDOP and TTF** — quality metrics for fix accuracy
 
 ## Build System
 
