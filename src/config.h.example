@@ -42,3 +42,6 @@
 
 // Optional SIM PIN (leave empty string if not required)
 #define SIM_PIN ""
+
+// Debug: set to 1 to stay awake instead of entering deep sleep (useful for serial monitoring)
+// #define DEBUG_NO_DEEP_SLEEP 0

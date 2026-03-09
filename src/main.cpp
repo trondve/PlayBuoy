@@ -391,11 +391,6 @@ void setup() {
 
   rtcStateBegin();
 
-  if (rtcState.firmwareUpdateAttempted) {
-    clearFirmwareUpdateAttempted();
-    SerialMon.println("OTA flag cleared after reboot.");
-  }
-
   const esp_partition_t* running = esp_ota_get_running_partition();
   esp_ota_img_states_t otaState;
   if (esp_ota_get_state_partition(running, &otaState) == ESP_OK) {

@@ -151,34 +151,6 @@ int getCurrentMonth() {
   }
 }
 
-int getCurrentHour() {
-  // Get current time from ESP32 RTC
-  time_t now;
-  struct tm timeinfo;
-  
-  // Wait for time to be set (this can take a few seconds after configTime)
-  int retry = 0;
-  do {
-    time(&now);
-    retry++;
-    if (now < 24 * 3600) {  // If time is less than 24 hours since epoch
-      delay(1000);
-    }
-  } while (now < 24 * 3600 && retry < 10);
-  
-  if (now > 24 * 3600) {  // Valid time (more than 24 hours since epoch)
-    localtime_r(&now, &timeinfo);
-    int hour = timeinfo.tm_hour;  // 0-23
-    bool isDST = timeinfo.tm_isdst > 0;
-    SerialMon.printf("RTC hour: %d, DST: %s (from epoch %lu)\n", hour, isDST ? "YES" : "NO", now);
-    return hour;
-  } else {
-    // Fallback: assume current hour (10 AM)
-    SerialMon.println("RTC not valid, using fallback hour: 10");
-    return 10;  // 10 AM
-  }
-}
-
 // Helper function to determine if current month is between October and April (inclusive)
 bool isWinterSeason(int month) {
   return (month >= 10 || month <= 4);

@@ -23,8 +23,7 @@ typedef struct {
   bool tempSpikeDetected;            // Flag for sudden temperature spike
   bool overTempDetected;             // Flag for temperature exceeding threshold
 
-  // Firmware update and upload status
-  bool firmwareUpdateAttempted;      // Flag indicating OTA update was attempted
+  // Upload status
   bool lastUploadFailed;             // Flag indicating last upload failure
 
   // Anchor drift alert and counter
@@ -71,7 +70,6 @@ void checkTemperatureAnomalies();
 //
 void markUploadSuccess();
 void markUploadFailed();
-void clearFirmwareUpdateAttempted();
 
 // Data buffering helpers
 void storeUnsentJson(const String& json);

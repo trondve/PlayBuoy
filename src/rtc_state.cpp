@@ -13,7 +13,6 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .lastWaterTemp = 0.0f,
   .tempSpikeDetected = false,
   .overTempDetected = false,
-  .firmwareUpdateAttempted = false,
   .lastUploadFailed = false,
   .anchorDriftDetected = false,
   .anchorDriftCounter = 0,
@@ -64,7 +63,6 @@ void logRtcState() {
   SerialMon.printf("- Charging problem: %s\n", rtcState.chargingProblemDetected ? "YES" : "NO");
   SerialMon.printf("- Temp spike detected: %s\n", rtcState.tempSpikeDetected ? "YES" : "NO");
   SerialMon.printf("- Over temp detected: %s\n", rtcState.overTempDetected ? "YES" : "NO");
-  SerialMon.printf("- Firmware update attempted: %s\n", rtcState.firmwareUpdateAttempted ? "YES" : "NO");
   SerialMon.printf("- Last upload failed: %s\n", rtcState.lastUploadFailed ? "YES" : "NO");
 
 }
@@ -110,12 +108,6 @@ void markUploadSuccess() {
 void markUploadFailed() {
   rtcState.lastUploadFailed = true;
   SerialMon.println("Upload marked as failure.");
-}
-
-// Clear the firmware update attempt flag after successful update
-void clearFirmwareUpdateAttempted() {
-  rtcState.firmwareUpdateAttempted = false;
-  SerialMon.println("Firmware update attempt flag cleared.");
 }
 
 void storeUnsentJson(const String& json) {
