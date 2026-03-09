@@ -30,6 +30,11 @@ extern "C" {
 #include "utils.h" // Utility functions (e.g., logging, time management)
 #include "config.h"  // Your NODE_ID, FIRMWARE_VERSION, GPS_SYNC_INTERVAL_SECONDS
 
+// Default DEBUG_NO_DEEP_SLEEP to 0 if not defined in config.h
+#ifndef DEBUG_NO_DEEP_SLEEP
+#define DEBUG_NO_DEEP_SLEEP 0
+#endif
+
 // Add watchdog include
 #include "esp_task_wdt.h"
 
