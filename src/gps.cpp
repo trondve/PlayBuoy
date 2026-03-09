@@ -225,7 +225,6 @@ static void gnssConfigure() {
 static bool gnssStart() {
   SerialMon.println("=== GNSS POWER ON ===");
   // Ensure GPS power pin is set just before GNSS start to avoid early power-on
-  extern void powerOnGPS();
   powerOnGPS();
   delay(5000);
   gnssConfigure();

@@ -77,8 +77,7 @@ void powerOn3V3Rail();
 void powerOff3V3Rail();
 void powerOnSensors();
 void powerOffSensors();
-void powerOnGPS();
-void powerOffGPS();
+// powerOnGPS() and powerOffGPS() declared in gps.h
 
 // Put buses/pins into low-leakage state before deep sleep
 void preparePinsAndSubsystemsForDeepSleep() {
