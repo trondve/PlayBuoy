@@ -94,7 +94,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 9. Check OTA firmware update
 10. Build JSON → HTTP POST upload (retry 3x)
 11. If upload fails, buffer JSON in RTC memory (512 bytes)
-12. Power off modem → configure pins high-Z → deep sleep
+12. Power off modem → configure pins high-Z → esp_sleep_pd_config (RTC periph OFF, XTAL OFF) → deep sleep
 
 **Critical:** Only power ONE subsystem at a time (GPS and cellular are voltage-sensitive).
 
