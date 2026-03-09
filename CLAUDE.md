@@ -94,9 +94,17 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 9. Check OTA firmware update
 10. Build JSON → HTTP POST upload (retry 3x)
 11. If upload fails, buffer JSON in RTC memory (512 bytes)
-12. Power off modem → configure pins high-Z → esp_sleep_pd_config (RTC periph OFF, XTAL OFF) → deep sleep
+12. Power off modem → configure pins high-Z → esp_sleep_pd_config → deep sleep
 
 **Critical:** Only power ONE subsystem at a time (GPS and cellular are voltage-sensitive).
+
+### Deep Sleep Power Optimizations
+- **Power domains:** RTC periph OFF, RTC fast mem OFF, XTAL OFF; only RTC slow mem ON (for rtcState)
+- **Bluetooth:** Controller disabled, deinitialized, and memory released at startup (~30KB freed)
+- **GPIO hold:** GPIO 25 (3V3 rail) held LOW via `gpio_hold_en` across deep sleep
+- **Pin state:** All modem/I2C/OneWire pins set to INPUT (high-Z) to prevent back-powering
+- **Brownout fast-track:** If ESP32 resets from brownout and battery <40%, goes straight to sleep (skips full cycle that would likely cause another brownout)
+- **Fallback season:** If RTC time is invalid, assumes January (winter schedule) for conservative power management
 
 ## Sleep Schedule
 
@@ -284,7 +292,7 @@ Root files:
 3. **`triedNBIoT` is static local:** Once tried, never retried in same boot
 4. **build_all_buoys.py hardcoded Windows path** (line 129)
 5. **update_firmware_version.py references create_version_files.py** which doesn't exist
-6. **Fallback month hardcoded to August** (battery.cpp getCurrentMonth)
+6. **Fallback month** now defaults to January (winter-safe) instead of August
 
 ### Not Working / Needs Improvement
 - **Wave height (Hs):** Now uses FFT spectral analysis (Hs = 4·√m₀). Needs field validation against known wave conditions.

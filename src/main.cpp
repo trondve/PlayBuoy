@@ -81,9 +81,8 @@ void powerOffSensors();
 
 // Put buses/pins into low-leakage state before deep sleep
 void preparePinsAndSubsystemsForDeepSleep() {
-  // Defensive radio off (WiFi/Bluetooth)
+  // Defensive radio off (WiFi already off, BT released at startup)
   WiFi.mode(WIFI_OFF);
-  btStop();
 
   // I2C high-Z
   Wire.end();
@@ -109,11 +108,11 @@ void preparePinsAndSubsystemsForDeepSleep() {
   gpio_hold_en(GPIO_NUM_25);
   gpio_deep_sleep_hold_en();
 
-  // Power domains: keep RTC memories, drop everything else
+  // Power domains: keep only RTC slow memory (holds RTC_DATA_ATTR), drop everything else
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_ON);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL,         ESP_PD_OPTION_OFF); // save ~250uA
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);   // rtcState lives here
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);  // not used, save ~0.5uA
+  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL,         ESP_PD_OPTION_OFF);  // save ~250uA
 }
 
 // Adjust next wake UTC to avoid 00:00-05:59 local; push to 06:00 if inside window
@@ -371,14 +370,21 @@ String getResetReasonString() {
 void setup() {
   Serial.begin(115200);
   delay(3000);
+
+  // Permanently release Bluetooth radio and memory (~30KB freed, BT never used)
+  btStop();
+  esp_bt_controller_disable();
+  esp_bt_controller_deinit();
+  esp_bt_mem_release(ESP_BT_MODE_BTDM);
+
   logWakeupReason();  // Log why we woke up
-  
-  // Check if we're recovering from a brownout
+
+  // Track brownout for fast-path sleep decision after battery measurement
   esp_reset_reason_t reason = esp_reset_reason();
-  if (reason == ESP_RST_BROWNOUT) {
+  bool brownoutRecovery = (reason == ESP_RST_BROWNOUT);
+  if (brownoutRecovery) {
     SerialMon.println("=== BROWNOUT RECOVERY DETECTED ===");
-    SerialMon.println("Device recovered from brownout reset");
-    SerialMon.println("Implementing conservative power management");
+    SerialMon.println("Battery sagged under load — will check voltage and may sleep immediately.");
     SerialMon.println("================================");
   }
 
@@ -423,8 +429,28 @@ void setup() {
   SerialMon.println("=== END BATTERY MEASUREMENT ===");
 
   checkBatteryChargeState();
+  logBatteryStatus();
 
-  logBatteryStatus();  // Battery status
+  // Brownout fast-track: if we just brown-out reset and battery is below 40%,
+  // skip the full cycle and go straight to deep sleep to preserve the battery.
+  // A brownout means the voltage sagged under load (modem 2A peak), so running
+  // the full cycle with modem/GPS would likely cause another brownout.
+  if (brownoutRecovery) {
+    int pct = estimateBatteryPercent(stableBatteryVoltage);
+    if (pct < 40) {
+      SerialMon.printf("BROWNOUT + LOW BATTERY (%d%% / %.3fV) — sleeping immediately.\n",
+                       pct, stableBatteryVoltage);
+      int sleepHours = determineSleepDuration(pct);
+      rtcState.lastSleepHours = (uint16_t)sleepHours;
+      uint32_t sleepSec = (uint32_t)sleepHours * 3600UL;
+      if (sleepSec < 300) sleepSec = 300;
+      preparePinsAndSubsystemsForDeepSleep();
+      esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
+      esp_deep_sleep_start();
+    } else {
+      SerialMon.printf("Brownout recovery but battery OK (%d%%) — proceeding with full cycle.\n", pct);
+    }
+  }
 
   if (handleUndervoltageProtection()) {
     // Device will deep sleep if battery critically low

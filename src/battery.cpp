@@ -149,9 +149,10 @@ int getCurrentMonth() {
     SerialMon.printf("RTC month: %d, DST: %s (from epoch %lu)\n", month, isDST ? "YES" : "NO", now);
     return month;
   } else {
-    // Fallback: assume current month (August 2025)
-    SerialMon.println("RTC not valid, using fallback month: 8 (August)");
-    return 8;  // August
+    // Fallback: assume winter (January) for conservative power management.
+    // Using summer schedule without valid time could drain the battery fatally.
+    SerialMon.println("RTC not valid, using fallback month: 1 (January/winter-safe)");
+    return 1;  // January — triggers winter sleep schedule
   }
 }
 
