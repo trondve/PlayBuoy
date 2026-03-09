@@ -218,7 +218,8 @@ Root files:
 - Also computes: mean tilt (degrees from vertical), acceleration RMS
 
 ### GPS (gps.cpp)
-- NTP sync → XTRA download (if >7 days stale) → GNSS start → 60s NMEA priming → fix polling
+- NTP sync → XTRA download (if >7 days stale) → GNSS start → 60s NMEA smoke test → fix polling
+- **60s smoke test** (`gnssSmoke60s`): Streams NMEA sentences while polling CGNSINF every second. Lets the GNSS engine warm up and acquire satellites before the main fix loop. Exits early if a fix is obtained during this phase.
 - 3 GPIO polarity variants tried for GNSS power (hardware revision compatibility)
 - PDP teardown after GPS, re-established for upload
 
