@@ -3,6 +3,7 @@
 #include "rtc_state.h"
 #include "config.h"
 #include "power.h"
+#include "wave.h"
 #include <time.h>
 
 String buildJsonPayload(
@@ -44,6 +45,11 @@ String buildJsonPayload(
   wave["period"] = wavePeriod;
   wave["direction"] = waveDirection;
   wave["power"] = wavePower;
+
+  // Buoy diagnostics from IMU
+  JsonObject buoy = doc.createNestedObject("buoy");
+  buoy["tilt"] = computeMeanTilt();       // degrees from vertical
+  buoy["accel_rms"] = computeAccelRms();  // m/s², proxy for conditions
 
   doc["temp"] = waterTemp;
   doc["temp_trend"] = getTemperatureTrend(); // °C change over last 5 readings

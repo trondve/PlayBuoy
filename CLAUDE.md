@@ -200,6 +200,7 @@ Root files:
 - Hs = mean of top 1/3 wave heights, Tp = their mean period
 - Wave caps: 0.5m per wave, 1.0m abort (small lake)
 - `DISP_AMP_SCALE = 1.75` empirical correction
+- Also computes: mean tilt (degrees from vertical), acceleration RMS
 
 ### GPS (gps.cpp)
 - NTP sync → XTRA download (if >7 days stale) → GNSS start → 60s NMEA priming → fix polling
@@ -232,6 +233,8 @@ Root files:
 | `wave.period` | float | Peak wave period Tp (seconds) |
 | `wave.direction` | string | Wave direction (currently always "N/A") |
 | `wave.power` | float | Wave power proxy (kW/m) |
+| `buoy.tilt` | float | Mean buoy tilt from vertical (degrees) |
+| `buoy.accel_rms` | float | Heave acceleration RMS (m/s², proxy for conditions) |
 | `temp` | float | Water temperature (°C) |
 | `temp_trend` | float | Temperature change over last 5 readings (°C, + = warming) |
 | `battery` | float | Battery voltage (V) |

@@ -56,6 +56,11 @@ static float s_lastHs = 0.0f;
 static float s_lastTp = 0.0f;
 static uint16_t s_lastWaves = 0;
 
+// Tilt and acceleration metrics (computed incrementally during sampling)
+static double s_tiltSum = 0.0;
+static uint32_t s_tiltCount = 0;
+static float s_accelRms = 0.0f;
+
 // I2C helpers
 static inline bool i2cWrite(uint8_t reg, uint8_t val) {
   Wire.beginTransmission(MPU6500_ADDR);
@@ -292,6 +297,7 @@ void recordWaveData() {
   // Reset all filter state to avoid stale data from previous boot/call
   dispCount = 0;
   s_heaveAbsSum = 0.0; s_heaveSqSum = 0.0; s_heaveStatCount = 0;
+  s_tiltSum = 0.0; s_tiltCount = 0; s_accelRms = 0.0f;
   hp_y_prev = hp_x_prev = lp_y_prev = 0.0f;
   hp_y_prev_d = hp_x_prev_d = lp_y_prev_d = 0.0f;
   g_lp_x = 0.0f; g_lp_y = 0.0f; g_lp_z = 9.80665f; // reset gravity tracker
@@ -338,6 +344,13 @@ void recordWaveData() {
     const float az_spec = az - g_lp_z;
     float gnorm = sqrtf(g_lp_x*g_lp_x + g_lp_y*g_lp_y + g_lp_z*g_lp_z);
     if (gnorm < 1e-3f) gnorm = 9.80665f;
+
+    // Tilt: angle between gravity vector and vertical (z-axis)
+    float cosAngle = g_lp_z / gnorm;
+    if (cosAngle > 1.0f) cosAngle = 1.0f;
+    if (cosAngle < -1.0f) cosAngle = -1.0f;
+    s_tiltSum += (double)(acosf(cosAngle) * 57.2958f); // rad to deg
+    s_tiltCount++;
     const float ux = g_lp_x / gnorm, uy = g_lp_y / gnorm, uz = g_lp_z / gnorm;
     float heaveAcc = -(ax_spec*ux + ay_spec*uy + az_spec*uz);
     if (fabsf(heaveAcc) < 0.001f) heaveAcc = 0.0f;
@@ -364,6 +377,9 @@ void recordWaveData() {
   }
 
   SerialMon.printf("Wave data collection complete: %d samples collected in %d seconds (target: 1800 samples in 180 seconds)\n", dispCount, (millis() - start) / 1000);
+
+  // Compute acceleration RMS from incremental stats
+  s_accelRms = (s_heaveStatCount > 0) ? sqrtf((float)(s_heaveSqSum / (double)s_heaveStatCount)) : 0.0f;
 
   // If not enough samples, produce zeros
   if (dispCount < (uint32_t)(FS_HZ * 5.0f)) {
@@ -412,6 +428,10 @@ String computeWaveDirection() {
 float computeWavePower(float height, float period) {
   return 0.49f * height * height * period; // deep-water proxy
 }
+float computeMeanTilt() {
+  return (s_tiltCount > 0) ? (float)(s_tiltSum / (double)s_tiltCount) : 0.0f;
+}
+float computeAccelRms() { return s_accelRms; }
 void logWaveStats() {
   SerialMon.println("---- Wave Stats (last window) ----");
   SerialMon.printf("Samples: %u @ %.1f Hz, Waves detected: %u\n", dispCount, FS_HZ, s_lastWaves);
@@ -434,6 +454,8 @@ void logWaveStats() {
     float meanAbsA = (float)(s_heaveAbsSum / (double)s_heaveStatCount);
     SerialMon.printf("Heave |a| mean:      %.4f m/s²\n", meanAbsA);
   }
+  SerialMon.printf("Accel RMS:           %.4f m/s²\n", s_accelRms);
+  SerialMon.printf("Mean tilt:           %.1f°\n", computeMeanTilt());
   
   if (!imuInitialized) {
     SerialMon.println("WARNING: MPU6500 data not available - wave readings may be zero");
