@@ -17,6 +17,8 @@ bool beginSensors() {
   Wire.begin(21, 22); // SDA = GPIO 21, SCL = GPIO 22
   // IMU initialization moved to wave.cpp to match working wave pipeline
   waterTempSensor.begin();
+  waterTempSensor.setResolution(12);             // Explicit 12-bit (0.0625°C)
+  waterTempSensor.setWaitForConversion(true);     // Block until conversion complete
   Serial.println("Sensors initialized");
   return true;
 }
@@ -30,7 +32,7 @@ float getWaterTemperature() {
     if (temp != -127.0f && temp != 85.0f && !isnan(temp) && temp > -30.0f && temp < 60.0f) {
       return temp;
     }
-    delay(800); // Must cover full 12-bit conversion time (750ms)
+    delay(800); // Retry backoff (conversion wait handled by setWaitForConversion)
   }
   // If all retries fail or value is out of range, return NAN
   return NAN;

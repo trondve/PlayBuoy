@@ -199,8 +199,9 @@ Root files:
 - Critical guard: 3.70V / 25% → deep sleep
 
 ### Water Temperature (sensors.cpp)
-- DallasTemperature library, 12-bit resolution (0.0625°C, 750ms conversion)
-- 3 retries with 800ms delay, validation: -127°C, 85°C error codes, range -30 to 60°C
+- DallasTemperature library, explicit 12-bit resolution (0.0625°C, 750ms conversion)
+- `setWaitForConversion(true)` — blocks until conversion complete, no timing guesswork
+- 3 retries with 800ms backoff, validation: -127°C, 85°C error codes, range -30 to 60°C
 - Read during sensor-powered phase, stored in RTC for JSON (3V3 rail off during upload)
 
 ### Wave Measurement (wave.cpp)
@@ -326,7 +327,7 @@ Root files:
 
 **Battery (power.cpp):** Solid. Median-of-five with burst averaging is optimal for ESP32 ADC noise. Now uses `esp_adc_cal` API for hardware-calibrated nonlinearity correction (50-150mV improvement). Logs calibration source (eFuse Two Point, Vref, or Default).
 
-**Water Temperature (sensors.cpp):** Good. 12-bit DS18B20 with 3 retries and 800ms delay covers conversion time. Minor: call `setWaitForConversion(true)` explicitly.
+**Water Temperature (sensors.cpp):** Good. 12-bit DS18B20 with 3 retries. Now explicitly sets 12-bit resolution and `setWaitForConversion(true)` so `requestTemperatures()` blocks until conversion is complete.
 
 **Wave Data (wave.cpp):** Weakest area. Time-domain double integration has fundamental drift. The `DISP_AMP_SCALE = 1.75` fudge confirms amplitude loss. Spectral (FFT) approach would be more robust — divide acceleration FFT by -ω² for displacement spectrum. The Mahony filter is redundant (gravity tracker does orientation independently).
 
