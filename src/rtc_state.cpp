@@ -21,6 +21,7 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .anchorDriftDetected = false,
   .anchorDriftCounter = 0,
   .chargingProblemDetected = false,
+  .firmwareUpdateAttempted = false,
   .lastUnsentJson = {0},
   .hasUnsentData = false,
   .lastSleepHours = 0,
@@ -68,6 +69,7 @@ void logRtcState() {
   SerialMon.printf("- Temp spike detected: %s\n", rtcState.tempSpikeDetected ? "YES" : "NO");
   SerialMon.printf("- Over temp detected: %s\n", rtcState.overTempDetected ? "YES" : "NO");
   SerialMon.printf("- Last upload failed: %s\n", rtcState.lastUploadFailed ? "YES" : "NO");
+  SerialMon.printf("- FW update attempted: %s\n", rtcState.firmwareUpdateAttempted ? "YES" : "NO");
 
 }
 
@@ -166,6 +168,18 @@ void markUploadSuccess() {
 void markUploadFailed() {
   rtcState.lastUploadFailed = true;
   SerialMon.println("Upload marked as failure.");
+}
+
+void markFirmwareUpdateAttempted() {
+  rtcState.firmwareUpdateAttempted = true;
+  SerialMon.println("Firmware update attempted — flag set for next boot.");
+}
+
+void clearFirmwareUpdateAttempted() {
+  if (rtcState.firmwareUpdateAttempted) {
+    SerialMon.println("Clearing firmware update flag (successful boot after OTA).");
+  }
+  rtcState.firmwareUpdateAttempted = false;
 }
 
 void storeUnsentJson(const String& json) {

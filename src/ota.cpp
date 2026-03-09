@@ -1,6 +1,7 @@
 #define TINY_GSM_MODEM_SIM7000
 #include "ota.h"
 #include "config.h"
+#include "rtc_state.h"
 #include <TinyGsmClient.h>
 #include <Update.h>
 
@@ -237,6 +238,7 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
   if (!firmwareUrl.endsWith(".bin")) firmwareUrl += ".bin";
   if (downloadAndInstallFirmware(firmwareUrl.c_str())) {
     SerialMon.println("OTA update successful. Rebooting...");
+    markFirmwareUpdateAttempted();
     delay(500);
     ESP.restart();
     return true;

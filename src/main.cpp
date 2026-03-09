@@ -637,6 +637,7 @@ void loop() {
       esp_ota_mark_app_valid_cancel_rollback();
     }
   }
+  clearFirmwareUpdateAttempted();
 
   // Try to send any buffered unsent JSON first
   bool bufferedDataSent = false;

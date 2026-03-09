@@ -37,6 +37,9 @@ typedef struct {
   // Battery charging alert
   bool chargingProblemDetected;      // Flag if no charge detected over 24 hours
 
+  // OTA firmware update tracking
+  bool firmwareUpdateAttempted;      // Set before OTA restart, cleared on successful boot
+
   // Data buffering for failed uploads
   char lastUnsentJson[512];         // Buffer for last unsent JSON payload
   bool hasUnsentData;               // Flag if there is unsent data
@@ -76,6 +79,8 @@ float getTemperatureTrend();              // Returns °C/hour rate of change (+ 
 //
 void markUploadSuccess();
 void markUploadFailed();
+void markFirmwareUpdateAttempted();
+void clearFirmwareUpdateAttempted();
 
 // Data buffering helpers
 void storeUnsentJson(const String& json);
