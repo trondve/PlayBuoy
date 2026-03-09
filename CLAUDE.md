@@ -55,6 +55,13 @@ Solar-powered, permanently sealed, waterproof IoT buoy that floats on a lake/coa
 - **Switched 3.3V rail** (GPIO 25) powers sensors, cut entirely during sleep
 - Haugesund: very rainy, effective daily solar harvest ~1.5-3 Wh summer, ~0.1-0.5 Wh winter
 
+### Battery Health Guidelines (18650 Li-ion)
+- **Never discharge below 20%** — prevents irreversible battery damage
+- **Never charge above 80%** — high SoC accelerates calendar aging and capacity loss
+- **Ideal operating range: 40-60%** — optimal for lithium-ion longevity (data center standard)
+- **Critical guard: 25% / 3.70V** — deep sleep with safety margin for SIM7000G (needs ≥3.55V under 2A peak)
+- The aggressive 2-hour wake schedule at >80% SoC is **intentional** — it forces the buoy to discharge toward the healthy range while also providing frequent temperature updates to users
+
 ## Buoy Deployments
 
 | Buoy ID | Node ID | Name | Location |
@@ -333,7 +340,7 @@ The OCV table overestimates SoC in the 5-60% range vs standard 18650 curves. At 
 3.70V / 25% critical guard is safe. SIM7000G minimum operating voltage 3.4V + 0.15V drop under 2A peak = 3.55V required resting voltage. 3.70V provides 150mV headroom for aged cells.
 
 ### Sleep Schedule Assessment
-Well-designed for 18650 health. The 2-hour interval at >80% is aggressive for Haugesund's rainy climate (~60-70% cloudy days in summer). Consider 3h minimum or battery-trend-based adjustment.
+Well-designed for 18650 health. The 2-hour interval at >80% is intentional — it actively discharges toward the healthy 40-60% range while providing frequent temperature updates during summer. The entire schedule is built around lithium-ion best practices: never above 80%, never below 20%, ideally 40-60%.
 
 ### Modem Timing Assessment
 All timings verified safe against SIM7000G datasheet. Tightest margin: PWRKEY power-off at 1300ms (spec min: 1200ms).
