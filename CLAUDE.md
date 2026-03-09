@@ -281,7 +281,7 @@ Root files:
 ### Not Working / Needs Improvement
 - **Wave height (Hs):** Unreliable due to double-integration drift. Needs spectral (FFT) approach.
 - **Wave direction:** Always "N/A" — magnetometer broken in sealed enclosure.
-- **Anchor drift detection:** Resets counter on every GPS fix, only detects within single boot.
+- **Anchor drift detection:** Fixed (2026-03-09) — counter now accumulates across boots, resets only when buoy returns within threshold.
 - **Temperature anomaly detection:** Implemented (2026-03-09) — detects >2°C spikes between readings, over-temp >35°C.
 - **Charging problem detection:** Flag exists but detection logic incomplete.
 

@@ -77,8 +77,8 @@ void updateLastGpsFix(float lat, float lon, uint32_t epochSec) {
   rtcState.lastGpsLat = lat;
   rtcState.lastGpsLon = lon;
   rtcState.lastGpsFixTime = epochSec;
-  rtcState.anchorDriftCounter = 0;
-  rtcState.anchorDriftDetected = false;
+  // Do NOT reset anchorDriftCounter/anchorDriftDetected here —
+  // drift state must accumulate across boots for reliable detection.
 }
 
 void checkAnchorDrift(float currentLat, float currentLon) {
@@ -90,9 +90,15 @@ void checkAnchorDrift(float currentLat, float currentLon) {
     return;
   }
   float dist = distanceBetween(currentLat, currentLon, rtcState.lastGpsLat, rtcState.lastGpsLon);
-  // Immediate detection: mark alert if distance exceeds threshold on this wake
-  rtcState.anchorDriftDetected = (dist > ANCHOR_DRIFT_DISTANCE_THRESHOLD);
-  rtcState.anchorDriftCounter = rtcState.anchorDriftDetected ? 1 : 0;
+  if (dist > ANCHOR_DRIFT_DISTANCE_THRESHOLD) {
+    // Accumulate consecutive drift detections across boots
+    if (rtcState.anchorDriftCounter < 255) rtcState.anchorDriftCounter++;
+    rtcState.anchorDriftDetected = true;
+  } else {
+    // No drift on this fix — reset counter (buoy is back in place)
+    rtcState.anchorDriftCounter = 0;
+    rtcState.anchorDriftDetected = false;
+  }
 
   SerialMon.printf("Anchor drift check: distance=%.2f m, counter=%d, alert=%s\n",
                    dist, rtcState.anchorDriftCounter,
