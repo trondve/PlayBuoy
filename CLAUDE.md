@@ -4,11 +4,13 @@ This file is the AI assistant's memory for the PlayBuoy project. It provides con
 
 ## Project Overview
 
-Solar-powered, permanently sealed, waterproof IoT buoy that floats on a lake/coastal water. Collects water temperature and wave data, transmits via 4G cellular to a web API for beachgoers.
+Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beaches. Collects water temperature and wave data, transmits via 4G cellular to a web API for beachgoers.
 
+- **Deployment environments:** Small lakes, large lakes, and ocean/coastal beaches
 - **Primary deployment:** Litla Grindevatnet, lake near Haugesund, Norway (59.4°N)
 - **Core feature:** Water temperature (most important for users)
 - **Secondary:** Wave height, period, power (for enthusiasts)
+- **Note:** Wave parameters (MAX_SAMPLES, MAX_WAVES, wave caps) may need adjustment for ocean deployments where waves are higher and more frequent than in small lakes
 - **Inspiration:** [Smart Buoy](https://github.com/sk-t3ch/smart-buoy) ([YouTube](https://www.youtube.com/watch?v=S-XMT6GDWk8&list=PLoTBNxUNjtjebnBR1B3RfByp8vZtZ6yL7))
 
 ### Design Priorities (in order)
@@ -205,7 +207,7 @@ Root files:
 - Heave acceleration → IIR bandpass (0.28-1.0 Hz) → trapezoidal integration
 - Linear detrend → DC removal → band-pass displacement → zero-upcrossing analysis
 - Hs = mean of top 1/3 wave heights, Tp = their mean period
-- Wave caps: 0.5m per wave, 1.0m abort (small lake)
+- Wave caps: 0.5m per wave, 1.0m abort (current small-lake defaults — increase for ocean deployments)
 - `DISP_AMP_SCALE = 1.75` empirical correction
 - Also computes: mean tilt (degrees from vertical), acceleration RMS
 
