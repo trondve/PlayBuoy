@@ -91,8 +91,8 @@ float readBatteryVoltage() {
   SerialMon.println("Starting battery voltage measurement..");
   SerialMon.printf("Pin: GPIO%d, ADC: 12-bit, Atten: 11 dB, Calibrated: %s\n",
                    PIN_ADC_BAT, s_adcCalibrated ? "YES" : "NO");
-  SerialMon.println("Stabilizing for 2 s before first burst...");
-  delay(2000);
+  SerialMon.println("Stabilizing before first burst...");
+  delay(500);  // ADC input is just a resistor divider, settles in <100ms
 
   float v[5];
   for (int i = 0; i < 5; i++) {
@@ -102,7 +102,7 @@ float readBatteryVoltage() {
     SerialMon.printf("Burst V[%d]: %.3f V (ADC: %lu mV)  %s\n",
                      i + 1, v[i], adcMv, isValidVoltage(v[i]) ? "OK" : "INVALID");
     if (i < 4) {
-      delay(1000);
+      delay(500);  // 500ms between bursts (was 1000ms, ADC settles in <100ms)
     }
   }
   float vmed = medianOfFive(v[0], v[1], v[2], v[3], v[4]);

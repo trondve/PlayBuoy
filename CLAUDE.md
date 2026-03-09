@@ -83,18 +83,19 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 
 ## Boot Cycle
 
-1. Wake from deep sleep → 3s startup → log wake reason
+1. Wake from deep sleep → 3s startup → release BT → log wake reason
 2. Release GPIO holds → measure battery (before powering anything)
-3. Critical battery check → deep sleep if ≤25% or ≤3.70V
-4. Power 3V3 rail → 500ms → init sensors → read temperature
-5. Record wave data (3 min, 10 Hz accelerometer)
-6. Power off sensors → 500ms → power off 3V3 rail
-7. Power on modem → NTP sync → XTRA download if stale → GNSS fix
-8. Power off GPS → re-establish cellular
-9. Check OTA firmware update
-10. Build JSON → HTTP POST upload (retry 3x)
-11. If upload fails, buffer JSON in RTC memory (512 bytes)
-12. Power off modem → configure pins high-Z → esp_sleep_pd_config → deep sleep
+3. Brownout fast-track → deep sleep if brownout + battery <40%
+4. Critical battery check → deep sleep if ≤25% or ≤3.70V
+5. Power 3V3 rail → 150ms → init sensors → read temperature
+6. Record wave data (3 min, 10 Hz accelerometer)
+7. Power off sensors → 100ms → power off 3V3 rail
+8. Power on modem → NTP sync → XTRA download if stale → GNSS fix
+9. Power off GPS → re-establish cellular (skip modem pre-cycle, already warm)
+10. Check OTA firmware update
+11. Build JSON → HTTP POST upload (retry 3x)
+12. If upload fails, buffer JSON in RTC memory (512 bytes)
+13. Power off modem → configure pins high-Z → esp_sleep_pd_config → deep sleep
 
 **Critical:** Only power ONE subsystem at a time (GPS and cellular are voltage-sensitive).
 
@@ -199,7 +200,7 @@ Root files:
 
 ### Battery Measurement (power.cpp)
 - GPIO 35, 12-bit ADC, 11dB attenuation
-- 5 bursts × 50 averaged samples, 1s between bursts, median-of-five
+- 5 bursts × 50 averaged samples, 500ms between bursts, median-of-five
 - Uses `esp_adc_cal` API for hardware-calibrated ADC→mV conversion (eFuse Two Point or Vref)
 - Battery voltage = ADC mV × 2.0 (100K/100K divider ratio)
 - Old formula `(raw / 4095.0) * 2.0 * 3.3 * (1110.0 / 1000.0)` replaced — the 1110/1000 empirical fudge is no longer needed with proper calibration

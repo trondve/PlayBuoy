@@ -25,14 +25,19 @@ static const unsigned long NETWORK_TIMEOUT_MS = 60000;
 //
 // Connect to NB-IoT or LTE-M network using given APN
 //
-bool connectToNetwork(const char* apn) {
+bool connectToNetwork(const char* apn, bool skipPreCycle) {
   const int maxRetries = 3;
-  // Pre-cycle the modem once at entry to mirror the known-good path of attempt 2
-  SerialMon.println("Pre-cycling modem before first registration attempt...");
-  powerOffModem();
-  delay(2000);
-  powerOnModem();
-  delay(3000);
+  if (!skipPreCycle) {
+    // Pre-cycle the modem once at entry to mirror the known-good path of attempt 2
+    // Skipped when modem is already warm (e.g. after GPS phase) to save ~14s
+    SerialMon.println("Pre-cycling modem before first registration attempt...");
+    powerOffModem();
+    delay(2000);
+    powerOnModem();
+    delay(3000);
+  } else {
+    SerialMon.println("Modem already warm, skipping pre-cycle.");
+  }
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     SerialMon.printf("Connecting to cellular network (attempt %d/%d)...\n", attempt + 1, maxRetries);
 
@@ -69,8 +74,8 @@ bool connectToNetwork(const char* apn) {
 
     // Use modem defaults (matches previously working configuration)
 
-    // Brief settle after GNSS teardown and RAT setup before network registration (conservative)
-    delay(3000);
+    // Brief settle after RAT setup before network registration
+    delay(1000);
     // Wake modem for network operations (drop DTR)
     extern void wakeModemForNetwork();
     wakeModemForNetwork();
@@ -123,7 +128,7 @@ bool connectToNetwork(const char* apn) {
     {
       unsigned long t0 = millis();
       String line;
-      while (millis() - t0 < 2000) {
+      while (millis() - t0 < 500) {
         while (Serial1.available()) {
           char c = (char)Serial1.read();
           if (c == '\n') {

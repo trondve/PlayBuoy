@@ -491,7 +491,7 @@ void loop() {
   
   // Power on 3.3V rail, wait for stabilization, then power on sensors
   powerOn3V3Rail();
-  delay(500);  // 500ms — rail stabilizes in <10ms, DS18B20/I2C need <100ms
+  delay(150);  // LDO rail stabilizes in <10ms, DS18B20 needs ~50ms, 150ms is safe
   powerOnSensors();
   if (!g_sensorsInitialized) {
     if (!beginSensors()) SerialMon.println("Sensor init failed.");
@@ -510,7 +510,7 @@ void loop() {
   
   // Power off sensors, then power off 3.3V rail
   powerOffSensors();
-  delay(500);  // 500ms settle before rail off
+  delay(100);  // brief settle before rail off (no datasheet requirement)
   powerOff3V3Rail();
   
   SerialMon.println("=== Wave data collection complete ===");
@@ -555,16 +555,17 @@ void loop() {
     }
     // Turn off GNSS, set GPS power pin back to LOW
     gpsEnd();
-    delay(1000);
+    delay(300);   // brief settle after GNSS stop AT command
     powerOffGPS();
-    delay(1000);
+    delay(200);   // brief settle before re-establishing cellular
     
     // Re-establish cellular data connection for firmware updates and JSON upload
+    // Modem is already powered from GPS phase — skip pre-cycle to save ~14s
     SerialMon.println("Re-establishing cellular data connection for upload...");
     ensureModemReady();
-    delay(4000);  // increased settle before first connect attempt
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
-    
+    delay(1000);  // brief settle before connect (modem already warm from GPS)
+    networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
+
     // If regular connection fails, try APN testing
     if (!networkConnected) {
       SerialMon.println("Regular connection failed, testing multiple APNs...");
@@ -575,12 +576,12 @@ void loop() {
     fix.longitude = rtcState.lastGpsLon;
     fix.fixTimeEpoch = rtcState.lastGpsFixTime;
     fix.success = true;
-    
+
     // GPS was skipped, but we still need cellular data for firmware updates and JSON upload
     SerialMon.println("GPS skipped, establishing cellular data connection for upload...");
     ensureModemReady();
-    delay(4000);  // increased settle before first connect attempt
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
+    delay(1000);  // brief settle before connect (modem just powered on)
+    networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
     
     // If regular connection fails, try APN testing
     if (!networkConnected) {
@@ -760,9 +761,8 @@ void loop() {
         storeUnsentJson(json);
       }
 
-      // Tear down cellular data after JSON upload and firmware check, wait 2 seconds
-      SerialMon.println("Tearing down cellular data after upload...");
-      delay(2000);
+      // Cellular data will be torn down when modem powers off before sleep
+      SerialMon.println("Upload complete, proceeding to sleep.");
     } else {
       SerialMon.println("Network connection failed.");
       markUploadFailed();
@@ -784,11 +784,10 @@ void loop() {
   }
   delay(100);
 
-  // Before sleep: cut power to 3.3V rail to disable GY-91 LED, wait 2 seconds
+  // Ensure 3V3 rail is off (should already be off from sensor phase)
   powerOff3V3Rail();
-  delay(2000);  // 2 second delay as requested
-  
-  // Before sleep: power down modem/GPS/Cellular data completely to conserve power
+
+  // Power down modem completely before sleep
   powerOffModem();
 
 #if DEBUG_NO_DEEP_SLEEP
