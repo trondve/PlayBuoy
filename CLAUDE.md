@@ -307,8 +307,7 @@ Root files:
 - Removed unused `directionFromAverage()` function
 - Replaced 12KB `aHeaveBuf` with incremental stats (~12KB RAM saved)
 - Removed unused MPU9250_asukiaaa library from lib/
-- Removed dead `getCurrentHour()` function
-- Removed dead `firmwareUpdateAttempted` flag, check, and clear function
+- Removed `getCurrentHour()` — quiet hours now handled by `adjustNextWakeUtcForQuietHours()` in main.cpp
 - Added `DEBUG_NO_DEEP_SLEEP` to config.h.example
 
 ### New Metrics Added
