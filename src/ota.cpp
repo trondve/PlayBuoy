@@ -8,6 +8,7 @@
 #define SerialMon Serial
 
 extern TinyGsm modem;
+extern void powerOffModem();
 
 static bool ensurePdpForHttp() {
   if (modem.isGprsConnected()) return true;
@@ -237,8 +238,9 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
   String firmwareUrl = String(baseUrl);
   if (!firmwareUrl.endsWith(".bin")) firmwareUrl += ".bin";
   if (downloadAndInstallFirmware(firmwareUrl.c_str())) {
-    SerialMon.println("OTA update successful. Rebooting...");
+    SerialMon.println("OTA update successful. Shutting down modem before reboot...");
     markFirmwareUpdateAttempted();
+    powerOffModem();
     delay(500);
     ESP.restart();
     return true;

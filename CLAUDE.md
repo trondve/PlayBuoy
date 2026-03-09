@@ -338,7 +338,7 @@ Root files:
 
 **GPS (gps.cpp):** NTP→XTRA→GNSS is correct per SIM7000G app notes. Dynamic timeout is well-designed. The double PDP setup/teardown (~20-30s) is necessary — SIM7000G shares the radio between cellular data and GNSS, so PDP must be torn down before GNSS and re-established after for upload.
 
-**OTA (ota.cpp):** Functional. No integrity check (consider SHA-256 hash). No graceful modem shutdown before ESP.restart().
+**OTA (ota.cpp):** Functional. No integrity check (consider SHA-256 hash). Graceful modem shutdown (CPOWD) now called before ESP.restart().
 
 **JSON/Upload (modem.cpp, json.cpp):** Solid. JSON built twice (once early, once with network info) — could optimize to build once.
 
