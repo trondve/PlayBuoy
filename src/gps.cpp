@@ -224,9 +224,8 @@ static void gnssConfigure() {
 
 static bool gnssStart() {
   SerialMon.println("=== GNSS POWER ON ===");
-  // Ensure GPS power pin is set just before GNSS start to avoid early power-on
-  powerOnGPS();
-  delay(5000);
+  // GNSS is internal to SIM7000G — controlled via AT commands, not ESP32 GPIO.
+  // AT+SGPIO/AT+CGPIO in gnssConfigure() handle the modem's internal GNSS power pin.
   gnssConfigure();
   sendAT("AT+CGNSPWR=1");
   delay(300);

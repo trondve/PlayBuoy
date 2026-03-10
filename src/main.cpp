@@ -55,7 +55,8 @@ extern "C" {
 
 // Power management pins
 #define POWER_3V3_ENABLE 25  // GPIO 25 to control 3.3V rail power
-#define GPS_POWER_PIN 4      // GPIO 4 for GPS power control (same as MODEM_PWRKEY)
+// GPS_POWER_PIN removed — was GPIO 4 (same as MODEM_PWRKEY), causing conflict.
+// SIM7000G GNSS is internal, controlled via AT commands (AT+CGNSPWR, AT+SGPIO).
 
 #define SerialMon Serial
 #define SerialAT Serial1
@@ -66,7 +67,6 @@ TinyGsm modem(SerialAT);
 static bool g_modemReady = false;
 static bool g_3v3RailPowered = false;
 static bool g_sensorsPowered = false;
-static bool g_gpsPinHigh = false;
 static bool g_sensorsInitialized = false;
 static float g_prevBatteryVoltage = 0.0f;
 
@@ -77,7 +77,7 @@ void powerOn3V3Rail();
 void powerOff3V3Rail();
 void powerOnSensors();
 void powerOffSensors();
-// powerOnGPS() and powerOffGPS() declared in gps.h
+// GPS power is controlled via AT commands in gps.cpp, not GPIO
 
 // Put buses/pins into low-leakage state before deep sleep
 void preparePinsAndSubsystemsForDeepSleep() {
@@ -294,31 +294,9 @@ void powerOffSensors() {
   SerialMon.println("Sensors powered off.");
 }
 
-// Power management functions for GPS
-void powerOnGPS() {
-  if (g_gpsPinHigh) {
-    SerialMon.println("GPS power pin already HIGH.");
-    return;
-  }
-  
-  SerialMon.println("Setting GPS power pin HIGH...");
-  pinMode(GPS_POWER_PIN, OUTPUT);
-  digitalWrite(GPS_POWER_PIN, HIGH);
-  g_gpsPinHigh = true;
-  SerialMon.println("GPS power pin set HIGH.");
-}
-
-void powerOffGPS() {
-  if (!g_gpsPinHigh) {
-    SerialMon.println("GPS power pin already LOW.");
-    return;
-  }
-  
-  SerialMon.println("Setting GPS power pin LOW...");
-  digitalWrite(GPS_POWER_PIN, LOW);
-  g_gpsPinHigh = false;
-  SerialMon.println("GPS power pin set LOW.");
-}
+// powerOnGPS()/powerOffGPS() removed — GPIO 4 is MODEM_PWRKEY.
+// Setting it HIGH/LOW from here corrupted modem power state.
+// SIM7000G GNSS is internal, controlled via AT+CGNSPWR/AT+SGPIO in gps.cpp.
 
 // Set ESP32 RTC time from GPS epoch
 void syncRtcWithGps(uint32_t gpsEpoch) {
@@ -397,7 +375,6 @@ void setup() {
   digitalWrite(POWER_3V3_ENABLE, LOW);  // Start with 3.3V rail off
   g_3v3RailPowered = false;
   g_sensorsPowered = false;
-  g_gpsPinHigh = false;
 
   rtcStateBegin();
 
@@ -539,11 +516,9 @@ void loop() {
       fix.fixTimeEpoch = rtcState.lastGpsFixTime;
       fix.success = false;
     }
-    // Turn off GNSS, set GPS power pin back to LOW
+    // Turn off GNSS engine via AT command
     gpsEnd();
-    delay(300);   // brief settle after GNSS stop AT command
-    powerOffGPS();
-    delay(200);   // brief settle before re-establishing cellular
+    delay(500);   // brief settle after GNSS stop before re-establishing cellular
     
     // Re-establish cellular data connection for firmware updates and JSON upload
     // Modem is already powered from GPS phase — skip pre-cycle to save ~14s
