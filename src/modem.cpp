@@ -38,6 +38,7 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
   } else {
     SerialMon.println("Modem already warm, skipping pre-cycle.");
   }
+  bool triedNBIoT = false;
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     SerialMon.printf("Connecting to cellular network (attempt %d/%d)...\n", attempt + 1, maxRetries);
 
@@ -93,7 +94,6 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
       SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
       SerialMon.println("Operator: " + modem.getOperator());
       // Fallback: try NB-IoT once if LTE-M fails first (no band/operator locks)
-      static bool triedNBIoT = false;
       if (!triedNBIoT) {
         triedNBIoT = true;
         SerialMon.println("Trying NB-IoT fallback (AT+CNMP=51)...");
@@ -105,13 +105,14 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
           SerialMon.println(" NB-IoT fallback failed.");
         }
       }
-      
+
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
         delay(2000);
         powerOnModem();
         delay(3000);
+        triedNBIoT = false; // Reset NB-IoT fallback after power-cycle
       }
       continue;
     }
