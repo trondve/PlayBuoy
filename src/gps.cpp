@@ -188,7 +188,9 @@ static bool downloadAndApplyXTRA() {
     String rl;
     if (!sendAT("AT+HTTPTOFSRL?", &rl, 2000)) { delay(500); continue; }
     if (rl.indexOf("+HTTPTOFS: 200") >= 0) ok = true;
-    if (rl.indexOf("+HTTPTOFSRL: 0") >= 0) { done = true; break; }
+    if (rl.indexOf("+HTTPTOFSRL: 0") >= 0) done = true;
+    // Only exit when BOTH flags are set — they can arrive in either order
+    if (done && ok) break;
     delay(1000);
   }
   if (!(done && ok)) return false;
