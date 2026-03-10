@@ -1,29 +1,53 @@
-# Release & Deployment Skill
+# Release — Build & Deploy Firmware
 
-## When to Use
-When building firmware, preparing OTA updates, or deploying to buoys.
+## When to invoke
+When preparing a new firmware version for OTA deployment.
 
-## Build Process
-1. Update version in `src/config.h` using `tools/scripts/update_firmware_version.py`
-2. Build all buoy variants: `python tools/scripts/build_all_buoys.py`
-3. Verify output in `firmware/` directory (`.bin`, `.version`, `.version.json`)
+## Instructions
 
-## OTA Update Checklist
-- [ ] Version number incremented (semver)
-- [ ] Build succeeds for all buoy variants (grinde, vatna)
-- [ ] Firmware size within SIM7000G OTA limits
-- [ ] Upload `.bin` to OTA server (`trondve.ddns.net`)
-- [ ] Verify buoy can reach OTA endpoint
+### Step 1: Version bump
+```bash
+python tools/scripts/update_firmware_version.py
+```
+Or manually edit `VERSION` in `src/config.h`. Use semver: MAJOR.MINOR.PATCH.
 
-## Pre-Release Checks
-- [ ] No secrets in committed code (config.h is gitignored)
-- [ ] Battery measurement accuracy verified
-- [ ] Deep sleep power consumption acceptable
-- [ ] All AT command timings within SIM7000G datasheet specs
-- [ ] Critical battery guard (3.70V / 25%) functional
+### Step 2: Build all variants
+```bash
+python tools/scripts/build_all_buoys.py
+```
+Produces:
+```
+firmware/
+  playbuoy_grinde.bin / .version / .version.json
+  playbuoy_vatna.bin  / .version / .version.json
+```
 
-## Deployment Targets
-| Buoy | Node ID | Config |
-|------|---------|--------|
-| Grinde | playbuoy_grinde | Lake deployment |
-| Vatna | playbuoy_vatna | Lake deployment |
+### Step 3: Pre-release checks
+- [ ] Version incremented from current deployed version
+- [ ] `config.h` is gitignored (no secrets in commit)
+- [ ] Build succeeds for both buoy variants
+- [ ] Run `/code-review` on all changed files
+- [ ] Critical battery guard (3.70V / 25%) untouched
+- [ ] All modem timings still at or above datasheet minimums
+- [ ] GPIO 25 held LOW in deep sleep path
+
+### Step 4: Deploy via OTA
+1. Upload `.bin` files to OTA server: `trondve.ddns.net`
+2. Upload `.version` files alongside them
+3. Buoy checks `{OTA_SERVER}/{NODE_ID}.version` each wake cycle
+4. If version is newer → downloads `.bin` → applies → restarts
+5. If boot fails → OTA rollback (pending verify flag not cleared)
+
+### Step 5: Monitor
+After OTA deploys to a buoy, watch the next 2-3 upload cycles:
+- `version` field in JSON matches new version?
+- `reset_reason` shows normal deep sleep (not brownout/watchdog)?
+- `battery_percent` stable (not rapidly draining)?
+- All sensor data present and reasonable?
+
+### Rollback
+If the buoy stops reporting after OTA:
+1. Upload the previous `.bin` to OTA server
+2. Wait for buoy to wake and auto-update
+3. If buoy is in brownout loop, it may take longer (extended sleep intervals)
+4. Worst case: physical retrieval and USB flash
