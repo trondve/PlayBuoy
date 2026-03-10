@@ -310,6 +310,13 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
     }
   }
   if (!(run && hasFix)) return false;
+  // Validate coordinates: reject (0,0) which is a common GPS default when no real fix,
+  // and reject anything outside valid geographic range
+  if (lat == 0.0 && lon == 0.0) { SerialMon.println("GPS fix rejected: (0,0) coordinates"); return false; }
+  if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+    SerialMon.printf("GPS fix rejected: out of range (%.4f, %.4f)\n", lat, lon);
+    return false;
+  }
   if (outLat) *outLat = (float)lat;
   if (outLon) *outLon = (float)lon;
   if (outHdop) *outHdop = hdop;
