@@ -7,7 +7,7 @@ Full firmware review identifying 16 issues across hardware pin config, power man
 | # | Issue | File | Status |
 |---|-------|------|--------|
 | 1 | GPIO 4 pin conflict (MODEM_PWRKEY = GPS_POWER_PIN) | main.cpp, gps.cpp | Fixed (2026-03-10) — Removed GPIO-based GPS power, use AT commands |
-| 2 | sleepSec=0 causes infinite reboot loop | main.cpp:797 | Needs min sleep guard |
+| 2 | sleepSec=0 causes infinite reboot loop | main.cpp | Already fixed — 300s minimum floor enforced in all 3 sleep paths |
 
 ## High
 
@@ -35,5 +35,5 @@ Full firmware review identifying 16 issues across hardware pin config, power man
 
 ## Priority
 
-**Before next deployment:** #2, #3
+**Before next deployment:** #3
 **All other issues resolved.**
