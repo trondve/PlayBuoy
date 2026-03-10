@@ -437,6 +437,9 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
   uint32_t nextProgressSec = 30;  // Log every 30s
   uint32_t lastInfLog = 0; bool firstInfLog = true;
 
+  // No watchdog reset in this loop — intentional. The 45-minute WDT is the safety
+  // net that prevents the buoy from burning battery forever in bad weather. If we
+  // can't get a fix within the WDT window, it's better to reset and sleep.
   SerialMon.println("Starting GPS fix acquisition...");
   while ((millis() - start) < timeoutSec * 1000UL) {
     String inf;

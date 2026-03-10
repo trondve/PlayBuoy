@@ -99,6 +99,8 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
       SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
       SerialMon.println("Operator: " + modem.getOperator());
       // Fallback: try NB-IoT once if LTE-M fails first (no band/operator locks)
+      // NOTE: NB-IoT is not used in our deployment. If it registers, the code
+      // falls through to continue (never reaches gprsConnect). Left as-is intentionally.
       if (!triedNBIoT) {
         triedNBIoT = true;
         SerialMon.println("Trying NB-IoT fallback (AT+CNMP=51)...");
