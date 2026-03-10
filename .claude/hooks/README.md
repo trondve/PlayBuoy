@@ -1,33 +1,21 @@
-# Claude Code Hooks
+# PlayBuoy Hooks — Automated Guardrails
 
-Hooks are shell commands that execute in response to Claude Code events (tool calls, session start, etc.).
+Models forget. Hooks don't.
+These run automatically on every tool call — no prompt needed.
 
-## Available Hook Points
+## Active Hooks
 
-- `PreToolUse` — runs before a tool is executed
-- `PostToolUse` — runs after a tool is executed
-- `SessionStart` — runs when a new session begins
+| Hook | Event | Action | Why |
+|------|-------|--------|-----|
+| `block-config-secrets.sh` | PreToolUse (Edit/Write) | **BLOCK** edits to `config.h` | Contains API keys, must stay gitignored |
+| `guard-battery-thresholds.sh` | PreToolUse (Edit/Write) | **BLOCK** lowering critical guard | ≤3.70V / ≤25% protects sealed buoy from death |
+| `guard-datasheet-timings.sh` | PreToolUse (Edit/Write) | **BLOCK** reducing modem timings | SIM7000G PWRKEY minimums are non-negotiable |
+| `warn-simultaneous-subsystems.sh` | PreToolUse (Edit/Write) | **WARN** if modem+GPS both referenced | 2A modem + GPS = brownout on 18650s |
+| `remind-decision-log.sh` | Stop | **REMIND** to log decisions | Architecture decisions get lost if not recorded |
 
-## Configuration
+## How hooks work
 
-Hooks are configured in `.claude/settings.json` under the `hooks` key. Example:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "command": "./tools/scripts/pre-bash-check.sh"
-      }
-    ]
-  }
-}
-```
-
-## PlayBuoy-Specific Hooks
-
-Add hooks here for:
-- Pre-commit firmware version validation
-- Build script automation
-- Config.h secret detection (prevent committing API keys)
+- **Exit 0** = allow the action
+- **Exit 2** = block the action (reason sent to Claude via stderr)
+- Hooks receive tool input as JSON on stdin
+- Configured in `.claude/settings.json` under `hooks`

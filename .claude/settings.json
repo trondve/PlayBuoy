@@ -1,34 +1,53 @@
 {
-  "name": "PlayBuoy - Solar IoT Water Buoy",
-  "description": "Permanently sealed solar-powered waterproof IoT buoy for collecting water temperature and wave data",
-  "projectType": "embedded-systems",
-  "primaryLanguage": "cpp",
-  "secondaryLanguages": ["python", "markdown"],
   "hooks": {
-    "enabled": true,
-    "directory": ".claude/hooks"
-  },
-  "skills": {
-    "enabled": true,
-    "directory": ".claude/skills"
-  },
-  "claudeSettings": {
-    "contextPriority": [
-      "CLAUDE.md",
-      "src/CLAUDE.md",
-      "docs/ARCHITECTURE.md"
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-config-secrets.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-battery-thresholds.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-datasheet-timings.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/warn-simultaneous-subsystems.sh"
+          }
+        ]
+      }
     ],
-    "ignoredPaths": [
-      ".git",
-      ".pio",
-      "firmware",
-      "logs",
-      "build"
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/remind-decision-log.sh"
+          }
+        ]
+      }
     ]
-  },
-  "documentation": {
-    "mainFile": "CLAUDE.md",
-    "architectureFile": "docs/ARCHITECTURE.md",
-    "decisionsDirectory": "docs/decisions"
   }
 }
