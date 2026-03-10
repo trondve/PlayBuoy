@@ -10,7 +10,6 @@
 #include "config.h"
 #include "esp_task_wdt.h"
 #include <Wire.h>
-#include <MahonyAHRS.h>
 #include <math.h>
 #include <algorithm>
 
@@ -39,7 +38,6 @@ static const float WAVE_FREQ_MAX = 1.0f;     // Max wave frequency (1s period)
 #define MPU6500_WHO_AM_I       0x75
 #define MPU6500_PWR_MGMT_1     0x6B
 #define MPU6500_CONFIG         0x1A
-#define MPU6500_GYRO_CONFIG    0x1B
 #define MPU6500_ACCEL_CONFIG   0x1C
 #define MPU6500_ACCEL_CONFIG2  0x1D
 #define MPU6500_SMPLRT_DIV     0x19
@@ -47,11 +45,10 @@ static const float WAVE_FREQ_MAX = 1.0f;     // Max wave frequency (1s period)
 
 // Runtime state
 static bool imuInitialized = false;
-static bool filterInitialized = false;
-static Mahony filter;
+static bool iirInitialized = false;
 
 // Collection buffer: stores heave acceleration samples
-static const uint32_t MAX_SAMPLES = 1800; // 180 s @ 10 Hz (3 minutes)
+static const uint32_t MAX_SAMPLES = 1600; // 160 s @ 10 Hz (~2:40, enough for 1024 FFT + 57s settling)
 static float accelBuf[MAX_SAMPLES];
 static uint32_t sampleCount = 0;
 
@@ -137,12 +134,6 @@ static bool initMPU6500() {
     return false;
   }
 
-  // Gyro +/-250 dps
-  if (!i2cWrite(MPU6500_GYRO_CONFIG, 0x00)) {
-    SerialMon.println("Failed to configure gyroscope");
-    return false;
-  }
-
   // Accel +/-2g
   if (!i2cWrite(MPU6500_ACCEL_CONFIG, 0x00)) {
     SerialMon.println("Failed to configure accelerometer");
@@ -166,25 +157,22 @@ static bool initMPU6500() {
   return true;
 }
 
-static void readMPU6500(float &ax, float &ay, float &az, float &gx, float &gy, float &gz) {
-  uint8_t buf[14];
-  if (!i2cReadBytes(MPU6500_ACCEL_XOUT_H, 14, buf)) {
-    ax = ay = az = gx = gy = gz = 0.0f;
+// ±2g: 16384 LSB/g → 9.80665/16384 m/s² per LSB
+static const float ACCEL_SCALE = 9.80665f / 16384.0f;
+
+static void readMPU6500(float &ax, float &ay, float &az) {
+  uint8_t buf[6];
+  if (!i2cReadBytes(MPU6500_ACCEL_XOUT_H, 6, buf)) {
+    ax = ay = az = 0.0f;
     return;
   }
   int16_t accelX = (int16_t)((buf[0] << 8) | buf[1]);
   int16_t accelY = (int16_t)((buf[2] << 8) | buf[3]);
   int16_t accelZ = (int16_t)((buf[4] << 8) | buf[5]);
-  int16_t gyroX  = (int16_t)((buf[8] << 8) | buf[9]);
-  int16_t gyroY  = (int16_t)((buf[10] << 8) | buf[11]);
-  int16_t gyroZ  = (int16_t)((buf[12] << 8) | buf[13]);
 
-  ax = accelX * 0.000598f; // m/s^2 per LSB (approx for +/-2g)
-  ay = accelY * 0.000598f;
-  az = accelZ * 0.000598f;
-  gx = gyroX  * 0.00763f;  // deg/s per LSB (+/-250 dps)
-  gy = gyroY  * 0.00763f;
-  gz = gyroZ  * 0.00763f;
+  ax = accelX * ACCEL_SCALE;
+  ay = accelY * ACCEL_SCALE;
+  az = accelZ * ACCEL_SCALE;
 }
 
 static void computeIIRCoeffs(float fs, float fc_hp, float fc_lp) {
@@ -328,7 +316,20 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
 
   // Hs = 4 * sqrt(m0) — standard oceanographic definition
   result.Hs = 4.0f * sqrtf((float)m0);
-  result.Tp = 1.0f / ((float)peakBin * df);
+
+  // Parabolic (quadratic) interpolation around peak bin for sub-bin Tp accuracy
+  float peakFreq = (float)peakBin * df;
+  if (peakBin > binMin && peakBin < binMax) {
+    float alpha_pk = re[peakBin - 1] * re[peakBin - 1] + fftIm[peakBin - 1] * fftIm[peakBin - 1];
+    float beta_pk  = re[peakBin]     * re[peakBin]     + fftIm[peakBin]     * fftIm[peakBin];
+    float gamma_pk = re[peakBin + 1] * re[peakBin + 1] + fftIm[peakBin + 1] * fftIm[peakBin + 1];
+    float denom = alpha_pk - 2.0f * beta_pk + gamma_pk;
+    if (fabsf(denom) > 1e-12f) {
+      float delta = 0.5f * (alpha_pk - gamma_pk) / denom;
+      peakFreq = ((float)peakBin + delta) * df;
+    }
+  }
+  result.Tp = (peakFreq > 0.0f) ? 1.0f / peakFreq : 0.0f;
   result.P = 0.49f * result.Hs * result.Hs * result.Tp; // deep-water power proxy
 
   // Sanity caps (configurable per deployment)
@@ -338,17 +339,15 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
   return result;
 }
 
-static void ensureFilterInitialized() {
-  if (!filterInitialized) {
-    filter.begin(FS_HZ);
+static void ensureIIRInitialized() {
+  if (!iirInitialized) {
     computeIIRCoeffs(FS_HZ, HP_CUTOFF_HZ, LP_CUTOFF_HZ);
-    filterInitialized = true;
+    iirInitialized = true;
   }
 }
 
 void recordWaveData() {
-  SerialMon.println("=== Starting wave data collection (3 minutes) ===");
-  ensureFilterInitialized();
+  SerialMon.println("=== Starting wave data collection (160s) ===");
 
   if (!imuInitialized) {
     SerialMon.println("Attempting IMU initialization...");
@@ -367,11 +366,11 @@ void recordWaveData() {
   s_tiltSum = 0.0; s_tiltCount = 0; s_accelRms = 0.0f;
   hp_y_prev = hp_x_prev = lp_y_prev = 0.0f;
   g_lp_x = 0.0f; g_lp_y = 0.0f; g_lp_z = 9.80665f;
-  filterInitialized = false;
-  ensureFilterInitialized();
+  iirInitialized = false;
+  ensureIIRInitialized();
 
-  // Collect heave acceleration samples for 3 minutes
-  const uint32_t sampleMs = 180000UL;
+  // Collect heave acceleration samples for 160s (1024 FFT + ~57s gravity settling)
+  const uint32_t sampleMs = 160000UL;
   uint32_t start = millis();
   uint32_t nextTick = start;
   uint32_t tick = 0;
@@ -387,14 +386,12 @@ void recordWaveData() {
                        sampleCount, (now - start) / 1000);
     }
 
-    float ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
-    readMPU6500(ax, ay, az, gx, gy, gz);
+    float ax = 0, ay = 0, az = 0;
+    readMPU6500(ax, ay, az);
 
     // Sanity: discard if accel magnitude far from 1g
     float amag = sqrtf(ax * ax + ay * ay + az * az);
     if (fabsf(amag - 9.80665f) > 4.9f) { tick++; continue; }
-
-    filter.updateIMU(gx, gy, gz, ax, ay, az);
 
     // Slow gravity tracker in body frame
     const float dt = 1.0f / FS_HZ;

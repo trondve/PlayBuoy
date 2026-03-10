@@ -454,7 +454,7 @@ void loop() {
   }
 
   // 1) Collect wave data first (modem is still off for lower power)
-  SerialMon.println("=== Starting wave data collection (3 minutes) ===");
+  SerialMon.println("=== Starting wave data collection ===");
 
   // Power on 3.3V rail, wait for stabilization, then power on sensors
   powerOn3V3Rail();

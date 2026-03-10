@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-// IMU handled directly by wave.cpp (Mahony + direct I2C). Do not init via library here to avoid conflicts.
+// IMU handled directly by wave.cpp (direct I2C). Do not init via library here to avoid conflicts.
 
 // DS18B20 setup
 #define TEMP_SENSOR_PIN 13  // DS18B20 data pin connected to GPIO 13
