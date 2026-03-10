@@ -1,4 +1,13 @@
-// Use esp_adc_cal for hardware-calibrated battery voltage measurement
+// Battery voltage measurement using esp_adc_cal for hardware-calibrated ADC
+//
+// Strategy: 3 bursts of 50 samples each, median-of-three.
+// Each burst averages out random ADC noise (σ reduced by √50 ≈ 7×).
+// Median-of-three rejects a single outlier burst (e.g. from a transient).
+// No inter-burst delays needed — ESP32 ADC noise is thermal, not bursty.
+//
+// Typical accuracy: ±10-20 mV at battery (±5-10 mV at ADC after divider),
+// depending on eFuse calibration quality.
+
 #include "power.h"
 #include "config.h"
 #include <Arduino.h>
@@ -6,53 +15,35 @@
 
 #define SerialMon Serial
 
-#ifndef UNUSED
-#define UNUSED(x) (void)(x)
-#endif
-
 #define PIN_ADC_BAT 35
-#define ADC_SAMPLES 50
+#define ADC_SAMPLES_PER_BURST 50
+#define NUM_BURSTS 3
 
 // ADC calibration characteristics (populated at init)
 static esp_adc_cal_characteristics_t s_adcChars;
-static bool s_adcCalibrated = false;
 
 // Voltage divider ratio: battery → 2:1 divider → ADC pin
-// The board has a 100K/100K divider, so actual battery = ADC reading * 2
-// The 1110/1000 factor was an empirical correction for uncalibrated ADC;
-// with esp_adc_cal this is no longer needed — just multiply by divider ratio.
+// The board has a 100K/100K divider, so actual battery = ADC reading × 2
 static const float DIVIDER_RATIO = 2.0f;
 
-static uint32_t readAdcCalibratedMv(int samples) {
-  // Throw away first reading (ESP32 ADC warmup)
-  UNUSED(analogRead(PIN_ADC_BAT));
-  delay(2);
+// Read N ADC samples, convert each via esp_adc_cal, return average in millivolts.
+// Uses 200µs inter-sample spacing to decorrelate from switching regulator noise
+// while keeping total burst time short (~10ms for 50 samples).
+static uint32_t readAdcBurstMv(int samples) {
   uint32_t sum = 0;
   for (int i = 0; i < samples; i++) {
     uint32_t raw = (uint32_t)analogRead(PIN_ADC_BAT);
-    if (s_adcCalibrated) {
-      sum += esp_adc_cal_raw_to_voltage(raw, &s_adcChars);
-    } else {
-      // Fallback: manual conversion if calibration data unavailable
-      sum += (uint32_t)((float)raw / 4095.0f * 3300.0f);
-    }
-    delay(2);
+    sum += esp_adc_cal_raw_to_voltage(raw, &s_adcChars);
+    delayMicroseconds(200);
   }
   return sum / samples;
 }
 
-static float medianOfFive(float a, float b, float c, float d, float e) {
-  float v[5] = {a, b, c, d, e};
-  for (int i = 0; i < 4; i++) {
-    for (int j = i + 1; j < 5; j++) {
-      if (v[j] < v[i]) {
-        float t = v[i];
-        v[i] = v[j];
-        v[j] = t;
-      }
-    }
-  }
-  return v[2];
+static float medianOfThree(float a, float b, float c) {
+  if (a > b) { float t = a; a = b; b = t; }
+  if (b > c) { float t = b; b = c; c = t; }
+  if (a > b) { float t = a; a = b; b = t; }
+  return b;
 }
 
 static bool isValidVoltage(float v) {
@@ -72,15 +63,12 @@ bool beginPowerMonitor() {
   switch (calType) {
     case ESP_ADC_CAL_VAL_EFUSE_TP:
       SerialMon.println("ADC calibration: Two Point (eFuse)");
-      s_adcCalibrated = true;
       break;
     case ESP_ADC_CAL_VAL_EFUSE_VREF:
       SerialMon.println("ADC calibration: Vref (eFuse)");
-      s_adcCalibrated = true;
       break;
     default:
       SerialMon.println("ADC calibration: Default (no eFuse data)");
-      s_adcCalibrated = true; // Still use esp_adc_cal default calibration
       break;
   }
   return true;
@@ -89,24 +77,35 @@ bool beginPowerMonitor() {
 float readBatteryVoltage() {
   SerialMon.println();
   SerialMon.println("Starting battery voltage measurement..");
-  SerialMon.printf("Pin: GPIO%d, ADC: 12-bit, Atten: 11 dB, Calibrated: %s\n",
-                   PIN_ADC_BAT, s_adcCalibrated ? "YES" : "NO");
-  SerialMon.println("Stabilizing before first burst...");
-  delay(500);  // ADC input is just a resistor divider, settles in <100ms
+  SerialMon.printf("Pin: GPIO%d, ADC: 12-bit, Atten: 11 dB\n", PIN_ADC_BAT);
 
-  float v[5];
-  for (int i = 0; i < 5; i++) {
-    uint32_t adcMv = readAdcCalibratedMv(ADC_SAMPLES);
-    // Convert from ADC millivolts to actual battery voltage
+  // Discard first reading — ESP32 ADC has a one-time warmup artifact
+  // when the channel is first selected after power-on.
+  analogRead(PIN_ADC_BAT);
+  delayMicroseconds(500);
+
+  float v[NUM_BURSTS];
+  for (int i = 0; i < NUM_BURSTS; i++) {
+    uint32_t adcMv = readAdcBurstMv(ADC_SAMPLES_PER_BURST);
     v[i] = (float)adcMv / 1000.0f * DIVIDER_RATIO;
     SerialMon.printf("Burst V[%d]: %.3f V (ADC: %lu mV)  %s\n",
                      i + 1, v[i], adcMv, isValidVoltage(v[i]) ? "OK" : "INVALID");
-    if (i < 4) {
-      delay(500);  // 500ms between bursts (was 1000ms, ADC settles in <100ms)
-    }
   }
-  float vmed = medianOfFive(v[0], v[1], v[2], v[3], v[4]);
-  SerialMon.printf("Median (5): %.3f V  %s\n", vmed, isValidVoltage(vmed) ? "OK" : "INVALID");
-  SerialMon.println("Measurement set complete.");
+
+  float vmed = medianOfThree(v[0], v[1], v[2]);
+
+  // Log spread for remote diagnostics — if bursts differ by >20mV something is off
+  float vmin = v[0], vmax = v[0];
+  for (int i = 1; i < NUM_BURSTS; i++) {
+    if (v[i] < vmin) vmin = v[i];
+    if (v[i] > vmax) vmax = v[i];
+  }
+  float spread = (vmax - vmin) * 1000.0f; // in mV
+  SerialMon.printf("Median (%d): %.3f V  spread: %.0f mV  %s\n",
+                   NUM_BURSTS, vmed, spread,
+                   isValidVoltage(vmed) ? "OK" : "INVALID");
+  if (spread > 20.0f) {
+    SerialMon.printf("WARNING: ADC spread %.0f mV > 20 mV — noisy measurement\n", spread);
+  }
   return vmed;
 }

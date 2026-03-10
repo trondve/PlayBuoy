@@ -473,22 +473,8 @@ void loop() {
   }
 
   // 1) Collect wave data first (modem is still off for lower power)
-  // OPTIMIZED: Reduced from 5 minutes to 3 minutes for wave data collection
-  SerialMon.println("=== Starting wave data collection with power management (3 minutes) ===");
-  
-  // Check voltage before high-power operation using stable reading
-  float voltage = getStableBatteryVoltage();
-  if (!isnan(voltage)) {
-    if (voltage < 3.2f) {
-      SerialMon.printf("WARNING: Low voltage (%.2fV) before wave data collection\n", voltage);
-      SerialMon.println("Consider reducing power consumption or delaying operation");
-    } else if (voltage < 3.5f) {
-      SerialMon.printf("CAUTION: Moderate voltage (%.2fV) - monitoring closely\n", voltage);
-    } else {
-      SerialMon.printf("Voltage OK (%.2fV) for wave data collection\n", voltage);
-    }
-  }
-  
+  SerialMon.println("=== Starting wave data collection (3 minutes) ===");
+
   // Power on 3.3V rail, wait for stabilization, then power on sensors
   powerOn3V3Rail();
   delay(150);  // LDO rail stabilizes in <10ms, DS18B20 needs ~50ms, 150ms is safe

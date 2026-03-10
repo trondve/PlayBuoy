@@ -200,11 +200,14 @@ Root files:
 
 ### Battery Measurement (power.cpp)
 - GPIO 35, 12-bit ADC, 11dB attenuation
-- 5 bursts × 50 averaged samples, 500ms between bursts, median-of-five
+- 3 bursts × 50 averaged samples, no inter-burst delays, median-of-three
+- 200µs inter-sample spacing decorrelates from switching regulator noise (~10ms per burst)
 - Uses `esp_adc_cal` API for hardware-calibrated ADC→mV conversion (eFuse Two Point or Vref)
 - Battery voltage = ADC mV × 2.0 (100K/100K divider ratio)
-- Old formula `(raw / 4095.0) * 2.0 * 3.3 * (1110.0 / 1000.0)` replaced — the 1110/1000 empirical fudge is no longer needed with proper calibration
+- Single warmup discard at start (ESP32 ADC one-time channel-switch artifact)
+- Logs burst spread in mV for remote diagnostics (warns if >20mV)
 - Measured before powering anything (open-circuit voltage)
+- Total measurement time: ~30ms (was ~3.5s)
 - Critical guard: 3.70V / 25% → deep sleep
 
 ### Water Temperature (sensors.cpp)
@@ -339,7 +342,7 @@ Root files:
 
 ### Measurement Approach Review
 
-**Battery (power.cpp):** Solid. Median-of-five with burst averaging is optimal for ESP32 ADC noise. Now uses `esp_adc_cal` API for hardware-calibrated nonlinearity correction (50-150mV improvement). Logs calibration source (eFuse Two Point, Vref, or Default).
+**Battery (power.cpp):** Solid. Median-of-three with 50-sample burst averaging. Uses `esp_adc_cal` API for hardware-calibrated nonlinearity correction (50-150mV improvement). Logs calibration source and burst spread for remote diagnostics. Total measurement time ~30ms (was ~3.5s) — no inter-burst delays needed since ESP32 ADC noise is thermal, not bursty.
 
 **Water Temperature (sensors.cpp):** Good. 12-bit DS18B20 with 3 retries. Now explicitly sets 12-bit resolution and `setWaitForConversion(true)` so `requestTemperatures()` blocks until conversion is complete.
 
