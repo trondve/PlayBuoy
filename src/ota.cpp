@@ -229,6 +229,17 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
 }
 
 bool checkForFirmwareUpdate(const char* baseUrl) {
+  // Battery safety check: OTA flash write draws power and takes time.
+  // If battery dies mid-flash on a sealed buoy, the device is permanently bricked.
+  extern float getStableBatteryVoltage();
+  extern int estimateBatteryPercent(float);
+  float voltage = getStableBatteryVoltage();
+  int pct = estimateBatteryPercent(voltage);
+  if (pct < 50) {
+    SerialMon.printf("OTA skipped: battery too low (%d%% / %.2fV). Need >=50%% for safe flash.\n", pct, voltage);
+    return false;
+  }
+
   String versionUrl = String(baseUrl);
   if (versionUrl.endsWith(".bin")) versionUrl = versionUrl.substring(0, versionUrl.length() - 4) + ".version";
   else versionUrl += ".version";
