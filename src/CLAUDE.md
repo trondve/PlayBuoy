@@ -20,6 +20,17 @@ ESP32 firmware for the PlayBuoy IoT buoy. Each boot cycle: measure battery → r
 | `rtc_state.cpp` | Persistent state | Boot counter, GPS anchor, temp history (survives deep sleep) |
 | `config.h` | Per-buoy config | Node ID, API key, server URLs — GITIGNORED |
 
+## Danger zones — read the local context files
+
+| Area | Context file | Why it's dangerous |
+|------|-------------|--------------------|
+| Cellular | `MODEM.md` | Wrong AT sequence or timing = no upload, wasted 2A for nothing |
+| GPS | `GPS.md` | PDP/GNSS radio sharing, XTRA staleness, cold start = 20 min waste |
+| Battery | `BATTERY.md` | Wrong threshold = bricked buoy or dead cells |
+| Waves | `WAVE.md` | FFT math, IMU fusion, spectral analysis — non-obvious correctness |
+| Deep sleep | `SLEEP.md` | One wrong pin or power domain = mA leak all winter |
+| OTA | `OTA.md` | Mid-flash failure on sealed device = permanently bricked |
+
 ## Rules
 
 ### Safety thresholds — never weaken these
@@ -41,10 +52,3 @@ ESP32 firmware for the PlayBuoy IoT buoy. Each boot cycle: measure battery → r
 - After GPS fix, call `connectToNetwork(apn, true)` to skip modem pre-cycle (already warm)
 - First ADC read after channel select is unreliable — discard once at startup
 - All pins set to INPUT (high-Z) before sleep to prevent back-powering peripherals
-
-### When reviewing or modifying code
-- Does it increase wake time? (every second ≈ 50-100mA)
-- Could it cause brownout under 2A modem peak?
-- Are datasheet timing limits respected?
-- Does it leak RAM or exceed 512-byte RTC upload buffer?
-- Is GPIO 25 (3V3 rail) still held LOW across deep sleep?
