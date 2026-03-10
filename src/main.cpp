@@ -202,7 +202,11 @@ void wakeModemForNetwork() {
 
 void powerOffModem() {
   SerialMon.println("Powering off modem...");
-  
+
+  // Disable radio before power-off to cleanly deregister from network
+  SerialAT.println("AT+CFUN=0");
+  delay(1500);  // Wait for radio shutdown
+
   // Try graceful shutdown first (optional)
 #if ENABLE_CPOWD_SHUTDOWN
   // Send CPOWD via raw AT if available
