@@ -651,18 +651,21 @@ void loop() {
     
     // Time should already be synced from NTP during GPS flow
 
-    // Check for firmware updates if network is connected
-    if (networkConnected) {
+    // Check for firmware updates if network is still connected
+    // Re-validate network status — connection may have dropped since initial check
+    if (networkConnected && modem.isGprsConnected()) {
        SerialMon.printf(" OTA: OTA_SERVER = %s\n", OTA_SERVER);
        SerialMon.printf(" OTA: OTA_PATH = %s\n", OTA_PATH);
        SerialMon.printf(" OTA: NODE_ID = %s\n", NODE_ID);
-       
+
        String baseUrl = "http://" + String(OTA_SERVER) + "/" + String(NODE_ID);
        SerialMon.printf(" OTA: Constructed baseUrl: %s\n", baseUrl.c_str());
-       
+
        if (checkForFirmwareUpdate(baseUrl.c_str())) {
          // OTA update in progress, will restart on completion
        }
+    } else if (networkConnected) {
+       SerialMon.println("OTA skipped: network connection lost since registration");
     }
     
     // Build JSON once with network info if available, empty strings if not
