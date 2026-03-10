@@ -3,6 +3,7 @@
 #include "gps.h"
 #include "config.h"
 #include "modem.h"
+#include "rtc_state.h"
 
 #include <Preferences.h>
 #include <time.h>
@@ -22,11 +23,15 @@ static const char* XTRA_URL      = "http://trondve.ddns.net/xtra3grc.bin";
 static const char* XTRA_FS_DST   = "/customer/xtra3grc.bin";
 static const uint32_t XTRA_HTTP_TIMEOUT_S = 120;
 static const uint8_t  XTRA_HTTP_RETRIES   = 5;
-static const uint32_t XTRA_STALE_DAYS     = 7;
+static const uint32_t XTRA_STALE_DAYS     = 3;  // Datasheet: xtra3grc.bin valid for 3 days
+
+// HDOP quality threshold — wait for HDOP below this before accepting a fix.
+// Fallback: accept any fix after 80% of timeout has elapsed.
+static const float HDOP_ACCEPT_THRESHOLD = 3.0f;
 
 // Local state
 static Preferences s_prefs;
-static bool s_muteEcho = false;  // Mute raw modem bytes while streaming NMEA
+static bool s_xtraJustApplied = false;  // Set when CGNSCOLD started engine with fresh XTRA
 
 // ---------- AT helpers ----------
 static void preATDelay() { delay(100); }
@@ -42,7 +47,7 @@ static bool sendAT(const String& cmd,
   while (millis() - t0 < timeoutMs) {
     while (SerialAT.available()) {
       char c = (char)SerialAT.read();
-      if (echo && !s_muteEcho) SerialMon.write(c);
+      if (echo) SerialMon.write(c);
       rsp += c;
       if (rsp.indexOf("\r\nOK\r\n") >= 0 || rsp.indexOf("\r\nERROR\r\n") >= 0 || rsp.indexOf("+CME ERROR:") >= 0) {
         if (rspOut) *rspOut = rsp;
@@ -197,8 +202,9 @@ static bool shouldDownloadXTRA(const ClockInfo& nowCi) {
 }
 
 // Portable UTC epoch builder (replacement for timegm)
+// Note: daysFromCivil(1970,1,1) == 0 by definition of the algorithm (epoch-relative).
 static uint32_t makeEpochUTC(int year, int month, int day, int hour, int minute, int second) {
-  long daysSinceEpoch = daysFromCivil(year, month, day) - daysFromCivil(1970, 1, 1);
+  long daysSinceEpoch = daysFromCivil(year, month, day);
   if (daysSinceEpoch < 0) return 0;
   uint32_t secondsInDay = (uint32_t)(hour * 3600L + minute * 60L + second);
   return (uint32_t)(daysSinceEpoch * 86400L) + secondsInDay;
@@ -233,8 +239,14 @@ static bool downloadAndApplyXTRA() {
   String cp;
   if (!sendAT("AT+CGNSCPY", &cp, 7000)) return false;
   sendAT("AT+CGNSXTRA=1");
+  // Configure GNSS mode and NMEA *before* CGNSCOLD starts the engine,
+  // so the cold start runs with correct settings from the beginning.
+  sendAT("AT+CGNSMOD=1,1,0,1");  // GPS + GLONASS + BeiDou, no Galileo
+  sendAT("AT+CGNSCFG=1");
   if (!sendAT("AT+CGNSCOLD", nullptr, 5000)) return false;
-  SerialMon.println("XTRA applied ✅");
+  // CGNSCOLD starts the GNSS engine with XTRA injected — do NOT power cycle after this.
+  s_xtraJustApplied = true;
+  SerialMon.println("XTRA applied ✅ (GNSS engine started via CGNSCOLD)");
   return true;
 }
 
@@ -249,22 +261,55 @@ static bool gnssEngineRunning() {
   return false;
 }
 
-static void gnssConfigure() {
-  sendAT("AT+CGNSPWR=0");
-  // Enable GPS, GLONASS, BeiDou; disable Galileo
-  sendAT("AT+CGNSMOD=1,1,0,1");
-  sendAT("AT+CGNSCFG=1");
-  sendAT("AT+CGPIO=0,48,1,1");
-  sendAT("AT+SGPIO=0,4,1,1");
+// Determine best GNSS start mode based on last fix age
+static const char* gnssStartCommand() {
+  uint32_t lastFix = rtcState.lastGpsFixTime;
+  if (lastFix <= 1000000000) return "AT+CGNSCOLD";  // No prior fix — cold start
+
+  uint32_t now = (uint32_t)time(NULL);
+  if (now <= 1000000000) return "AT+CGNSCOLD";      // RTC not set — cold start
+
+  uint32_t ageSec = now - lastFix;
+  if (ageSec < 4 * 3600) {
+    SerialMon.printf("Last fix %lu sec ago — hot start\n", ageSec);
+    return "AT+CGNSHOT";    // Ephemeris still valid (<4h)
+  } else if (ageSec < 24 * 3600) {
+    SerialMon.printf("Last fix %lu sec ago — warm start\n", ageSec);
+    return "AT+CGNSWARM";   // Almanac valid, ephemeris stale
+  }
+  SerialMon.printf("Last fix %lu sec ago — cold start\n", ageSec);
+  return "AT+CGNSCOLD";     // Everything stale
 }
 
 static bool gnssStart() {
   SerialMon.println("=== GNSS POWER ON ===");
-  // GNSS is internal to SIM7000G — controlled via AT commands, not ESP32 GPIO.
-  // AT+SGPIO/AT+CGPIO in gnssConfigure() handle the modem's internal GNSS power pin.
-  gnssConfigure();
+
+  // If XTRA just did CGNSCOLD, the engine is already running with XTRA injected.
+  // Don't power-cycle — just configure NMEA output and verify.
+  if (s_xtraJustApplied) {
+    SerialMon.println("GNSS already started by XTRA CGNSCOLD — skipping power cycle");
+    s_xtraJustApplied = false;
+    sendAT("AT+CGNSNMEA=511");
+    sendAT("AT+CGNSRTMS=1000");
+    // Verify engine is actually running
+    for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) return true; delay(300); }
+    SerialMon.println("XTRA-started engine not responding, falling through to normal start");
+  }
+
+  // Normal start: configure, power on, use appropriate start mode
+  sendAT("AT+CGNSPWR=0");
+  sendAT("AT+CGNSMOD=1,1,0,1");  // GPS + GLONASS + BeiDou
+  sendAT("AT+CGNSCFG=1");
+  sendAT("AT+CGPIO=0,48,1,1");
+  sendAT("AT+SGPIO=0,4,1,1");
   sendAT("AT+CGNSPWR=1");
   delay(300);
+
+  // Issue warm/hot/cold start based on last fix age
+  const char* startCmd = gnssStartCommand();
+  SerialMon.printf("GNSS start mode: %s\n", startCmd);
+  sendAT(startCmd);
+
   for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
   SerialMon.println("GNSS not running; trying opposite SGPIO polarity...");
   sendAT("AT+CGNSPWR=0"); delay(150);
@@ -334,46 +379,32 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
   return true;
 }
 
-// Returns true and populates result if a fix was acquired during the smoke test
-static bool gnssSmoke60s(GpsFixResult* outResult, uint32_t gnssStartTime) {
-  // Stream NMEA for up to 60s while polling CGNSINF each second; stop early on fix
-  s_muteEcho = true;
-  sendAT("AT+CGNSTST=1");
+// Returns true and populates result if a fix was acquired during the warmup period.
+// Uses CGNSINF polling only — no NMEA streaming, avoiding UART contention.
+static bool gnssWarmup60s(GpsFixResult* outResult, uint32_t gnssStartTime) {
   uint32_t tStart = millis();
-  uint32_t lastInf = 0;
-  bool gotFix = false;
-  while (millis() - tStart < 60000 && !gotFix) {
-    // Drain streaming NMEA quickly
-    while (SerialAT.available()) {
-      String line = SerialAT.readStringUntil('\n');
-      line.trim();
-      if (!line.startsWith("$")) continue;
-      if (line.startsWith("$GA")) continue; // drop Galileo
-      SerialMon.println(line);
-    }
-    if (millis() - lastInf > 1000) {
-      lastInf = millis();
-      String inf;
-      if (sendAT("AT+CGNSINF", &inf, 1200, /*echo*/false)) {
-        float lat, lon, hdop; uint32_t epoch;
-        if (parseCgnsInfFix(inf, &lat, &lon, &epoch, &hdop)) {
-          gotFix = true;
-          if (outResult) {
-            outResult->success = true;
-            outResult->latitude = lat;
-            outResult->longitude = lon;
-            outResult->fixTimeEpoch = epoch;
-            outResult->hdop = hdop;
-            outResult->ttfSeconds = (uint16_t)((millis() - gnssStartTime) / 1000);
-            SerialMon.printf("GPS Fix during smoke test! HDOP=%.1f TTF=%us\n", hdop, outResult->ttfSeconds);
-          }
+  SerialMon.println("GNSS warmup: polling CGNSINF for up to 60s...");
+  while (millis() - tStart < 60000) {
+    String inf;
+    if (sendAT("AT+CGNSINF", &inf, 1500, /*echo*/false)) {
+      float lat, lon, hdop; uint32_t epoch;
+      if (parseCgnsInfFix(inf, &lat, &lon, &epoch, &hdop)) {
+        if (outResult) {
+          outResult->success = true;
+          outResult->latitude = lat;
+          outResult->longitude = lon;
+          outResult->fixTimeEpoch = epoch;
+          outResult->hdop = hdop;
+          outResult->ttfSeconds = (uint16_t)((millis() - gnssStartTime) / 1000);
+          SerialMon.printf("GPS fix during warmup! HDOP=%.1f TTF=%us\n", hdop, outResult->ttfSeconds);
         }
+        return true;
       }
     }
+    delay(1000);
   }
-  sendAT("AT+CGNSTST=0", nullptr, 1200, /*echo*/false);
-  s_muteEcho = false;
-  return gotFix;
+  SerialMon.println("GNSS warmup: no fix after 60s");
+  return false;
 }
 
 // ---------- Public API ----------
@@ -425,32 +456,49 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
     SerialMon.println("GNSS engine NOT running ❌ (continuing anyway)");
   }
 
-  // Optional priming smoketest: 60s or until fix
-  if (gnssSmoke60s(&result, gnssStartTime)) {
-    // Fix acquired during smoke test — skip redundant polling
+  // Warmup: poll CGNSINF for up to 60s (no NMEA streaming — avoids UART contention)
+  if (gnssWarmup60s(&result, gnssStartTime)) {
+    // Fix acquired during warmup — skip redundant polling
     gnssStop();
     return result;
   }
 
   // Attempt fix up to timeoutSec by polling CGNSINF
   uint32_t start = millis();
+  uint32_t timeoutMs = timeoutSec * 1000UL;
   uint32_t nextProgressSec = 30;  // Log every 30s
   uint32_t lastInfLog = 0; bool firstInfLog = true;
+
+  // HDOP quality gate: accept fix immediately if HDOP is good enough.
+  // After 80% of timeout, accept any fix regardless of HDOP (better than nothing).
+  uint32_t hdopGraceMs = (uint32_t)(timeoutMs * 0.8f);
 
   // No watchdog reset in this loop — intentional. The 45-minute WDT is the safety
   // net that prevents the buoy from burning battery forever in bad weather. If we
   // can't get a fix within the WDT window, it's better to reset and sleep.
   SerialMon.println("Starting GPS fix acquisition...");
-  while ((millis() - start) < timeoutSec * 1000UL) {
+  while ((millis() - start) < timeoutMs) {
     String inf;
     if (sendAT("AT+CGNSINF", &inf, 1500, /*echo*/false)) {
       float lat, lon, hdop; uint32_t epoch;
       if (parseCgnsInfFix(inf, &lat, &lon, &epoch, &hdop)) {
-        result.success = true; result.latitude = lat; result.longitude = lon; result.fixTimeEpoch = epoch;
-        result.hdop = hdop;
-        result.ttfSeconds = (uint16_t)((millis() - gnssStartTime) / 1000);
-        SerialMon.printf("GPS Fix acquired! HDOP=%.1f TTF=%us\n", hdop, result.ttfSeconds);
-        break;
+        uint32_t elapsed = millis() - start;
+        bool hdopOk = (hdop <= HDOP_ACCEPT_THRESHOLD);
+        bool pastGrace = (elapsed >= hdopGraceMs);
+
+        if (hdopOk || pastGrace) {
+          result.success = true; result.latitude = lat; result.longitude = lon; result.fixTimeEpoch = epoch;
+          result.hdop = hdop;
+          result.ttfSeconds = (uint16_t)((millis() - gnssStartTime) / 1000);
+          if (!hdopOk) {
+            SerialMon.printf("GPS fix accepted (HDOP=%.1f, past grace period) TTF=%us\n", hdop, result.ttfSeconds);
+          } else {
+            SerialMon.printf("GPS fix acquired! HDOP=%.1f TTF=%us\n", hdop, result.ttfSeconds);
+          }
+          break;
+        } else {
+          SerialMon.printf("GPS fix has HDOP=%.1f (want ≤%.1f), waiting for better fix...\n", hdop, HDOP_ACCEPT_THRESHOLD);
+        }
       }
     }
 
