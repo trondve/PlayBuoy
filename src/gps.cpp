@@ -29,7 +29,7 @@ static Preferences s_prefs;
 static bool s_muteEcho = false;  // Mute raw modem bytes while streaming NMEA
 
 // ---------- AT helpers ----------
-static void preATDelay() { delay(20); }
+static void preATDelay() { delay(100); }
 
 static bool sendAT(const String& cmd,
                    String* rspOut = nullptr,
