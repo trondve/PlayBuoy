@@ -27,7 +27,8 @@ src/                      ← Firmware source (ESP32/PlatformIO)
   CLAUDE.md                 Per-module context and constraints
 docs/
   ARCHITECTURE.md           Full system design (hardware, boot cycle, timings)
-  decisions/                Architecture Decision Records
+  decisions/                Architecture Decision Records (why things are this way)
+  reviews/                  Code review audit findings and bug tracking
   runbooks/DEPLOYMENT.md    Field deployment and troubleshooting guide
   components/               Datasheets, examples, AT command manuals
 .claude/
@@ -66,6 +67,7 @@ references/                 Known-working reference implementations
 - Read `docs/ARCHITECTURE.md` for hardware details, pin maps, and timing tables
 - Read `src/CLAUDE.md` for module-level constraints and safety thresholds
 - Read `docs/decisions/` for rationale behind non-obvious design choices
+- Read `docs/reviews/` for known bugs and their priority
 - Check `docs/components/` for datasheet verification (especially SIM7000G AT command manual)
 
 ### Known issues
