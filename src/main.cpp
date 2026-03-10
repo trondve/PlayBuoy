@@ -748,6 +748,16 @@ void loop() {
   // Ensure 3V3 rail is off (should already be off from sensor phase)
   powerOff3V3Rail();
 
+  // Tear down PDP context before modem power-off to prevent registered-during-sleep leak.
+  // Order: CNACT → CGACT → CGATT → CIPSHUT (same as gps.cpp tearDownPDP)
+  if (g_modemReady) {
+    SerialMon.println("Tearing down PDP context before sleep...");
+    modem.sendAT("+CNACT=0,0");    modem.waitResponse(5000);
+    modem.sendAT("+CGACT=0,1");    modem.waitResponse(5000);
+    modem.sendAT("+CGATT=0");      modem.waitResponse(5000);
+    modem.sendAT("+CIPSHUT");      modem.waitResponse(8000);
+  }
+
   // Power down modem completely before sleep
   powerOffModem();
 
