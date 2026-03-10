@@ -58,10 +58,11 @@ static bool sendAT(const String& cmd,
 static bool bringUpPDP(const char* apn) {
   SerialMon.printf("=== PDP with APN \"%s\" ===\n", apn);
   sendAT(String("AT+CGDCONT=1,\"IP\",\"") + apn + "\"");
-  // CNACT is preferred on SIM7000
+  // Send CNACT activation once, then poll status — repeated CNACT commands
+  // can confuse the modem while activation is still in progress (takes up to 15s)
+  sendAT(String("AT+CNACT=1,\"") + apn + "\"", nullptr, 3000);
   uint32_t t0 = millis();
   while (millis() - t0 < 20000) {
-    sendAT(String("AT+CNACT=1,\"") + apn + "\"", nullptr, 3000);
     String r;
     if (sendAT("AT+CNACT?", &r)) {
       int ipIdx = r.indexOf("+CNACT: 1,\"");
@@ -75,8 +76,8 @@ static bool bringUpPDP(const char* apn) {
         }
       }
     }
-    // Conservative cadence between PDP attempts
-    delay(1200);
+    // Poll cadence — give modem time to complete activation
+    delay(1500);
   }
   return false;
 }
@@ -333,7 +334,8 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
   return true;
 }
 
-static void gnssSmoke60s() {
+// Returns true and populates result if a fix was acquired during the smoke test
+static bool gnssSmoke60s(GpsFixResult* outResult, uint32_t gnssStartTime) {
   // Stream NMEA for up to 60s while polling CGNSINF each second; stop early on fix
   s_muteEcho = true;
   sendAT("AT+CGNSTST=1");
@@ -353,15 +355,25 @@ static void gnssSmoke60s() {
       lastInf = millis();
       String inf;
       if (sendAT("AT+CGNSINF", &inf, 1200, /*echo*/false)) {
-        float lat, lon; uint32_t epoch;
-        if (parseCgnsInfFix(inf, &lat, &lon, &epoch)) {
+        float lat, lon, hdop; uint32_t epoch;
+        if (parseCgnsInfFix(inf, &lat, &lon, &epoch, &hdop)) {
           gotFix = true;
+          if (outResult) {
+            outResult->success = true;
+            outResult->latitude = lat;
+            outResult->longitude = lon;
+            outResult->fixTimeEpoch = epoch;
+            outResult->hdop = hdop;
+            outResult->ttfSeconds = (uint16_t)((millis() - gnssStartTime) / 1000);
+            SerialMon.printf("GPS Fix during smoke test! HDOP=%.1f TTF=%us\n", hdop, outResult->ttfSeconds);
+          }
         }
       }
     }
   }
   sendAT("AT+CGNSTST=0", nullptr, 1200, /*echo*/false);
   s_muteEcho = false;
+  return gotFix;
 }
 
 // ---------- Public API ----------
@@ -414,7 +426,11 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
   }
 
   // Optional priming smoketest: 60s or until fix
-  gnssSmoke60s();
+  if (gnssSmoke60s(&result, gnssStartTime)) {
+    // Fix acquired during smoke test — skip redundant polling
+    gnssStop();
+    return result;
+  }
 
   // Attempt fix up to timeoutSec by polling CGNSINF
   uint32_t start = millis();

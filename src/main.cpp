@@ -492,11 +492,9 @@ void loop() {
   if (shouldGetNewGpsFix) {
     bool isFirstFix = (rtcState.lastGpsFixTime == 0);
     
-    // Bring up modem and configure GNSS just before NTP/XTRA/GPS flow to save power
+    // Bring up modem just before NTP/XTRA/GPS flow to save power
+    // CGNSMOD is configured inside gps.cpp gnssConfigure() — no need to set it here
     ensureModemReady();
-    // Enable GPS, GLONASS, BeiDou; disable Galileo
-    modem.sendAT("+CGNSMOD=1,1,0,1");
-    modem.waitResponse(1000);
 
     fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {

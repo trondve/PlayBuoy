@@ -42,16 +42,21 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     SerialMon.printf("Connecting to cellular network (attempt %d/%d)...\n", attempt + 1, maxRetries);
 
-    // Initialize modem
-    SerialMon.println("Initializing modem...");
-    modem.init();
-    // Brief settle after init before AT commands
-    delay(2000);
+    // Initialize modem (skip when warm from GPS — init sends ATZ which resets
+    // all AT parameters including RAT preference, wasting time and causing re-registration)
+    if (!skipPreCycle) {
+      SerialMon.println("Initializing modem...");
+      modem.init();
+      // Brief settle after init before AT commands
+      delay(2000);
+    } else {
+      SerialMon.println("Modem warm, skipping init (ATZ).");
+    }
 
     // Prefer LTE-M (CAT-M1) as primary RAT (no band/operator locks)
     modem.sendAT("+CNMP=38"); // LTE-M
     modem.waitResponse(1000);
-    
+
     // Test basic communication first (conservative pacing)
     SerialMon.println("Testing AT communication...");
     if (!modem.testAT()) {
