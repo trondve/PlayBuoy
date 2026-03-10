@@ -121,19 +121,52 @@ static bool doNTPSync(ClockInfo* outCi = nullptr) {
   SerialMon.println("=== NTP SYNC (no.pool.ntp.org) ===");
   sendAT("AT+CNTPCID=1");
   sendAT(String("AT+CNTP=\"") + NTP_HOST + "\",0");
+
+  // Read CCLK before NTP to detect stale modem RTC
+  String preNtpCclk;
+  sendAT("AT+CCLK?", &preNtpCclk, 1000);
+  ClockInfo preCi = parseCCLK(preNtpCclk);
+
+  // Trigger NTP sync and wait for +CNTP: result
   String rsp; sendAT("AT+CNTP", &rsp, 8000);
+
+  // Wait for +CNTP: unsolicited response (1 = success, others = failure)
+  bool ntpSuccess = false;
   uint32_t t0 = millis();
-  while (millis() - t0 < 90000) {
-    String cclk;
-    if (sendAT("AT+CCLK?", &cclk, 1000)) {
-      ClockInfo ci = parseCCLK(cclk);
-      if (ci.valid) {
-        SerialMon.print("CCLK raw: \n"); SerialMon.println(cclk);
-        if (outCi) *outCi = ci;
-        return true;
+  while (millis() - t0 < 15000) {
+    while (SerialAT.available()) {
+      String line = SerialAT.readStringUntil('\n');
+      if (line.indexOf("+CNTP: 1") >= 0) { ntpSuccess = true; break; }
+      // +CNTP: 61 = network error, +CNTP: 62 = DNS error, +CNTP: 63 = connect error
+      if (line.indexOf("+CNTP:") >= 0 && line.indexOf("+CNTP: 1") < 0) {
+        SerialMon.print("NTP failed: "); SerialMon.println(line);
+        return false;
       }
     }
-    delay(1000);
+    if (ntpSuccess) break;
+    delay(500);
+  }
+
+  if (!ntpSuccess) {
+    SerialMon.println("NTP sync timeout (no +CNTP: 1 response)");
+    return false;
+  }
+
+  // Read CCLK after NTP and verify time actually changed
+  delay(500);
+  String cclk;
+  if (sendAT("AT+CCLK?", &cclk, 1000)) {
+    ClockInfo ci = parseCCLK(cclk);
+    if (ci.valid) {
+      // Verify year is reasonable (NTP synced to real time, not 2000/2004 default)
+      if (ci.year < 2024) {
+        SerialMon.printf("NTP returned stale year (%d), rejecting\n", ci.year);
+        return false;
+      }
+      SerialMon.print("NTP synced CCLK: "); SerialMon.println(cclk);
+      if (outCi) *outCi = ci;
+      return true;
+    }
   }
   return false;
 }
