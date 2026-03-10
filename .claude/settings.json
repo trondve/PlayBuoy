@@ -1,0 +1,34 @@
+{
+  "name": "PlayBuoy - Solar IoT Water Buoy",
+  "description": "Permanently sealed solar-powered waterproof IoT buoy for collecting water temperature and wave data",
+  "projectType": "embedded-systems",
+  "primaryLanguage": "cpp",
+  "secondaryLanguages": ["python", "markdown"],
+  "hooks": {
+    "enabled": true,
+    "directory": ".claude/hooks"
+  },
+  "skills": {
+    "enabled": true,
+    "directory": ".claude/skills"
+  },
+  "claudeSettings": {
+    "contextPriority": [
+      "CLAUDE.md",
+      "src/CLAUDE.md",
+      "docs/ARCHITECTURE.md"
+    ],
+    "ignoredPaths": [
+      ".git",
+      ".pio",
+      "firmware",
+      "logs",
+      "build"
+    ]
+  },
+  "documentation": {
+    "mainFile": "CLAUDE.md",
+    "architectureFile": "docs/ARCHITECTURE.md",
+    "decisionsDirectory": "docs/decisions"
+  }
+}
