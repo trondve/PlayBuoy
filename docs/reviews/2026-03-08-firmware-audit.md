@@ -13,7 +13,7 @@ Full firmware review identifying 16 issues across hardware pin config, power man
 
 | # | Issue | File | Status |
 |---|-------|------|--------|
-| 3 | HTTP response status code not checked | modem.cpp:232 | Open |
+| 3 | HTTP response status code not checked | modem.cpp:232 | Already fixed — Parses HTTP status, only accepts 2xx, retries on failure |
 | 4 | XTRA download race condition (ok/done flags) | gps.cpp:180 | Fixed (2026-03-10) — Wait for both ok AND done |
 | 5 | NTP time sync not validated | gps.cpp:120 | Fixed (2026-03-10) — Validate +CNTP: 1 and year >= 2024 |
 | 6 | Incomplete PDP teardown before sleep | main.cpp | Fixed (2026-03-10) — Full CNACT/CGACT/CGATT/CIPSHUT sequence |
@@ -35,5 +35,4 @@ Full firmware review identifying 16 issues across hardware pin config, power man
 
 ## Priority
 
-**Before next deployment:** #3
-**All other issues resolved.**
+**All 16 issues resolved.**
