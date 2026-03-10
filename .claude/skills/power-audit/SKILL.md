@@ -1,83 +1,50 @@
-# Power Audit — Full Power Consumption Audit
+# /power-audit — Full Power Consumption Audit
 
-## When to invoke
-Before winter deployment, after major code changes, or periodically to find waste.
+Trigger: Before winter deployment, after major changes, or periodically to find waste.
 
-## Instructions
+## Checklist
 
-### Phase 1: Deep Sleep Audit
-Deep sleep is where the buoy spends 99%+ of its life. Every µA matters.
+1. **Audit deep sleep** — where the buoy spends 99% of its life
+   - Power domains: RTC periph OFF, RTC fast mem OFF, XTAL OFF, only slow mem ON?
+   - GPIO 25 (3V3 rail) → LOW + `gpio_hold_en`?
+   - All modem/I2C/sensor pins → INPUT high-Z?
+   - Bluetooth controller disabled + memory released?
+   - No forgotten `digitalWrite(pin, HIGH)` before sleep?
+   - Target: 10-15µA. Higher = something is leaking
 
-1. **Read `main.cpp` → `preparePinsAndSubsystemsForDeepSleep()`**
-2. Check each item:
-   - [ ] `esp_sleep_pd_config`: RTC periph OFF, RTC fast mem OFF, XTAL OFF, only RTC slow mem ON
-   - [ ] GPIO 25 (3V3 rail) → LOW + `gpio_hold_en`
-   - [ ] All modem pins (4, 5, 23, 26, 27, 32) → INPUT (high-Z)
-   - [ ] I2C pins (21, 22) → INPUT
-   - [ ] OneWire pin (13) → INPUT
-   - [ ] Bluetooth controller disabled + deinitialized + memory released
-   - [ ] No peripherals left powered (check for forgotten `digitalWrite(pin, HIGH)`)
-3. **Estimate**: Target is 10-15µA. If higher, something is leaking.
+2. **Audit wake cycle** — walk through `main.cpp setup()` line by line
+   - Startup: boot delay, BT release, battery measurement (~30ms)
+   - Sensor phase: 3V3 settle (150ms), temp (750ms), waves (3 min), shutdown (100ms)
+   - Modem power-on: PWRKEY (2s) + settle (6s) = 8s minimum, don't touch
+   - GPS: NTP (~10s) + XTRA (if stale, ~20s) + smoke test (60s) + fix polling (up to 20 min)
+   - Post-GPS: skip modem pre-cycle? (`connectToNetwork(apn, true)` saves ~14s)
+   - Upload: JSON build + HTTP POST + OTA check + modem shutdown
+   - Total all delays and operations, compare against previous baseline
 
-### Phase 2: Wake Cycle Audit
-Walk through `main.cpp setup()` line by line. For every delay or operation, ask: is this necessary, and is it the minimum safe duration?
+3. **Audit battery measurement** — `power.cpp`
+   - Burst count and samples per burst (target: 3 × 50)
+   - Inter-sample delay (target: 200µs)
+   - Inter-burst delay (target: none — noise is thermal not bursty)
+   - Warmup discards (target: 1 at startup only)
+   - Using `esp_adc_cal` with eFuse calibration data?
+   - Spread logging enabled? Warns if >20mV between bursts?
+   - Total time target: ~30ms
 
-1. **Startup phase** (before sensors):
-   - Boot delay, BT release, wake reason logging
-   - GPIO hold release, battery measurement
-   - Battery guard check — must happen before any subsystem powers on
+4. **Check sleep schedule efficiency**
+   - Summer/winter thresholds appropriate for deployment latitude?
+   - Quiet hours (00:00-05:59) pushing wake to 06:00?
+   - High SoC (>80%) forcing frequent wakes to discharge toward 40-60%?
+   - Minimum sleep floor (300s) preventing reboot loops?
 
-2. **Sensor phase** (~4 minutes):
-   - 3V3 rail power-on settle time (150ms — actual need is <50ms, margin is fine)
-   - Temperature conversion (750ms — fixed by DS18B20 at 12-bit, cannot reduce)
-   - Wave collection (3 min at 10Hz — reducing this degrades spectral resolution, don't cut below 2 min)
-   - Sensor shutdown settle time (100ms — adequate)
+5. **Quantify and report**
+   - Deep sleep current: X µA
+   - Wake cycle duration: X seconds per phase
+   - Energy per cycle: X mAh
+   - Waste identified: list with estimated savings
+   - Safety notes: timings that must not be reduced
 
-3. **Modem/GPS phase** (3-20 minutes, biggest variable):
-   - Modem power-on sequence (2s PWRKEY + 6s settle = 8s — datasheet minimum, don't touch)
-   - NTP sync (~5-10s)
-   - XTRA download (~10-20s, only every 7 days)
-   - PDP teardown (~2-3s)
-   - GPS smoke test (60s — needed for satellite acquisition)
-   - GPS fix polling (up to 20 min — battery-adaptive timeout, don't reduce)
-   - Post-GPS: does modem skip pre-cycle? (`connectToNetwork(apn, true)` — saves ~14s)
-
-4. **Upload phase** (~10-30s):
-   - JSON build, HTTP POST, retry logic
-   - OTA check
-   - Modem shutdown (1.3s PWRKEY + 8s CPOWD timeout)
-
-5. **Quantify total**: Add up all delays and operation times. Compare against previous audit baseline.
-
-### Phase 3: Measurement Audit
-Check `power.cpp` for battery measurement efficiency.
-
-- [ ] How many bursts? How many samples per burst? (Target: 3 × 50)
-- [ ] Inter-sample delay? (Target: 200µs — decorrelates from switching regulator)
-- [ ] Inter-burst delay? (Target: none — ESP32 ADC noise is thermal, not bursty)
-- [ ] Warmup discards? (Target: 1 at startup only)
-- [ ] Calibration method? (Must use `esp_adc_cal` with eFuse data)
-- [ ] Spread logging enabled? (Warns if >20mV between bursts)
-- [ ] Total measurement time? (Target: ~30ms)
-
-### Phase 4: Report
-```
-## Power Audit Report
-
-### Deep Sleep: [X µA estimated]
-- Issues found: ...
-
-### Wake Cycle: [X seconds total, Y mAh per cycle]
-- Phase breakdown: ...
-- Waste identified: ...
-
-### Battery Measurement: [X ms]
-- Issues found: ...
-
-### Recommendations (by impact)
-1. ...
-2. ...
-
-### Safety notes
-- Do NOT reduce: [list any timings at datasheet minimum]
-```
+6. **Recommend improvements** — conservative only
+   - Never risk brownout to save power
+   - Never reduce below datasheet minimum timings
+   - Never cut wave sampling below 2 minutes (degrades spectral resolution)
+   - Never reduce GPS timeout (essential for fix acquisition)
