@@ -92,22 +92,37 @@ bool handleUndervoltageProtection() {
 }
 
 int estimateBatteryPercent(float voltage) {
-  // Standard 18650 Li-ion OCV table based on typical discharge curves.
-  // Key characteristics: steep drop at 0-10%, flat plateau 3.6-3.8V (30-70%),
-  // steep rise at 90-100%. At 3.733V this gives ~41% (accurate for standard 18650).
-  // Previous table overestimated SoC in 5-60% range vs standard curves.
-  // Source: composite of Samsung INR18650-25R/30Q and generic 18650 discharge data.
+  // Samsung INR18650-35E (3500mAh energy cell) OCV table, 101 points (0-100%).
+  // Target cell: LiitoKala Lii-35S which uses the 35E core.
+  // Adjusted ~20mV downward from 25°C datasheet values for typical 5-15°C
+  // operating temperature (Norwegian lake water). The 35E has a higher and
+  // flatter plateau than the 25R/30Q power cells previously used.
+  //
+  // Key reference points (at ~10°C):
+  //   0% = 2.950V (conservative floor, real cutoff is 2.50V)
+  //   10% = 3.350V    25% = 3.555V
+  //   50% = 3.720V    75% = 4.002V
+  //   90% = 4.153V   100% = 4.200V
+  //   3.70V = ~47% (voltage guard catches well before 25% SoC guard)
+  //
+  // Flat plateau region: 3.55-3.75V covers roughly 20-55% SoC.
+  // Small voltage changes in this region = large SoC swings — this is normal
+  // for high-capacity energy cells. The binary search + interpolation gives
+  // sub-1% resolution despite the flat curve.
+  //
+  // Source: Samsung INR18650-35E datasheet discharge curves (0.2C, 0.5C)
+  // with cold-temperature offset derived from published -10°C/0°C/25°C data.
   static const float ocvByPercent[101] = {
-    3.000f, 3.050f, 3.100f, 3.150f, 3.200f, 3.270f, 3.310f, 3.340f, 3.370f, 3.400f,  //  0-9%
-    3.430f, 3.455f, 3.475f, 3.495f, 3.510f, 3.525f, 3.540f, 3.555f, 3.568f, 3.580f,  // 10-19%
-    3.590f, 3.600f, 3.608f, 3.616f, 3.624f, 3.632f, 3.639f, 3.646f, 3.653f, 3.660f,  // 20-29%
-    3.666f, 3.672f, 3.678f, 3.684f, 3.690f, 3.696f, 3.702f, 3.708f, 3.714f, 3.720f,  // 30-39%
-    3.726f, 3.732f, 3.738f, 3.744f, 3.750f, 3.756f, 3.762f, 3.768f, 3.774f, 3.780f,  // 40-49%
-    3.786f, 3.792f, 3.798f, 3.804f, 3.810f, 3.817f, 3.824f, 3.831f, 3.838f, 3.846f,  // 50-59%
-    3.854f, 3.862f, 3.870f, 3.879f, 3.888f, 3.897f, 3.907f, 3.917f, 3.928f, 3.939f,  // 60-69%
-    3.950f, 3.962f, 3.974f, 3.987f, 4.000f, 4.013f, 4.027f, 4.041f, 4.055f, 4.070f,  // 70-79%
-    4.085f, 4.095f, 4.105f, 4.114f, 4.123f, 4.132f, 4.140f, 4.148f, 4.155f, 4.162f,  // 80-89%
-    4.168f, 4.173f, 4.178f, 4.182f, 4.186f, 4.189f, 4.192f, 4.195f, 4.197f, 4.199f,  // 90-99%
+    2.950f, 3.020f, 3.080f, 3.130f, 3.175f, 3.215f, 3.250f, 3.280f, 3.305f, 3.330f,  //  0-9%
+    3.350f, 3.370f, 3.388f, 3.405f, 3.420f, 3.435f, 3.450f, 3.464f, 3.478f, 3.490f,  // 10-19%
+    3.502f, 3.514f, 3.525f, 3.535f, 3.545f, 3.555f, 3.564f, 3.573f, 3.581f, 3.589f,  // 20-29%
+    3.596f, 3.603f, 3.610f, 3.616f, 3.622f, 3.628f, 3.634f, 3.640f, 3.646f, 3.652f,  // 30-39%
+    3.658f, 3.664f, 3.670f, 3.676f, 3.682f, 3.688f, 3.694f, 3.700f, 3.706f, 3.713f,  // 40-49%
+    3.720f, 3.727f, 3.734f, 3.742f, 3.750f, 3.758f, 3.767f, 3.776f, 3.786f, 3.796f,  // 50-59%
+    3.806f, 3.817f, 3.828f, 3.840f, 3.852f, 3.864f, 3.877f, 3.890f, 3.904f, 3.918f,  // 60-69%
+    3.932f, 3.946f, 3.960f, 3.974f, 3.988f, 4.002f, 4.016f, 4.030f, 4.044f, 4.058f,  // 70-79%
+    4.071f, 4.082f, 4.092f, 4.101f, 4.110f, 4.118f, 4.126f, 4.133f, 4.140f, 4.147f,  // 80-89%
+    4.153f, 4.159f, 4.164f, 4.169f, 4.174f, 4.179f, 4.184f, 4.189f, 4.194f, 4.197f,  // 90-99%
     4.200f                                                                               // 100%
   };
 
