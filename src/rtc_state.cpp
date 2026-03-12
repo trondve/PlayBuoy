@@ -24,7 +24,7 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .firmwareUpdateAttempted = false,
   .lastUnsentJson = {0},
   .hasUnsentData = false,
-  .lastSleepHours = 0,
+  .lastSleepMinutes = 0,
   .lastNextWakeUtc = 0,
 
 };

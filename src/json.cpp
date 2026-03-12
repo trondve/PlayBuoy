@@ -27,7 +27,7 @@ String buildJsonPayload(
   String ip,
   int signalQuality,
   float rtcWaterTemp,
-  int hoursToSleep,
+  int minutesToSleep,
   uint32_t nextWakeUtc,
   float batteryChangeSinceLast
 ) {
@@ -64,7 +64,7 @@ String buildJsonPayload(
   doc["reset_reason"] = resetReason;
 
   // New fields
-  doc["hours_to_sleep"] = hoursToSleep;
+  doc["minutes_to_sleep"] = minutesToSleep;
   doc["next_wake_utc"] = nextWakeUtc;
   doc["battery_change_since_last"] = batteryChangeSinceLast;
 

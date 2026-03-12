@@ -317,8 +317,12 @@ String getResetReasonString() {
     esp_sleep_wakeup_cause_t wc = esp_sleep_get_wakeup_cause();
     switch (wc) {
       case ESP_SLEEP_WAKEUP_TIMER: {
-        if (rtcState.lastSleepHours > 0) {
-          return String("WokeUpFromTimerSleep(") + String((int)rtcState.lastSleepHours) + String("h)");
+        if (rtcState.lastSleepMinutes > 0) {
+          int m = (int)rtcState.lastSleepMinutes;
+          if (m >= 60)
+            return String("WokeUpFromTimerSleep(") + String(m / 60) + "h" + String(m % 60) + "m)";
+          else
+            return String("WokeUpFromTimerSleep(") + String(m) + "m)";
         }
         return String("WokeUpFromTimerSleep");
       }
@@ -406,7 +410,9 @@ void setup() {
   float stableBatteryVoltage = readBatteryVoltage();
   g_prevBatteryVoltage = rtcState.lastBatteryVoltage; // capture previous persisted value
   setStableBatteryVoltage(stableBatteryVoltage);
-  rtcState.lastBatteryVoltage = stableBatteryVoltage;
+  // NOTE: rtcState.lastBatteryVoltage is NOT updated here — it still holds the
+  // previous cycle's voltage, used by determineSleepDuration() for SoC hysteresis.
+  // It gets updated after the sleep decision in loop().
   SerialMon.println("=== END BATTERY MEASUREMENT ===");
 
   checkBatteryChargeState();
@@ -421,9 +427,18 @@ void setup() {
     if (pct < 40) {
       SerialMon.printf("BROWNOUT + LOW BATTERY (%d%% / %.3fV) — sleeping immediately.\n",
                        pct, stableBatteryVoltage);
-      int sleepHours = determineSleepDuration(pct);
-      rtcState.lastSleepHours = (uint16_t)sleepHours;
-      uint32_t sleepSec = (uint32_t)sleepHours * 3600UL;
+      // fastPath=true: skip 10s RTC retry loop (NTP hasn't run yet)
+      int sleepMinutes = determineSleepDuration(pct, true);
+      rtcState.lastBatteryVoltage = stableBatteryVoltage; // persist for next boot's hysteresis
+      rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+      // Apply quiet hours adjustment (same as normal path)
+      uint32_t now = (uint32_t)time(NULL);
+      uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
+      uint32_t nextWake = adjustNextWakeUtcForQuietHours(candidate);
+      rtcState.lastNextWakeUtc = nextWake;
+      uint32_t sleepSec = 300;
+      now = (uint32_t)time(NULL);
+      if (nextWake > now) sleepSec = nextWake - now;
       if (sleepSec < 300) sleepSec = 300;
       preparePinsAndSubsystemsForDeepSleep();
       esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
@@ -579,14 +594,25 @@ void loop() {
     SerialMon.printf("Using RTC timestamp (UTC epoch): %lu\n", currentTimestamp);
   }
 
+  // Re-measure battery right before sleep decision for most accurate SoC.
+  // The initial measurement was taken before modem/GPS (~30 minutes ago).
+  {
+    float freshVoltage = readBatteryVoltage();
+    SerialMon.printf("Battery re-measure before sleep: %.3fV (was %.3fV at boot)\n",
+                     freshVoltage, getStableBatteryVoltage());
+    setStableBatteryVoltage(freshVoltage);
+  }
+
   // Compute planned sleep and next wake based on current state/time
   int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());
-  int sleepHours = determineSleepDuration(batteryPercent);
+  int sleepMinutes = determineSleepDuration(batteryPercent);
+  // Now that hysteresis has used the previous cycle's voltage, persist the fresh one
+  rtcState.lastBatteryVoltage = getStableBatteryVoltage();
 #if DEBUG_NO_DEEP_SLEEP
-  sleepHours = 3;
+  sleepMinutes = 180;
 #endif
   uint32_t nowUtc = (uint32_t)time(NULL);
-  uint32_t candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
+  uint32_t candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
   uint32_t nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
@@ -681,7 +707,7 @@ void loop() {
     }
     // Refresh next wake after potential time update and apply quiet-hours adjustment
     nowUtc = (uint32_t)time(NULL);
-    candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
+    candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
     nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
     json = buildJsonPayload(
       fix.latitude,
@@ -703,7 +729,7 @@ void loop() {
       ipStr,
       rssi,
       rtcState.lastWaterTemp,
-      sleepHours,
+      sleepMinutes,
       nextWakeUtc,
       batteryDelta
     );
@@ -736,10 +762,13 @@ void loop() {
     }
   }
   // Store planned sleep/wake info in RTC for next boot's wake reason context
-  rtcState.lastSleepHours = (uint16_t)sleepHours;
+  rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
   rtcState.lastNextWakeUtc = nextWakeUtc;
 
-  SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
+  if (sleepMinutes >= 60)
+    SerialMon.printf("Sleeping for %dh %dm...\n", sleepMinutes / 60, sleepMinutes % 60);
+  else
+    SerialMon.printf("Sleeping for %d minute(s)...\n", sleepMinutes);
   if (rtcState.lastNextWakeUtc >= 24 * 3600) {
     struct tm tm_local;
     time_t t = (time_t)rtcState.lastNextWakeUtc;
@@ -769,7 +798,7 @@ void loop() {
 #if DEBUG_NO_DEEP_SLEEP
   SerialMon.println("DEBUG_NO_DEEP_SLEEP active: staying awake and delaying instead of deep sleep.");
   // Stay awake but idle for the sleep duration, resetting WDT periodically
-  uint32_t remainingMs = (uint32_t)sleepHours * 3600UL * 1000UL;
+  uint32_t remainingMs = (uint32_t)sleepMinutes * 60UL * 1000UL;
   const uint32_t chunkMs = 10000UL; // 10s chunks to keep logs responsive
   while (remainingMs > 0) {
     esp_task_wdt_reset();

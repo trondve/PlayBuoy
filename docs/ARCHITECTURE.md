@@ -120,7 +120,7 @@ rtc_state_t {
   bool tempSpikeDetected;         // >2°C change
   uint8_t anchorDriftCounter;     // Consecutive drifts
   char lastUnsentJson[512];       // Failed upload buffer
-  uint16_t lastSleepHours;        // Sleep context
+  uint16_t lastSleepMinutes;      // Sleep context (minutes)
 }
 ```
 

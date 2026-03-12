@@ -24,7 +24,7 @@ String buildJsonPayload(
   // Keep only rtcWaterTemp in RTC snapshot
   float rtcWaterTemp,
   // New fields for server
-  int hoursToSleep,
+  int minutesToSleep,
   uint32_t nextWakeUtc,
   float batteryChangeSinceLast
 );
