@@ -87,3 +87,10 @@ void storeUnsentJson(const String& json);
 void clearUnsentJson();
 bool hasUnsentJson();
 String getUnsentJson();
+
+//
+// NVS persistence — survives hard resets (OTA, brownout, watchdog).
+// RTC memory is the primary store; NVS is only a safety net for rare events.
+//
+void saveStateToNvs();               // Snapshot critical RTC state to flash
+void restoreStateFromNvs();          // Restore from NVS if pending, then clear

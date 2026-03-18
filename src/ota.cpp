@@ -346,8 +346,9 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
   }
 
   if (downloadAndInstallFirmware(firmwareUrl.c_str(), haveSha ? expectedHash : nullptr)) {
-    SerialMon.println("OTA update successful. Shutting down modem before reboot...");
+    SerialMon.println("OTA update successful. Saving state and rebooting...");
     markFirmwareUpdateAttempted();
+    saveStateToNvs();
     powerOffModem();
     delay(500);
     ESP.restart();

@@ -1,5 +1,6 @@
 #include "rtc_state.h"
 #include <Arduino.h>
+#include <Preferences.h>
 
 #define SerialMon Serial
 
@@ -47,6 +48,10 @@ static float distanceBetween(float lat1, float lon1, float lat2, float lon2) {
 #define ANCHOR_DRIFT_DISTANCE_THRESHOLD 50.0f
 
 void rtcStateBegin() {
+  // Restore state from NVS if this boot follows a hard reset (OTA, brownout).
+  // Must happen before incrementing bootCounter so the saved count is correct.
+  restoreStateFromNvs();
+
   rtcState.bootCounter++;
 
   // Initialize counters on first boot
@@ -210,4 +215,83 @@ String getUnsentJson() {
     return String(rtcState.lastUnsentJson);
   }
   return String();
+}
+
+// ── NVS persistence (survives OTA / hard reset) ──────────────────────
+//
+// Only the fields that matter across a hard reset are saved.
+// The unsent JSON buffer is intentionally excluded — it's 512 bytes
+// and NVS writes should be small. If upload failed before OTA, the
+// server simply won't get that one reading.
+
+static const char* NVS_NAMESPACE = "rtc_snap";
+
+void saveStateToNvs() {
+  Preferences prefs;
+  if (!prefs.begin(NVS_NAMESPACE, false)) {
+    SerialMon.println("NVS: failed to open for writing");
+    return;
+  }
+
+  prefs.putULong("bootCnt",    rtcState.bootCounter);
+  prefs.putFloat("batV",       rtcState.lastBatteryVoltage);
+  prefs.putFloat("gpsLat",     rtcState.lastGpsLat);
+  prefs.putFloat("gpsLon",     rtcState.lastGpsLon);
+  prefs.putULong("gpsFix",     rtcState.lastGpsFixTime);
+  prefs.putFloat("gpsHdop",    rtcState.lastGpsHdop);
+  prefs.putUShort("gpsTtf",    rtcState.lastGpsTtf);
+  prefs.putFloat("wTemp",      rtcState.lastWaterTemp);
+  prefs.putUChar("thCnt",      rtcState.tempHistoryCount);
+  prefs.putBytes("tHist",      rtcState.tempHistory, sizeof(rtcState.tempHistory));
+  prefs.putUChar("driftCnt",   rtcState.anchorDriftCounter);
+  prefs.putBool("driftDet",    rtcState.anchorDriftDetected);
+  prefs.putBool("chgProb",     rtcState.chargingProblemDetected);
+  prefs.putBool("otaPend",     true);  // flag: restore needed on next boot
+
+  prefs.end();
+  SerialMon.println("NVS: state saved before hard reset");
+}
+
+void restoreStateFromNvs() {
+  Preferences prefs;
+  if (!prefs.begin(NVS_NAMESPACE, true)) {
+    return;  // no NVS namespace yet — first boot ever, nothing to restore
+  }
+
+  bool pending = prefs.getBool("otaPend", false);
+  prefs.end();
+
+  if (!pending) {
+    return;  // normal deep-sleep wake, RTC memory is fine
+  }
+
+  // Re-open read-write to restore and clear
+  if (!prefs.begin(NVS_NAMESPACE, false)) {
+    SerialMon.println("NVS: failed to reopen for restore");
+    return;
+  }
+
+  SerialMon.println("NVS: restoring state after hard reset");
+
+  rtcState.bootCounter           = prefs.getULong("bootCnt", 0);
+  rtcState.lastBatteryVoltage    = prefs.getFloat("batV", 0.0f);
+  rtcState.lastGpsLat            = prefs.getFloat("gpsLat", 0.0f);
+  rtcState.lastGpsLon            = prefs.getFloat("gpsLon", 0.0f);
+  rtcState.lastGpsFixTime        = prefs.getULong("gpsFix", 0);
+  rtcState.lastGpsHdop           = prefs.getFloat("gpsHdop", 99.0f);
+  rtcState.lastGpsTtf            = prefs.getUShort("gpsTtf", 0);
+  rtcState.lastWaterTemp         = prefs.getFloat("wTemp", 0.0f);
+  rtcState.tempHistoryCount      = prefs.getUChar("thCnt", 0);
+  prefs.getBytes("tHist", rtcState.tempHistory, sizeof(rtcState.tempHistory));
+  rtcState.anchorDriftCounter    = prefs.getUChar("driftCnt", 0);
+  rtcState.anchorDriftDetected   = prefs.getBool("driftDet", false);
+  rtcState.chargingProblemDetected = prefs.getBool("chgProb", false);
+  rtcState.firmwareUpdateAttempted = true;  // we know we got here via OTA
+
+  // Clear the pending flag so next deep-sleep wake doesn't re-restore
+  prefs.putBool("otaPend", false);
+  prefs.end();
+
+  SerialMon.printf("NVS: restored bootCounter=%lu, waterTemp=%.1f, gpsLat=%.4f\n",
+                   rtcState.bootCounter, rtcState.lastWaterTemp, rtcState.lastGpsLat);
 }
