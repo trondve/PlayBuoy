@@ -162,13 +162,17 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
     if (!gotStatus) delay(5);
   }
   // Read headers until blank line
+  bool sawHeaderEnd = false;
   t0 = millis();
   while (millis() - t0 < 15000) {
     while (client.available()) {
       char c = client.read();
       if (c == '\n') {
         String h = line; h.trim();
-        if (h.length() == 0) return (statusCode > 0);
+        if (h.length() == 0) {
+          sawHeaderEnd = true;
+          break;  // Exit inner while loop
+        }
         if (h.startsWith("Content-Length:")) {
           String v = h.substring(strlen("Content-Length:")); v.trim();
           contentLength = (size_t)v.toInt();
@@ -178,9 +182,10 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
         line += c;
       }
     }
+    if (sawHeaderEnd) break;  // Exit outer while loop
     delay(5);
   }
-  return (statusCode > 0);
+  return (statusCode > 0 && sawHeaderEnd);
 }
 
 bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expectedSha256) {
