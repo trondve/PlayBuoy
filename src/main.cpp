@@ -428,13 +428,13 @@ void setup() {
   checkBatteryChargeState();
   logBatteryStatus();
 
-  // Brownout fast-track: if we just brown-out reset and battery is below 40%,
+  // Brownout fast-track: if we just brown-out reset and battery is below threshold,
   // skip the full cycle and go straight to deep sleep to preserve the battery.
   // A brownout means the voltage sagged under load (modem 2A peak), so running
   // the full cycle with modem/GPS would likely cause another brownout.
   if (brownoutRecovery) {
     int pct = estimateBatteryPercent(stableBatteryVoltage);
-    if (pct < 40) {
+    if (pct < BROWNOUT_SKIP_PCT) {
       SerialMon.printf("BROWNOUT + LOW BATTERY (%d%% / %.3fV) — sleeping immediately.\n",
                        pct, stableBatteryVoltage);
       // fastPath=true: skip 10s RTC retry loop (NTP hasn't run yet)

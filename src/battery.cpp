@@ -93,9 +93,8 @@ bool handleUndervoltageProtection() {
 int estimateBatteryPercent(float voltage) {
   // Samsung INR18650-35E (3500mAh energy cell) OCV table, 101 points (0-100%).
   // Target cell: LiitoKala Lii-35S which uses the 35E core.
-  // Adjusted ~20mV downward from 25°C datasheet values for typical 5-15°C
-  // operating temperature (Norwegian lake water). The 35E has a higher and
-  // flatter plateau than the 25R/30Q power cells previously used.
+  // Table is adjusted for ~10°C Norwegian lake water operating temperature.
+  // The 35E has a higher and flatter plateau than the 25R/30Q power cells previously used.
   //
   // Key reference points (at ~10°C):
   //   0% = 2.950V (conservative floor, real cutoff is 2.50V)
@@ -125,17 +124,31 @@ int estimateBatteryPercent(float voltage) {
     4.200f                                                                               // 100%
   };
 
-  if (voltage <= ocvByPercent[0]) return 0;
-  if (voltage >= ocvByPercent[100]) return 100;
+  // Temperature compensation: OCV shifts ~1.5mV per °C between -20°C and +25°C
+  // Use water temperature as proxy for cell temperature. At cold temps (<10°C),
+  // apply upward correction to prevent over-reporting SoC.
+  float voltageTempCorrected = voltage;
+  if (!isnan(rtcState.lastWaterTemp)) {
+    float tempC = rtcState.lastWaterTemp;
+    if (tempC < 10.0f) {
+      // OCV drops at cold temps; correct upward (add voltage) to account for it
+      // Formula: vCorrected = vRaw + 0.0015V/°C * (25°C - tempC)
+      voltageTempCorrected = voltage + 0.0015f * (25.0f - tempC);
+    }
+  }
+
+  if (voltageTempCorrected <= ocvByPercent[0]) return 0;
+  if (voltageTempCorrected >= ocvByPercent[100]) return 100;
 
   int lo = 0, hi = 100;
   while (hi - lo > 1) {
     int mid = (lo + hi) / 2;
-    if (ocvByPercent[mid] <= voltage) lo = mid; else hi = mid;
+    if (ocvByPercent[mid] <= voltageTempCorrected) lo = mid; else hi = mid;
   }
   float vLo = ocvByPercent[lo];
   float vHi = ocvByPercent[hi];
-  float t = (vHi - vLo) > 1e-6f ? (voltage - vLo) / (vHi - vLo) : 0.0f;
+  // Raise epsilon from 1e-6 to 1e-3 (1 mV): prevents div-by-near-zero in tight voltage bands
+  float t = (vHi - vLo) > 1e-3f ? (voltageTempCorrected - vLo) / (vHi - vLo) : 0.0f;
   int pct = (int)roundf(lo + t * (hi - lo));
   if (pct < 0) pct = 0; if (pct > 100) pct = 100;
   return pct;
@@ -210,7 +223,8 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
   if (prevV > 0.1f && fabsf(currentV - prevV) > 0.005f) {
     // Voltage rising → bias SoC up (stay in shorter sleep)
     // Voltage falling → bias SoC down (stay in longer sleep)
-    int hysteresis = (currentV > prevV) ? 2 : -2;
+    // Widened to ±5% (from ±2%) to prevent oscillation in 25-50% SoC plateau
+    int hysteresis = (currentV > prevV) ? 5 : -5;
     batteryPercent += hysteresis;
     if (batteryPercent < 0) batteryPercent = 0;
     if (batteryPercent > 100) batteryPercent = 100;
