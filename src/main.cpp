@@ -119,15 +119,25 @@ void preparePinsAndSubsystemsForDeepSleep() {
 uint32_t adjustNextWakeUtcForQuietHours(uint32_t candidateUtc) {
   time_t cand = (time_t)candidateUtc;
   struct tm lt;
-  localtime_r(&cand, &lt);   // uses configTzTime timezone
+  localtime_r(&cand, &lt);   // convert to local time (uses configTzTime timezone)
+
   if (lt.tm_hour >= 0 && lt.tm_hour < 6) {
+    // Wake falls in quiet hours (00:00-06:00 local); defer to 06:00 local
     lt.tm_hour = 6;
     lt.tm_min = 0;
     lt.tm_sec = 0;
+
+    // Reset DST flag to -1 (auto-detect) to ensure mktime computes correct interpretation for 06:00 on DST transition days
+    // On spring-forward (Mar 29), 06:00 is unambiguous (either 06:00 CET or 06:00 CEST depending on hour)
+    // On fall-back (Oct 25), 06:00 is unambiguous (only one 06:00 local)
+    lt.tm_isdst = -1;
+
     time_t adj = mktime(&lt); // mktime interprets struct tm as local time, returns UTC epoch
-    if (adj == (time_t)-1) return candidateUtc; // mktime failed (invalid tm), keep original
+    if (adj == (time_t)-1) return candidateUtc; // mktime failed, keep original
+
     return (uint32_t)adj;
   }
+
   return candidateUtc;
 }
 
