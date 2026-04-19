@@ -24,15 +24,23 @@ static bool ensurePdpForHttp() {
 static String extractVersionFromBody(const String& body) {
   String trimmed = body; trimmed.trim();
   if (trimmed.length() == 0) return "";
+
+  // Require strict MAJOR.MINOR.PATCH format: must start with a digit (no leading junk)
+  if (trimmed[0] < '0' || trimmed[0] > '9') return "";
+
   String candidate;
   for (size_t i = 0; i < trimmed.length(); ++i) {
     char c = trimmed[i];
     if ((c >= '0' && c <= '9') || c == '.') candidate += c;
-    else if (candidate.length() > 0) break;
+    else if (candidate.length() > 0) break;  // Stop at first non-digit/non-dot
   }
+
+  // Verify format: must have exactly 2 dots for MAJOR.MINOR.PATCH
   int a = candidate.indexOf('.');
   int b = candidate.lastIndexOf('.');
-  if (a > 0 && b > a) return candidate;
+  if (a > 0 && b > a && b < (int)candidate.length() - 1) {
+    return candidate;
+  }
   return "";
 }
 
@@ -97,14 +105,25 @@ static String httpGetTinyGsm(const char* url) {
   req += "Connection: close\r\n\r\n";
   client.print(req);
 
-  // Read entire response (headers + body) into one buffer, then split once
-  String raw; unsigned long t0 = millis();
+  // Read entire response (headers + body) into one buffer with size cap to prevent OOM
+  // Version/SHA files should be small (<100 bytes); cap at 4KB for safety
+  const size_t MAX_RESPONSE_SIZE = 4096;
+  String raw; raw.reserve(MAX_RESPONSE_SIZE);
+  unsigned long t0 = millis();
   while (millis() - t0 < 20000) {
-    while (client.available()) raw += (char)client.read();
+    while (client.available()) {
+      if (raw.length() >= MAX_RESPONSE_SIZE) {
+        SerialMon.printf("HTTP response exceeds %u bytes; aborting to prevent OOM\n", (unsigned)MAX_RESPONSE_SIZE);
+        client.stop();
+        return "";
+      }
+      raw += (char)client.read();
+    }
     if (!client.connected()) break;
     delay(5);
   }
   client.stop();
+
   // Split at first \r\n\r\n to separate headers from body
   String body;
   int p = raw.indexOf("\r\n\r\n");
@@ -136,9 +155,11 @@ bool downloadAndCheckVersion(const char* versionUrl) {
   return false;
 }
 
-static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, size_t& contentLength) {
+static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, size_t& contentLength, String* outLocation = nullptr) {
   statusCode = -1;
   contentLength = 0;
+  if (outLocation) outLocation->clear();
+
   String line;
   unsigned long t0 = millis();
   // Read status line
@@ -177,6 +198,11 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
           String v = h.substring(strlen("Content-Length:")); v.trim();
           contentLength = (size_t)v.toInt();
         }
+        // Capture Location header for 3xx redirects
+        if (outLocation && h.startsWith("Location:")) {
+          String loc = h.substring(strlen("Location:")); loc.trim();
+          *outLocation = loc;
+        }
         line = "";
       } else if (c != '\r') {
         line += c;
@@ -195,124 +221,149 @@ bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expected
     return false;
   }
 
-  // Parse URL
-  String u(firmwareUrl), host, path; uint16_t port = 80;
-  if (u.startsWith("http://")) u = u.substring(7);
-  else if (u.startsWith("https://")) u = u.substring(8);
-  int slash = u.indexOf('/');
-  if (slash > 0) { host = u.substring(0, slash); path = u.substring(slash); } else { host = u; path = "/"; }
-  int colon = host.indexOf(':');
-  if (colon > 0) { port = (uint16_t)host.substring(colon + 1).toInt(); host = host.substring(0, colon); }
+  const int MAX_REDIRECTS = 3;
+  String currentUrl(firmwareUrl);
 
-  TinyGsmClient client(modem);
-  if (!client.connect(host.c_str(), port)) { SerialMon.println("TCP connect failed"); return false; }
-
-  // Send request
-  String req;
-  req += String("GET ") + path + " HTTP/1.1\r\n";
-  req += String("Host: ") + host + "\r\n";
-  req += "User-Agent: TinyGSM-HTTP/1.0\r\n";
-  req += "Accept: application/octet-stream\r\n";
-  req += "Connection: close\r\n\r\n";
-  client.print(req);
-
-  int status = -1; size_t contentLength = 0;
-  if (!parseHttpResponseHeaders(client, status, contentLength)) { client.stop(); return false; }
-  SerialMon.printf("HTTP status: %d, Content-Length: %u\n", status, (unsigned)contentLength);
-  if (status != 200) { client.stop(); return false; }
-
-  size_t updateSize = (contentLength > 0) ? contentLength : (size_t)UPDATE_SIZE_UNKNOWN;
-  if (!Update.begin(updateSize)) {
-    SerialMon.printf("Update.begin failed: %s\n", Update.errorString());
-    client.stop();
-    return false;
-  }
-
-  // Initialize SHA-256 context for integrity verification
-  mbedtls_sha256_context sha256ctx;
-  bool verifySha = (expectedSha256 != nullptr);
-  if (verifySha) {
-    mbedtls_sha256_init(&sha256ctx);
-    mbedtls_sha256_starts(&sha256ctx, 0);  // 0 = SHA-256 (not SHA-224)
-  }
-
-  size_t written = 0; uint8_t buf[1024];
-  unsigned long lastLog = millis();
-  unsigned long downloadStart = millis();
-  bool timedOut = false;
-
-  while (client.connected()) {
-    // Wall-clock timeout: abort if download takes too long (prevents stalled TCP
-    // from draining battery — the 45-min WDT is too late for OTA safety)
-    if (millis() - downloadStart > OTA_DOWNLOAD_TIMEOUT_MS) {
-      SerialMon.printf("OTA download timeout after %lu ms (%u bytes received)\n",
-                       millis() - downloadStart, (unsigned)written);
-      timedOut = true;
-      break;
+  for (int redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
+    if (redirectCount > 0) {
+      SerialMon.printf("Following redirect %d/%d to: %s\n", redirectCount, MAX_REDIRECTS, currentUrl.c_str());
     }
 
-    int n = client.readBytes(buf, sizeof(buf));
-    if (n < 0) break;
-    if (n == 0) { delay(5); continue; }
+    // Parse URL
+    String u(currentUrl), host, path; uint16_t port = 80;
+    if (u.startsWith("http://")) u = u.substring(7);
+    else if (u.startsWith("https://")) u = u.substring(8);
+    int slash = u.indexOf('/');
+    if (slash > 0) { host = u.substring(0, slash); path = u.substring(slash); } else { host = u; path = "/"; }
+    int colon = host.indexOf(':');
+    if (colon > 0) { port = (uint16_t)host.substring(colon + 1).toInt(); host = host.substring(0, colon); }
 
-    // Hash the raw bytes before writing to flash
-    if (verifySha) {
-      mbedtls_sha256_update(&sha256ctx, buf, (size_t)n);
-    }
+    TinyGsmClient client(modem);
+    if (!client.connect(host.c_str(), port)) { SerialMon.println("TCP connect failed"); return false; }
 
-    size_t w = Update.write(buf, (size_t)n);
-    if (w != (size_t)n) {
-      SerialMon.printf("Update.write mismatch (w=%u n=%d) err=%s\n", (unsigned)w, n, Update.errorString());
+    // Send request
+    String req;
+    req += String("GET ") + path + " HTTP/1.1\r\n";
+    req += String("Host: ") + host + "\r\n";
+    req += "User-Agent: TinyGSM-HTTP/1.0\r\n";
+    req += "Accept: application/octet-stream\r\n";
+    req += "Connection: close\r\n\r\n";
+    client.print(req);
+
+    int status = -1; size_t contentLength = 0;
+    String location;
+    if (!parseHttpResponseHeaders(client, status, contentLength, &location)) { client.stop(); return false; }
+    SerialMon.printf("HTTP status: %d, Content-Length: %u\n", status, (unsigned)contentLength);
+
+    // Handle redirects
+    if ((status >= 300 && status < 400) && location.length() > 0) {
       client.stop();
+      if (redirectCount >= MAX_REDIRECTS) {
+        SerialMon.printf("Too many redirects (max %d)\n", MAX_REDIRECTS);
+        return false;
+      }
+      currentUrl = location;
+      continue;  // Try next redirect
+    }
+
+    // Only proceed if we got 200 OK
+    if (status != 200) { client.stop(); return false; }
+
+    size_t updateSize = (contentLength > 0) ? contentLength : (size_t)UPDATE_SIZE_UNKNOWN;
+    if (!Update.begin(updateSize)) {
+      SerialMon.printf("Update.begin failed: %s\n", Update.errorString());
+      client.stop();
+      return false;
+    }
+
+    // Initialize SHA-256 context for integrity verification
+    mbedtls_sha256_context sha256ctx;
+    bool verifySha = (expectedSha256 != nullptr);
+    if (verifySha) {
+      mbedtls_sha256_init(&sha256ctx);
+      mbedtls_sha256_starts(&sha256ctx, 0);  // 0 = SHA-256 (not SHA-224)
+    }
+
+    size_t written = 0; uint8_t buf[1024];
+    unsigned long lastLog = millis();
+    unsigned long downloadStart = millis();
+    bool timedOut = false;
+
+    while (client.connected()) {
+      // Wall-clock timeout: abort if download takes too long (prevents stalled TCP
+      // from draining battery — the 45-min WDT is too late for OTA safety)
+      if (millis() - downloadStart > OTA_DOWNLOAD_TIMEOUT_MS) {
+        SerialMon.printf("OTA download timeout after %lu ms (%u bytes received)\n",
+                         millis() - downloadStart, (unsigned)written);
+        timedOut = true;
+        break;
+      }
+
+      int n = client.readBytes(buf, sizeof(buf));
+      if (n < 0) break;
+      if (n == 0) { delay(5); continue; }
+
+      // Hash the raw bytes before writing to flash
+      if (verifySha) {
+        mbedtls_sha256_update(&sha256ctx, buf, (size_t)n);
+      }
+
+      size_t w = Update.write(buf, (size_t)n);
+      if (w != (size_t)n) {
+        SerialMon.printf("Update.write mismatch (w=%u n=%d) err=%s\n", (unsigned)w, n, Update.errorString());
+        client.stop();
+        if (verifySha) mbedtls_sha256_free(&sha256ctx);
+        Update.abort();
+        return false;
+      }
+      written += w;
+      if (millis() - lastLog > 2000) { SerialMon.printf("Downloaded %u bytes\n", (unsigned)written); lastLog = millis(); }
+      if (contentLength > 0 && written >= contentLength) break;
+    }
+    client.stop();
+
+    if (timedOut) {
       if (verifySha) mbedtls_sha256_free(&sha256ctx);
       Update.abort();
       return false;
     }
-    written += w;
-    if (millis() - lastLog > 2000) { SerialMon.printf("Downloaded %u bytes\n", (unsigned)written); lastLog = millis(); }
-    if (contentLength > 0 && written >= contentLength) break;
-  }
-  client.stop();
 
-  if (timedOut) {
-    if (verifySha) mbedtls_sha256_free(&sha256ctx);
-    Update.abort();
-    return false;
-  }
-
-  if (contentLength > 0 && written != contentLength) {
-    SerialMon.printf("Short read: expected %u, got %u\n", (unsigned)contentLength, (unsigned)written);
-    if (verifySha) mbedtls_sha256_free(&sha256ctx);
-    Update.abort();
-    return false;
-  }
-
-  // Verify SHA-256 before committing the update
-  if (verifySha) {
-    uint8_t computedHash[32];
-    mbedtls_sha256_finish(&sha256ctx, computedHash);
-    mbedtls_sha256_free(&sha256ctx);
-
-    if (memcmp(computedHash, expectedSha256, 32) != 0) {
-      SerialMon.println("SHA-256 MISMATCH — firmware corrupted, aborting OTA!");
-      SerialMon.print("  Expected: ");
-      for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", expectedSha256[i]);
-      SerialMon.println();
-      SerialMon.print("  Computed: ");
-      for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", computedHash[i]);
-      SerialMon.println();
+    if (contentLength > 0 && written != contentLength) {
+      SerialMon.printf("Short read: expected %u, got %u\n", (unsigned)contentLength, (unsigned)written);
+      if (verifySha) mbedtls_sha256_free(&sha256ctx);
       Update.abort();
       return false;
     }
-    SerialMon.println("SHA-256 verified OK");
-  }
 
-  if (!Update.end(true)) { // true => set boot partition, image pending verify
-    SerialMon.printf("Update.end failed: %s\n", Update.errorString());
-    return false;
+    // Verify SHA-256 before committing the update
+    if (verifySha) {
+      uint8_t computedHash[32];
+      mbedtls_sha256_finish(&sha256ctx, computedHash);
+      mbedtls_sha256_free(&sha256ctx);
+
+      if (memcmp(computedHash, expectedSha256, 32) != 0) {
+        SerialMon.println("SHA-256 MISMATCH — firmware corrupted, aborting OTA!");
+        SerialMon.print("  Expected: ");
+        for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", expectedSha256[i]);
+        SerialMon.println();
+        SerialMon.print("  Computed: ");
+        for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", computedHash[i]);
+        SerialMon.println();
+        Update.abort();
+        return false;
+      }
+      SerialMon.println("SHA-256 verified OK");
+    }
+
+    if (!Update.end(true)) { // true => set boot partition, image pending verify
+      SerialMon.printf("Update.end failed: %s\n", Update.errorString());
+      return false;
+    }
+    SerialMon.printf("OTA image written (%u bytes); rebooting into pending verify\n", (unsigned)written);
+    return true;
   }
-  SerialMon.printf("OTA image written (%u bytes); rebooting into pending verify\n", (unsigned)written);
-  return true;
+  // If we exhausted redirects without getting 200, return failure
+  return false;
 }
 
 bool checkForFirmwareUpdate(const char* baseUrl) {
