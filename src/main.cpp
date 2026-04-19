@@ -798,11 +798,11 @@ void loop() {
 #if DEBUG_NO_DEEP_SLEEP
   SerialMon.println("DEBUG_NO_DEEP_SLEEP active: staying awake and delaying instead of deep sleep.");
   // Stay awake but idle for the sleep duration, resetting WDT periodically
-  uint32_t remainingMs = (uint32_t)sleepMinutes * 60UL * 1000UL;
+  uint64_t remainingMs = (uint64_t)sleepMinutes * 60ULL * 1000ULL; // uint64 avoids overflow at 129600 min
   const uint32_t chunkMs = 10000UL; // 10s chunks to keep logs responsive
   while (remainingMs > 0) {
     esp_task_wdt_reset();
-    uint32_t d = remainingMs > chunkMs ? chunkMs : remainingMs;
+    uint32_t d = (remainingMs > chunkMs) ? chunkMs : (uint32_t)remainingMs;
     delay(d);
     remainingMs -= d;
   }

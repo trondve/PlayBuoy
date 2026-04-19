@@ -22,6 +22,12 @@ CLAUDE.md files, and the previous 2026-03-08 audit. Only NEW findings are listed
 | CAT5-01 | LOW | Dead Code | main.cpp:1, modem.cpp:1, ota.cpp:1 | Fixed |
 | CAT5-02 | LOW | Dead Code | config.h.example:38-39 | Fixed |
 | CAT5-03 | LOW | Dead Code | main.cpp:215 | Fixed |
+| CAT6-01 | INFO | Security | modem.cpp, ota.cpp | Noted (hardware limit) |
+| CAT6-02 | MEDIUM | Security/OTA | ota.cpp:344 | Noted (by design) |
+| CAT7-01 | LOW | Best Practices | ota.cpp:314-315 | Fixed |
+| CAT7-02 | LOW | Best Practices / Cat4 | ota.cpp:154 | Fixed |
+| CAT9-01 | LOW | Architecture | battery.h:12-16 | Noted |
+| CAT12-01 | LOW | Power Efficiency | main.cpp:801 | Fixed |
 
 ---
 
@@ -371,3 +377,290 @@ The following were checked and are implemented correctly:
 - **ADC eFuse two-point calibration** — `esp_adc_cal_characterize()` attempts eFuse TP
   first, logs which calibration was used. ✅
 - **First ADC read discarded** — `analogRead(PIN_ADC_BAT)` dummy read in `readBatteryVoltage()`. ✅
+
+---
+
+## Cat 6 — Security
+
+### CAT6-01 — INFO: API key and OTA firmware transmitted over HTTP (hardware limitation)
+
+**Files:** `src/modem.cpp:259`, `src/ota.cpp:77`
+
+**Finding:**
+`sendJsonToServer()` sends `X-API-Key: <key>` in plain HTTP (port 80). `downloadAndInstallFirmware()`
+fetches firmware binaries over HTTP. TLS is broken on the SIM7000G module with this SDK combination
+(documented in CLAUDE.md: *"OTA server: trondve.ddns.net (HTTP only, HTTPS broken on SIM7000G)"*).
+
+**Risk:** INFO — Not a firmware bug. API key exposed on the radio link. For a buoy in a Norwegian
+lake, RF interception is unlikely in practice. A proper fix requires upgrading to a supported
+TLS library (e.g., MQTT-over-TLS or mbedTLS direct) or hardware that supports it.
+
+**Action:** No code change possible without hardware support. Documented for awareness.
+
+---
+
+### CAT6-02 — MEDIUM: OTA proceeds without integrity check when `.sha256` unavailable
+
+**File:** `src/ota.cpp:344`
+
+**Code:**
+```cpp
+// If .sha256 file is unavailable, proceed without verification (graceful degradation).
+String sha256Body = httpGetTinyGsm(sha256Url.c_str());
+bool haveSha = parseHexSha256(sha256Body, expectedHash);
+if (!haveSha) {
+    SerialMon.println("No .sha256 file available — proceeding without integrity check");
+}
+```
+
+**Risk:** MEDIUM — If the `.sha256` sidecar file is accidentally deleted or the server returns
+an empty/malformed response, any binary at the firmware URL is flashed without verification.
+On a sealed buoy, a corrupted flash = permanent brick.
+
+**This is an intentional design choice** (graceful degradation for servers without sha256sum
+infrastructure). Risk is mitigated by the fact that the OTA server is controlled by the operator.
+
+**Recommendation:** Add a `#define OTA_REQUIRE_SHA256 1` guard in `config.h.example` to let
+deployments opt into mandatory hash verification. Not implemented now — risk accepted per design.
+
+---
+
+## Cat 7 — Best Practices & Idioms
+
+### CAT7-01 — LOW: Inline `extern` declarations instead of `#include` in `ota.cpp`
+
+**File:** `src/ota.cpp:314-315` (before fix)
+
+**Problem:**
+`checkForFirmwareUpdate()` declared its dependencies inline:
+```cpp
+extern float getStableBatteryVoltage();
+extern int estimateBatteryPercent(float);
+```
+These functions are already declared in `battery.h`. Inline externs bypass the header and
+cause a compile error if the signatures ever change.
+
+**Fix applied:** Added `#include "battery.h"` to ota.cpp includes; removed inline externs.
+
+---
+
+### CAT7-02 / CAT4-02 — LOW: `goto` in `parseHttpResponseHeaders()` in `ota.cpp`
+
+**File:** `src/ota.cpp:154` (before fix)
+
+**Problem:**
+`goto read_headers;` used to jump from the status-line loop to the header-parsing loop.
+This is the same pattern removed from `gnssStart()` in Cat4. `goto` obscures control flow
+and is banned in most embedded coding standards (MISRA C, AUTOSAR).
+
+**Fix applied:** Replaced with a `bool gotStatus` flag; the inner loop breaks on first complete
+status line and the outer while condition prevents re-running the status-line logic.
+
+---
+
+## Cat 8 — Testing Gaps
+
+### CAT8-01 — INFO: No unit tests (inherent hardware dependency)
+
+**Finding:**
+The firmware has no automated test suite. All logic depends on hardware (modem AT responses,
+ADC readings, I2C sensor, GPS NMEA stream). This is standard for tightly-coupled embedded
+firmware where a hardware-in-loop (HIL) setup would be required for meaningful tests.
+
+**Risk:** INFO — Acceptable for this type of system. The review itself serves as the primary
+correctness validation mechanism.
+
+**Recommended improvement (future):** Extract pure-logic functions (OCV table lookup,
+`compareVersions()`, `adjustNextWakeUtcForQuietHours()`, `determineSleepDuration()`,
+`estimateBatteryPercent()`) into a platform-independent library and test on host with a
+native PlatformIO env. These functions have no hardware dependencies.
+
+---
+
+## Cat 9 — Architecture
+
+### CAT9-01 — LOW: `battery.h` forward-declares functions defined in `main.cpp`
+
+**File:** `src/battery.h:12-16`
+
+**Code:**
+```cpp
+// Power controls and sleep helpers provided by the main module (main.cpp)
+void powerOff3V3Rail();
+void powerOffModem();
+uint32_t adjustNextWakeUtcForQuietHours(uint32_t candidateUtc);
+void preparePinsAndSubsystemsForDeepSleep();
+```
+
+**Problem:**
+`battery.cpp` calls power-control functions defined in `main.cpp`. The comment acknowledges
+this coupling explicitly. Creating a circular dependency (battery → main → battery) is
+technically safe in C++ at link time (single program, no ODR violation) but architecturally
+incorrect. If `battery.cpp` were ever compiled standalone (unit test), it would fail to link.
+
+**Risk:** LOW — No runtime impact. The buoy will never fail because of this.
+
+**Recommended fix (future refactor):** Introduce a `power_control.h` / `power_control.cpp`
+module that owns `powerOff3V3Rail()`, `powerOffModem()`, `preparePinsAndSubsystemsForDeepSleep()`,
+and `adjustNextWakeUtcForQuietHours()`. Both `battery.cpp` and `main.cpp` would include it.
+Not implemented — would require touching 4 files for a purely architectural improvement.
+
+---
+
+## Cat 10 — Brownout & Power Sequencing
+
+All items verified correct. See "Items Confirmed Correct" section for the full checklist.
+
+Additional verification:
+- **3V3 rail off before modem activation** — `powerOn3V3Rail()` and `powerOnModem()` are
+  independent; modem is powered via `MODEM_POWER_ON` (GPIO 23), sensor rail via `POWER_3V3_ENABLE`
+  (GPIO 25). Wave collection runs on 3V3 rail, modem is powered separately. ✅
+- **Brownout loop prevention** — `brownoutRecovery && pct < 40` → direct sleep with 300s floor,
+  never re-enters modem/GPS path. ✅
+- **PDP teardown on all paths** — `tearDownPDP()` called in gps.cpp after GPS; main.cpp tears
+  down PDP manually before `powerOffModem()`. Both paths confirmed. ✅
+
+---
+
+## Cat 11 — SIM7000G Timing Compliance
+
+**PWRKEY ON timing:** `powerOnModem()` pulls PWRKEY HIGH for 100ms, then LOW for 2000ms (spec: ≥1.0s). ✅
+
+**PWRKEY OFF timing:** `powerOffModem()` pulls PWRKEY LOW for 1300ms (spec: ≥1.2s). ✅
+
+**Pre-AT delay:** 6000ms settle after PWRKEY sequence + `delay(2000)` in `ensureModemReady()`.
+Total ≥6s before first AT command. ✅
+
+**CGNSPWR → CGNSINF:** 50ms minimum enforced via `preATDelay()` (100ms). ✅
+
+**CNTP timeout:** Extended to 60s (was 15s) in BUG-07/BUG-08 fix. Within SIM7000G spec. ✅
+
+**XTRA injection sequence:** Fixed in BUG-03. `CGNSPWR=1` → `CGNSCPY` → `CGNSXTRA=1` → `CGNSCOLD`. ✅
+
+**PDP teardown order:** `CNACT=0` → `CGACT=0` → `CGATT=0` → `CIPSHUT`. ✅
+
+**Shutdown order:** `CFUN=0` → `CPOWD=1` → hard PWR key. ✅
+
+---
+
+## Cat 12 — Power Efficiency
+
+### CAT12-01 — LOW: `uint32_t` overflow in `DEBUG_NO_DEEP_SLEEP` delay loop
+
+**File:** `src/main.cpp:801` (before fix)
+
+**Problem:**
+```cpp
+uint32_t remainingMs = (uint32_t)sleepMinutes * 60UL * 1000UL;
+```
+For the winter hibernate schedule (129,600 min): `129600 × 60 × 1000 = 7,776,000,000 ms`
+exceeds `uint32_t` max (4,294,967,295). The computed value wraps to ~3.48 billion ms (~40 days)
+instead of ~90 days. The WDT (45 min) would fire and reboot the device.
+
+**Production impact:** NONE — `DEBUG_NO_DEEP_SLEEP` is `0` in all production builds.
+Development impact: misleading debug behavior in winter-schedule testing.
+
+**Fix applied:** Changed to `uint64_t remainingMs = (uint64_t)sleepMinutes * 60ULL * 1000ULL;`.
+
+---
+
+Additional power efficiency items confirmed correct:
+- **WiFi/BT released at boot** — `btStop()` + `esp_bt_mem_release()` called before wave measurement. ✅
+- **Serial logging overhead** — Acceptable; Serial is at 115200 baud, ~10KB/s, logs are <1KB total. ✅
+- **All retry loops bounded** — NTP 60s, GPS 20min max, HTTP 3 retries with 2s backoff, APN 2 candidates. ✅
+- **Modem reuse after GPS** — GPS shares modem; `connectToNetwork(apn, true)` skips pre-cycle when modem is warm. ✅
+- **No duplicate AT commands detected** — each AT command issued once per required operation. ✅
+
+---
+
+## Cat 13 — Deep Sleep Integrity
+
+All items verified correct:
+- **All paths reach deep sleep** — Brownout path, undervoltage path, and normal path all call
+  `esp_deep_sleep_start()`. Loop() ends with sleep unconditionally. ✅
+- **No infinite loops without WDT** — All loops are bounded by timeout or WDT. ✅
+- **WDT 45 min** — `esp_task_wdt_init(2700, true)` in setup(). ✅
+- **RTC config** — `RTC_SLOW_MEM=ON`, `RTC_FAST_MEM=OFF`, `RTC_PERIPH=OFF`, `XTAL=OFF`. ✅
+- **GPIO isolation** — All pins set INPUT before sleep; POWER_3V3_ENABLE held LOW via gpio_hold. ✅
+- **RTC struct size** — Calculated ~1109 bytes (within 8KB limit). ✅
+- **NVS restore before RTC use** — `restoreStateFromNvs()` first call in `rtcStateBegin()`. ✅
+
+---
+
+## Cat 14 — GPS Fix Quality & Timeout
+
+All items verified correct:
+- **HDOP threshold 3.0** with 80% grace logic (accept any fix after 80% of timeout). ✅
+- **GPS timeout < WDT** — Max GPS timeout ~20 min; WDT = 45 min. ✅
+- **XTRA validity 3 days** — `XTRA_STALE_DAYS = 3` matches datasheet. ✅
+- **Hot/warm/cold selection** — Smart start: if XTRA just applied → cold; if XTRA fresh (<72h) → warm; else hot. ✅
+- **Coordinate validation** — `(0,0)` rejected; lat -90 to +90, lon -180 to +180 checked. ✅
+- **TTF accounting** — `ttfSeconds` stored as uint16_t, max GPS timeout 1200s, well within range. ✅
+
+---
+
+## Cat 15 — OTA Safety
+
+All items verified correct:
+- **Battery ≥50% before OTA** — Hard check in `checkForFirmwareUpdate()`, returns false immediately. ✅
+- **SHA-256 verified before `Update.end()`** — `memcmp(computedHash, expectedHash, 32)` before
+  `Update.end(true)`. ✅
+- **5-minute download timeout** — `OTA_DOWNLOAD_TIMEOUT_MS = 5UL * 60UL * 1000UL`. ✅
+- **Rollback flow** — `ESP_OTA_IMG_PENDING_VERIFY` checked at boot; `esp_ota_mark_app_valid_cancel_rollback()`
+  called after first successful `loop()` run. ✅
+- **NVS saved before restart** — `saveStateToNvs()` called before `ESP.restart()`. ✅
+- **OTA works without .sha256** — Graceful degradation (see CAT6-02). ✅
+
+---
+
+## Cat 16 — Data Integrity
+
+All items verified correct:
+- **JSON buffer (2048 bytes)** — Estimated worst-case serialized payload ~900 bytes; fits in
+  `StaticJsonDocument<2048>`. ✅
+- **RTC unsent buffer (1024 bytes)** — Increased from 512 in BUG-04 fix. Sized above worst-case
+  JSON output. Oversized payloads are now dropped rather than truncated (BUG-04 fix). ✅
+- **GPS precision ≥6 decimals** — `lat`/`lon` stored as `float` (7 significant digits). At 59°N,
+  float gives ~1.1m precision, adequate for buoy tracking. ✅
+- **Timestamp validity** — `time(NULL) < 24*3600` treated as invalid; fallback to last GPS time
+  or 0 if unknown. ✅
+- **NaN handling** — `isnan(waterTemp)` checked; `temp_valid` field set accordingly. ✅
+
+---
+
+## Cat 17 — Seasonal & Schedule Logic
+
+All items verified correct:
+- **Correct season transitions at 59°N** — Winter Nov–Mar, Shoulder Apr–May/Sep–Oct, Summer Jun–Aug. ✅
+- **CET/CEST timezone** — `configTzTime("CET-1CEST,M3.5.0,M10.5.0/3", NTP_SERVER)` in `setup()`. ✅
+- **uint16_t overflow fixed** — BUG-01 fix: `lastSleepMinutes` changed to `uint32_t`. ✅
+- **Hysteresis at boundaries** — ±2% SoC offset based on voltage trend prevents oscillation. ✅
+- **Winter hibernate (129,600 min / ~90 days)** — `uint32_t` confirmed large enough (max ~4B). ✅
+
+---
+
+## Cat 18 — Network Resilience
+
+All items verified correct:
+- **APN fallback** — `testMultipleAPNs()` tries `["telenor", "telenor.smart"]` with
+  a hard-coded bounded list (2 APNs). Returns false if neither works. ✅
+- **HTTP retry backoff** — `sendJsonToServer()` retries 3× with 2s delay between attempts. ✅
+- **Re-validation before OTA** — `modem.isGprsConnected()` checked before OTA in `loop()`. ✅
+- **Invalid IP handling** — `modem.localIP()` result stored once then decomposed into String
+  (BUG-06 fix). If IP is 0.0.0.0 the string will be "0.0.0.0" — harmless in the JSON payload. ✅
+
+---
+
+## Cat 19 — Hardware Errata
+
+All items verified correct:
+- **GPIO 4 conflict** — `MODEM_PWRKEY` and `GPS_POWER_PIN` share GPIO 4. Conflict is resolved by
+  removing `GPS_POWER_PIN` (GNSS is internal to SIM7000G and controlled via AT commands, not GPIO).
+  Comment in main.cpp confirms this. ✅
+- **ADC eFuse calibration** — `esp_adc_cal_characterize()` uses `ESP_ADC_CAL_VAL_EFUSE_TP` with
+  fallback to `EFUSE_VREF` then default. Logs which was used. ✅
+- **Voltage divider tolerance** — Calibration step accounts for actual measured Vref; tolerance
+  impact is absorbed into the calibration. ✅
+- **DS18B20 powered via 3V3 rail** — OneWire bus on GPIO 13 is powered via `POWER_3V3_ENABLE`
+  (GPIO 25 rail). Not parasitic mode. ✅
+

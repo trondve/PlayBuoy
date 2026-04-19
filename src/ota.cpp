@@ -1,6 +1,7 @@
 #include "ota.h"
 #include "config.h"
 #include "rtc_state.h"
+#include "battery.h"
 #include <TinyGsmClient.h>
 #include <Update.h>
 #include "mbedtls/sha256.h"
@@ -141,7 +142,8 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
   String line;
   unsigned long t0 = millis();
   // Read status line
-  while (millis() - t0 < 15000) {
+  bool gotStatus = false;
+  while (!gotStatus && millis() - t0 < 15000) {
     while (client.available()) {
       char c = client.read();
       if (c == '\n') {
@@ -151,14 +153,14 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
           if (sp > 0) statusCode = line.substring(sp + 1).toInt();
         }
         line = "";
-        goto read_headers;
+        gotStatus = true;
+        break;
       } else if (c != '\r') {
         line += c;
       }
     }
-    delay(5);
+    if (!gotStatus) delay(5);
   }
-read_headers:;
   // Read headers until blank line
   t0 = millis();
   while (millis() - t0 < 15000) {
@@ -311,8 +313,6 @@ bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expected
 bool checkForFirmwareUpdate(const char* baseUrl) {
   // Battery safety check: OTA flash write draws power and takes time.
   // If battery dies mid-flash on a sealed buoy, the device is permanently bricked.
-  extern float getStableBatteryVoltage();
-  extern int estimateBatteryPercent(float);
   float voltage = getStableBatteryVoltage();
   int pct = estimateBatteryPercent(voltage);
   if (pct < 50) {
