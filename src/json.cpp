@@ -33,28 +33,31 @@ String buildJsonPayload(
 ) {
   StaticJsonDocument<2048> doc;
 
+  // Sanitize float fields: replace NaN/Inf with 0 to prevent invalid JSON
+  auto sanitize = [](float x) -> float { return isfinite(x) ? x : 0.0f; };
+
   doc["nodeId"] = nodeId;
   doc["name"] = name;
   doc["version"] = firmwareVersion;
   // Send timestamp as Unix epoch integer (UTC)
   doc["timestamp"] = timestamp;
-  doc["lat"] = lat;
-  doc["lon"] = lon;
+  doc["lat"] = sanitize(lat);
+  doc["lon"] = sanitize(lon);
 
   JsonObject wave = doc.createNestedObject("wave");
-  wave["height"] = waveHeight;
-  wave["period"] = wavePeriod;
-  wave["direction"] = waveDirection;
-  wave["power"] = wavePower;
+  wave["height"] = sanitize(waveHeight);
+  wave["period"] = sanitize(wavePeriod);
+  wave["direction"] = sanitize(waveDirection);
+  wave["power"] = sanitize(wavePower);
 
   // Buoy diagnostics from IMU
   JsonObject buoy = doc.createNestedObject("buoy");
-  buoy["tilt"] = computeMeanTilt();       // degrees from vertical
-  buoy["accel_rms"] = computeAccelRms();  // m/s², proxy for conditions
+  buoy["tilt"] = sanitize(computeMeanTilt());       // degrees from vertical
+  buoy["accel_rms"] = sanitize(computeAccelRms());  // m/s², proxy for conditions
 
-  doc["temp"] = waterTemp;
-  doc["temp_trend"] = getTemperatureTrend(); // °C change over last 5 readings
-  doc["battery"] = batteryVoltage;
+  doc["temp"] = sanitize(waterTemp);
+  doc["temp_trend"] = sanitize(getTemperatureTrend()); // °C change over last 5 readings
+  doc["battery"] = sanitize(batteryVoltage);
   doc["battery_percent"] = estimateBatteryPercent(batteryVoltage);
 
   doc["temp_valid"] = !isnan(waterTemp);
@@ -70,11 +73,11 @@ String buildJsonPayload(
 
   // RTC snapshot values for visibility (keep waterTemp only)
   JsonObject rtc = doc.createNestedObject("rtc");
-  rtc["waterTemp"] = rtcWaterTemp;
+  rtc["waterTemp"] = sanitize(rtcWaterTemp);
 
   // GPS diagnostics
   JsonObject gps = doc.createNestedObject("gps");
-  gps["hdop"] = rtcState.lastGpsHdop;
+  gps["hdop"] = sanitize(rtcState.lastGpsHdop);
   gps["ttf"] = rtcState.lastGpsTtf;
 
   // Modem/network diagnostics

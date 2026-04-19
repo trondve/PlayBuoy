@@ -31,18 +31,19 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
 };
 
 // Haversine formula to calculate distance in meters between two lat/lon points
+// Uses double-precision internally to avoid precision loss at small angles (<100m)
 static float distanceBetween(float lat1, float lon1, float lat2, float lon2) {
-  const float R = 6371000; // Earth radius in meters
-  float dLat = radians(lat2 - lat1);
-  float dLon = radians(lon2 - lon1);
+  const double R = 6371000.0; // Earth radius in meters
+  double dLat = radians((double)(lat2 - lat1));
+  double dLon = radians((double)(lon2 - lon1));
 
-  float a = sin(dLat / 2) * sin(dLat / 2) +
-            cos(radians(lat1)) * cos(radians(lat2)) *
-            sin(dLon / 2) * sin(dLon / 2);
-  float c = 2 * atan2(sqrt(a), sqrt(1 - a));
-  float distance = R * c;
+  double a = sin(dLat / 2.0) * sin(dLat / 2.0) +
+            cos(radians((double)lat1)) * cos(radians((double)lat2)) *
+            sin(dLon / 2.0) * sin(dLon / 2.0);
+  double c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+  double distance = R * c;
 
-  return distance;
+  return (float)distance;  // Cast back to float for storage
 }
 
 #define ANCHOR_DRIFT_DISTANCE_THRESHOLD 50.0f
@@ -307,6 +308,21 @@ bool restoreStateFromNvs() {
   rtcState.anchorDriftDetected   = prefs.getBool("driftDet", false);
   rtcState.chargingProblemDetected = prefs.getBool("chgProb", false);
   rtcState.firmwareUpdateAttempted = true;  // we know we got here via OTA
+
+  // Validate restored data; treat corrupted NVS as cold-boot fallback
+  bool validRestore = true;
+  if (rtcState.bootCounter > 1e6) validRestore = false;  // Unreasonable boot count
+  if (rtcState.lastWaterTemp < -50.0f || rtcState.lastWaterTemp > 100.0f) validRestore = false;  // Out-of-range temp
+  if (rtcState.lastGpsLat < -90.0f || rtcState.lastGpsLat > 90.0f) validRestore = false;  // Invalid latitude
+  if (rtcState.lastGpsLon < -180.0f || rtcState.lastGpsLon > 180.0f) validRestore = false;  // Invalid longitude
+  if (rtcState.lastGpsFixTime > 0 && rtcState.lastGpsFixTime < 1000000000) validRestore = false;  // Before year 2001
+
+  if (!validRestore) {
+    SerialMon.println("NVS: restored data validation FAILED — treating as cold boot");
+    prefs.putBool("otaPend", false);
+    prefs.end();
+    return false;  // Treat as validation failure; caller will use RTC defaults
+  }
 
   // Clear the pending flag so next deep-sleep wake doesn't re-restore
   prefs.putBool("otaPend", false);

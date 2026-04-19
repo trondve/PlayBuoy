@@ -386,7 +386,15 @@ void setup() {
 
   // Release any deep-sleep holds from previous cycle before driving pins
   gpio_deep_sleep_hold_dis();
-  gpio_hold_dis(GPIO_NUM_25);
+  esp_err_t holdErr = gpio_hold_dis(GPIO_NUM_25);
+  if (holdErr != ESP_OK) {
+    SerialMon.printf("WARNING: GPIO 25 hold release failed (err=%d). Retrying once...\n", holdErr);
+    holdErr = gpio_hold_dis(GPIO_NUM_25);
+    if (holdErr != ESP_OK) {
+      SerialMon.printf("ERROR: GPIO 25 hold release FAILED permanently. Sensors may not power up.\n");
+      // Don't return — try to proceed anyway, but mark that this cycle may be broken
+    }
+  }
 
   // Initialize power management pins
   pinMode(POWER_3V3_ENABLE, OUTPUT);
