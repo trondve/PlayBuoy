@@ -155,14 +155,18 @@ void checkTemperatureAnomalies() {
     SerialMon.println("Temp anomaly check: no valid temperature");
     return;
   }
-  // Check spike: >2°C change from previous reading
+
+  // Reset spike flag at start of each check; only set if detected this cycle
+  rtcState.tempSpikeDetected = false;
+
+  // Check spike: >2°C change from previous reading (single-sample transient)
   if (rtcState.tempHistoryCount >= 2) {
     float prev = rtcState.tempHistory[rtcState.tempHistoryCount - 2];
     if (!isnan(prev)) {
       float delta = fabsf(currentTemp - prev);
-      rtcState.tempSpikeDetected = (delta > 2.0f);
-      if (rtcState.tempSpikeDetected) {
-        SerialMon.printf("TEMP SPIKE: %.1f°C change (%.1f -> %.1f)\n", delta, prev, currentTemp);
+      if (delta > 2.0f) {
+        rtcState.tempSpikeDetected = true;
+        SerialMon.printf("TEMP SPIKE: %.1f°C change this cycle (%.1f -> %.1f)\n", delta, prev, currentTemp);
       }
     }
   }
