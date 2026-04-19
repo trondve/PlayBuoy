@@ -19,6 +19,9 @@ CLAUDE.md files, and the previous 2026-03-08 audit. Only NEW findings are listed
 | INFO-02 | LOW | Wave Analysis | wave.cpp:322 | Noted |
 | INFO-03 | LOW | Battery | battery.cpp:31 | Noted |
 | INFO-04 | LOW | OTA | gps.cpp:23 | Noted |
+| CAT5-01 | LOW | Dead Code | main.cpp:1, modem.cpp:1, ota.cpp:1 | Fixed |
+| CAT5-02 | LOW | Dead Code | config.h.example:38-39 | Fixed |
+| CAT5-03 | LOW | Dead Code | main.cpp:215 | Fixed |
 
 ---
 
@@ -261,6 +264,73 @@ GPS falls back to cold start (20 min acquisition vs. 2–5 min with XTRA). Not a
 degrades wake time budget significantly.
 
 **Recommendation:** Add a secondary fallback URL from Qualcomm's XTRA CDN (publicly hosted).
+
+---
+
+---
+
+## Cat 5 — Dead/Unused Code
+
+### CAT5-01 — LOW: `#define TINY_GSM_MODEM_SIM7000` triple-defined
+
+**Files:** `src/main.cpp:1`, `src/modem.cpp:1`, `src/ota.cpp:1`
+
+**Problem:**
+`TINY_GSM_MODEM_SIM7000` is `#define`d in three translation units. In practice, PlatformIO
+compiles each `.cpp` file independently so there is no ODR violation — the macro is set before
+`TinyGsmClient.h` is pulled in each unit, so each compilation succeeds.  However, redefinition
+of the same macro across TUs with different values *can* cause subtle ODR bugs if `TinyGsmClient`
+is ever compiled with different settings. The canonical fix is to put it — once — in the project's
+`platformio.ini` build flags.
+
+**Risk:** LOW (currently harmless because all three files define the same value).
+
+**Recommended fix:**
+Add to `platformio.ini` under `build_flags`:
+```
+-D TINY_GSM_MODEM_SIM7000
+-D TINY_GSM_RX_BUFFER=1024
+```
+Then remove the two defines from `modem.cpp` and `ota.cpp`, leaving only `main.cpp` as the
+TinyGSM "owner" until the INI approach is adopted. This is a build hygiene issue; addressed by
+removing the duplicates from `modem.cpp:1` and `ota.cpp:1`.
+
+**Fix applied:** Removed duplicate `#define TINY_GSM_MODEM_SIM7000` from `modem.cpp:1` and
+`ota.cpp:1`.
+
+---
+
+### CAT5-02 — LOW: `ENABLE_GENTLE_MODEM_TIMING` defined but never tested in source
+
+**Files:** `src/config.h.example:38-39`
+
+**Problem:**
+`config.h.example` defines `ENABLE_GENTLE_MODEM_TIMING 1` with a comment claiming it enables
+conservative timing. No `#if ENABLE_GENTLE_MODEM_TIMING` guard appears anywhere in the source
+tree. The timing is unconditionally conservative regardless of this flag.
+
+**Risk:** LOW (dead documentation that could confuse a future developer toggling the flag expecting
+a behaviour change).
+
+**Fix applied:** Added clarifying comment to `config.h.example` noting the flag is reserved/
+currently unused.
+
+---
+
+### CAT5-03 — LOW: `ENABLE_CPOWD_SHUTDOWN` block in `powerOffModem()` — confirmed active
+
+**File:** `src/main.cpp:212–248`, `src/config.h.example:41`
+
+**Finding:**
+`ENABLE_CPOWD_SHUTDOWN` IS defined in `config.h.example` (enabled by default). The
+`#if ENABLE_CPOWD_SHUTDOWN` block in `powerOffModem()` is therefore live code. The block
+attempts AT+CPOWD=1 and waits up to 8 s for "NORMAL POWER DOWN". The block also contains a raw
+`extern HardwareSerial Serial1` declaration inside the function body (main.cpp:215) which is
+redundant (Serial1 is already accessible in this TU). No functional bug, but the inline extern
+is an unusual pattern that should be removed.
+
+**Fix applied:** Removed inline `extern HardwareSerial Serial1;` from inside `powerOffModem()` —
+Serial1 is already globally visible via the Arduino framework in main.cpp.
 
 ---
 

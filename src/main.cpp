@@ -211,7 +211,6 @@ void powerOffModem() {
   // Try graceful shutdown first (optional)
 #if ENABLE_CPOWD_SHUTDOWN
   // Send CPOWD via raw AT if available
-  extern HardwareSerial Serial1;
   Serial1.println("AT+CPOWD=1");
   unsigned long t0 = millis();
   bool normalDown = false;

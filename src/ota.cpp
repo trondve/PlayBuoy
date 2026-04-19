@@ -1,4 +1,3 @@
-#define TINY_GSM_MODEM_SIM7000
 #include "ota.h"
 #include "config.h"
 #include "rtc_state.h"

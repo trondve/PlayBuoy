@@ -35,7 +35,7 @@
 #define BATTERY_CRITICAL_VOLTAGE 3.70f       // deep sleep at or below this voltage (V)
 
 // Modem timing and shutdown feature flags
-// ENABLE_GENTLE_MODEM_TIMING: use conservative timing for modem power-on/off sequences
+// ENABLE_GENTLE_MODEM_TIMING: reserved — currently unused in source (timing is always conservative)
 #define ENABLE_GENTLE_MODEM_TIMING 1
 // ENABLE_CPOWD_SHUTDOWN: try AT+CPOWD=1 graceful shutdown before hard power-off
 #define ENABLE_CPOWD_SHUTDOWN 1

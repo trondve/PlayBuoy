@@ -1,5 +1,3 @@
-#define TINY_GSM_MODEM_SIM7000
-
 #include "config.h"
 #include "modem.h"
 #include <TinyGsmClient.h>
