@@ -117,9 +117,16 @@ static ClockInfo parseCCLK(const String& cclk) {
   String times=t.substring(0,tzpos), tzs=t.substring(tzpos);
   int c1=times.indexOf(':'), c2=times.indexOf(':',c1+1); if(c1<0||c2<0) return ci;
   int hh=times.substring(0,c1).toInt(), mm=times.substring(c1+1,c2).toInt(), ss=times.substring(c2+1).toInt();
-  int sign=(tzs[0]=='-')?-1:+1, q=tzs.substring(1).toInt();
-  ci.year=2000+yy; ci.month=MM; ci.day=dd; ci.hour=hh; ci.min=mm; ci.sec=ss; ci.tz_q=sign*q;
-  ci.valid=(ci.year>=2000 && MM>=1 && MM<=12 && dd>=1 && dd<=31);
+
+  // Parse TZ: handle both "+8" and "+08" formats (toInt handles both)
+  int sign=(tzs[0]=='-')?-1:+1, tzVal=tzs.substring(1).toInt();
+  // TZ offset is in 15-minute units (e.g., +8 means UTC+2h = +8*15min). Sanity check range: [-48, +56] (UTC-12h to +14h)
+  if (tzVal<-48 || tzVal>56) return ci;
+
+  ci.year=2000+yy; ci.month=MM; ci.day=dd; ci.hour=hh; ci.min=mm; ci.sec=ss; ci.tz_q=sign*tzVal;
+  // Validate date/time ranges
+  ci.valid=(ci.year>=2000 && ci.year<=2100 && MM>=1 && MM<=12 && dd>=1 && dd<=31 &&
+            hh>=0 && hh<=23 && mm>=0 && mm<=59 && ss>=0 && ss<=59);
   return ci;
 }
 
@@ -149,16 +156,30 @@ static bool doNTPSync(ClockInfo* outCi = nullptr) {
 
   // Wait for +CNTP: unsolicited response (1 = success, others = failure).
   // Timeout raised to 60s: datasheet documents NTP response as 1-60s.
+  // Other URCs like +SAPBR: may interleave; discard non-CNTP lines.
   uint32_t t0 = millis();
   while (!ntpSuccess && millis() - t0 < 60000) {
     while (SerialAT.available()) {
       String line = SerialAT.readStringUntil('\n');
-      if (line.indexOf("+CNTP: 1") >= 0) { ntpSuccess = true; break; }
-      // +CNTP: 61 = network error, +CNTP: 62 = DNS error, +CNTP: 63 = connect error
-      if (line.indexOf("+CNTP:") >= 0 && line.indexOf("+CNTP: 1") < 0) {
-        SerialMon.print("NTP failed: "); SerialMon.println(line);
-        return false;
+      line.trim();
+      // Check for explicit +CNTP: <digit> format
+      if (line.startsWith("+CNTP:")) {
+        int sp = line.indexOf(' ');
+        if (sp > 0) {
+          String codeStr = line.substring(sp + 1);
+          codeStr.trim();
+          int code = codeStr.toInt();
+          if (code == 1) {
+            ntpSuccess = true;
+            break;
+          } else {
+            // Known error codes: 61=network, 62=DNS, 63=connect
+            SerialMon.printf("NTP failed with code %d: %s\n", code, line.c_str());
+            return false;
+          }
+        }
       }
+      // Else: discard other URCs (e.g., +SAPBR:, +PDP, etc.)
     }
     if (ntpSuccess) break;
     delay(500);
@@ -198,6 +219,14 @@ static long daysFromCivil(int y, int m, int d) {
 }
 
 static bool shouldDownloadXTRA(const ClockInfo& nowCi) {
+  // Validate that RTC has been NTP-synced; unsynced RTC defaults to 1970
+  // which would always trigger spurious XTRA downloads.
+  const int MIN_VALID_YEAR = 2020;
+  if (nowCi.year < MIN_VALID_YEAR) {
+    SerialMon.printf("XTRA: RTC appears unsynced (year=%d < %d). Force refresh.\n", nowCi.year, MIN_VALID_YEAR);
+    return true;  // Force download
+  }
+
   s_prefs.begin("xtra", false);
   long lastDay = s_prefs.getLong("last_day", -1);
   long today   = daysFromCivil(nowCi.year, nowCi.month, nowCi.day);
@@ -386,11 +415,12 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
     }
   }
   if (!(run && hasFix)) return false;
-  // Validate coordinates: reject (0,0) which is a common GPS default when no real fix,
-  // and reject anything outside valid geographic range
-  if (lat == 0.0 && lon == 0.0) { SerialMon.println("GPS fix rejected: (0,0) coordinates"); return false; }
+  // Validate coordinates: reject (0,0) which is Null Island (common GPS default on no fix),
+  // and reject anything outside valid geographic range (±90° lat, ±180° lon).
+  // Note: ±180° is valid at antimeridian; ±90° are valid at poles.
+  if (lat == 0.0 && lon == 0.0) { SerialMon.println("GPS fix rejected: (0,0) Null Island"); return false; }
   if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
-    SerialMon.printf("GPS fix rejected: out of range (%.4f, %.4f)\n", lat, lon);
+    SerialMon.printf("GPS fix rejected: out of range (lat=%.4f, lon=%.4f)\n", lat, lon);
     return false;
   }
   if (outLat) *outLat = (float)lat;
