@@ -316,12 +316,17 @@ bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expected
 }
 
 bool checkForFirmwareUpdate(const char* baseUrl) {
-  // Battery safety check: OTA flash write draws power and takes time.
+  // Battery safety check: OTA download and flash write draw significant power (modem TX + flash ops).
   // If battery dies mid-flash on a sealed buoy, the device is permanently bricked.
+  // Low battery sag under TX current can brown out NVS write, corrupting state.
   float voltage = getStableBatteryVoltage();
   int pct = estimateBatteryPercent(voltage);
-  if (pct < 50) {
-    SerialMon.printf("OTA skipped: battery too low (%d%% / %.2fV). Need >=50%% for safe flash.\n", pct, voltage);
+  const float MIN_OTA_VOLTAGE = 3.85f;  // Provides headroom under modem TX current
+  const int MIN_OTA_SOC_PCT = 50;       // Ensures recovery even if battery dips during download
+
+  if (voltage < MIN_OTA_VOLTAGE || pct < MIN_OTA_SOC_PCT) {
+    SerialMon.printf("OTA skipped: insufficient battery (%.2fV / %d%%). Need >=%.2fV AND >=%d%%.\n",
+                     voltage, pct, MIN_OTA_VOLTAGE, MIN_OTA_SOC_PCT);
     return false;
   }
 
