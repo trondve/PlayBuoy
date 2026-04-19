@@ -133,13 +133,24 @@ static bool doNTPSync(ClockInfo* outCi = nullptr) {
   sendAT("AT+CCLK?", &preNtpCclk, 1000);
   ClockInfo preCi = parseCCLK(preNtpCclk);
 
-  // Trigger NTP sync and wait for +CNTP: result
+  // Trigger NTP sync and capture the AT+CNTP command response.
+  // The +CNTP: URC may arrive before or after the "OK" confirmation — both cases
+  // are handled: if sendAT() captures it in rsp we check rsp first; if it arrives
+  // later we read it in the wait loop below.
   String rsp; sendAT("AT+CNTP", &rsp, 8000);
 
-  // Wait for +CNTP: unsolicited response (1 = success, others = failure)
-  bool ntpSuccess = false;
+  // Check if +CNTP: 1 was already captured in the command response buffer.
+  bool ntpSuccess = (rsp.indexOf("+CNTP: 1") >= 0);
+  if (!ntpSuccess && rsp.indexOf("+CNTP:") >= 0) {
+    // An error URC arrived with the OK — fail immediately
+    SerialMon.print("NTP failed (in-band): "); SerialMon.println(rsp);
+    return false;
+  }
+
+  // Wait for +CNTP: unsolicited response (1 = success, others = failure).
+  // Timeout raised to 60s: datasheet documents NTP response as 1-60s.
   uint32_t t0 = millis();
-  while (millis() - t0 < 15000) {
+  while (!ntpSuccess && millis() - t0 < 60000) {
     while (SerialAT.available()) {
       String line = SerialAT.readStringUntil('\n');
       if (line.indexOf("+CNTP: 1") >= 0) { ntpSuccess = true; break; }
