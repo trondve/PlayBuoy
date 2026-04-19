@@ -356,7 +356,7 @@ String getResetReasonString() {
 
 void setup() {
   Serial.begin(115200);
-  delay(3000);
+  delay(500);  // 500ms is sufficient for USB-CDC enumeration; 3000ms wasted ~0.15mAh per boot
 
   // Permanently release Bluetooth radio and memory (~30KB freed, BT never used)
   btStop();
