@@ -9,6 +9,8 @@ void logBatteryStatus();
 void setStableBatteryVoltage(float voltage);  // Set stable battery voltage measured at startup
 float getStableBatteryVoltage();  // Get battery voltage measured at startup
 
-// Power controls provided by the main power module
+// Power controls and sleep helpers provided by the main module (main.cpp)
 void powerOff3V3Rail();
 void powerOffModem();
+uint32_t adjustNextWakeUtcForQuietHours(uint32_t candidateUtc);
+void preparePinsAndSubsystemsForDeepSleep();

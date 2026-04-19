@@ -195,7 +195,14 @@ void clearFirmwareUpdateAttempted() {
 
 void storeUnsentJson(const String& json) {
   size_t len = json.length();
-  if (len >= sizeof(rtcState.lastUnsentJson)) len = sizeof(rtcState.lastUnsentJson) - 1;
+  if (len >= sizeof(rtcState.lastUnsentJson)) {
+    // Payload exceeds buffer — storing a truncated fragment would produce invalid JSON
+    // that the server rejects (HTTP 400), causing an infinite retry loop. Drop it instead.
+    SerialMon.printf("storeUnsentJson: payload %u bytes exceeds buffer %u — dropping to avoid retry loop\n",
+                     (unsigned)len, (unsigned)sizeof(rtcState.lastUnsentJson));
+    rtcState.hasUnsentData = false;
+    return;
+  }
   strncpy(rtcState.lastUnsentJson, json.c_str(), len);
   rtcState.lastUnsentJson[len] = '\0';
   rtcState.hasUnsentData = true;

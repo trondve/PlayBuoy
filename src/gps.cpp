@@ -235,9 +235,18 @@ static bool downloadAndApplyXTRA() {
   }
   if (!(done && ok)) return false;
 
-  SerialMon.println("=== APPLY XTRA (CGNSCPY → CGNSXTRA=1 → CGNSCOLD) ===");
+  SerialMon.println("=== APPLY XTRA (CGNSPWR=1 → CGNSCPY → CGNSXTRA=1 → CGNSCOLD) ===");
+  // CGNSCPY requires the GNSS engine to be powered on (per SIM7000G datasheet).
+  // Power it on cleanly first; if it was already on, CGNSPWR=0 + CGNSPWR=1 restarts it.
+  sendAT("AT+CGNSPWR=0");
+  delay(300);
+  sendAT("AT+CGNSPWR=1");
+  delay(300);
   String cp;
-  if (!sendAT("AT+CGNSCPY", &cp, 7000)) return false;
+  if (!sendAT("AT+CGNSCPY", &cp, 7000)) {
+    sendAT("AT+CGNSPWR=0"); // ensure GNSS is off on failure
+    return false;
+  }
   sendAT("AT+CGNSXTRA=1");
   // Configure GNSS mode and NMEA *before* CGNSCOLD starts the engine,
   // so the cold start runs with correct settings from the beginning.

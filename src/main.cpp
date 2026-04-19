@@ -125,6 +125,7 @@ uint32_t adjustNextWakeUtcForQuietHours(uint32_t candidateUtc) {
     lt.tm_min = 0;
     lt.tm_sec = 0;
     time_t adj = mktime(&lt); // mktime interprets struct tm as local time, returns UTC epoch
+    if (adj == (time_t)-1) return candidateUtc; // mktime failed (invalid tm), keep original
     return (uint32_t)adj;
   }
   return candidateUtc;
@@ -318,7 +319,7 @@ String getResetReasonString() {
     switch (wc) {
       case ESP_SLEEP_WAKEUP_TIMER: {
         if (rtcState.lastSleepMinutes > 0) {
-          int m = (int)rtcState.lastSleepMinutes;
+          uint32_t m = rtcState.lastSleepMinutes;
           if (m >= 60)
             return String("WokeUpFromTimerSleep(") + String(m / 60) + "h" + String(m % 60) + "m)";
           else
@@ -430,7 +431,7 @@ void setup() {
       // fastPath=true: skip 10s RTC retry loop (NTP hasn't run yet)
       int sleepMinutes = determineSleepDuration(pct, true);
       rtcState.lastBatteryVoltage = stableBatteryVoltage; // persist for next boot's hysteresis
-      rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+      rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
       // Apply quiet hours adjustment (same as normal path)
       uint32_t now = (uint32_t)time(NULL);
       uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
@@ -702,7 +703,7 @@ void loop() {
         currentTimestamp = ts;
       }
       op = modem.getOperator();
-      ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
+      { IPAddress lip = modem.localIP(); ipStr = String((int)lip[0]) + "." + String((int)lip[1]) + "." + String((int)lip[2]) + "." + String((int)lip[3]); }
       rssi = modem.getSignalQuality();
     }
     // Refresh next wake after potential time update and apply quiet-hours adjustment
@@ -762,7 +763,7 @@ void loop() {
     }
   }
   // Store planned sleep/wake info in RTC for next boot's wake reason context
-  rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+  rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
   rtcState.lastNextWakeUtc = nextWakeUtc;
 
   if (sleepMinutes >= 60)
