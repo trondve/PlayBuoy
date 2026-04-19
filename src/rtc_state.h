@@ -93,4 +93,4 @@ String getUnsentJson();
 // RTC memory is the primary store; NVS is only a safety net for rare events.
 //
 void saveStateToNvs();               // Snapshot critical RTC state to flash
-void restoreStateFromNvs();          // Restore from NVS if pending, then clear
+bool restoreStateFromNvs();           // Restore from NVS if pending, then clear; returns true if restored

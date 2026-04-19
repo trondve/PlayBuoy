@@ -50,9 +50,18 @@ static float distanceBetween(float lat1, float lon1, float lat2, float lon2) {
 void rtcStateBegin() {
   // Restore state from NVS if this boot follows a hard reset (OTA, brownout).
   // Must happen before incrementing bootCounter so the saved count is correct.
-  restoreStateFromNvs();
+  bool wasHardReset = restoreStateFromNvs();
 
+  // Save bootCounter before increment to detect first boot
+  uint32_t bootCounterBefore = rtcState.bootCounter;
   rtcState.bootCounter++;
+
+  // On first boot (power-on reset) or hard reset, zero the unsent JSON buffer.
+  // RTC memory may not be cleared on every boot path, leaving stale data.
+  if (bootCounterBefore == 0 || wasHardReset) {
+    rtcState.lastUnsentJson[0] = '\0';
+    rtcState.hasUnsentData = false;
+  }
 
   // Initialize counters on first boot
   if (rtcState.bootCounter == 1) {
@@ -259,23 +268,23 @@ void saveStateToNvs() {
   SerialMon.println("NVS: state saved before hard reset");
 }
 
-void restoreStateFromNvs() {
+bool restoreStateFromNvs() {
   Preferences prefs;
   if (!prefs.begin(NVS_NAMESPACE, true)) {
-    return;  // no NVS namespace yet — first boot ever, nothing to restore
+    return false;  // no NVS namespace yet — first boot ever, nothing to restore
   }
 
   bool pending = prefs.getBool("otaPend", false);
   prefs.end();
 
   if (!pending) {
-    return;  // normal deep-sleep wake, RTC memory is fine
+    return false;  // normal deep-sleep wake, RTC memory is fine
   }
 
   // Re-open read-write to restore and clear
   if (!prefs.begin(NVS_NAMESPACE, false)) {
     SerialMon.println("NVS: failed to reopen for restore");
-    return;
+    return false;
   }
 
   SerialMon.println("NVS: restoring state after hard reset");
@@ -301,4 +310,5 @@ void restoreStateFromNvs() {
 
   SerialMon.printf("NVS: restored bootCounter=%lu, waterTemp=%.1f, gpsLat=%.4f\n",
                    rtcState.bootCounter, rtcState.lastWaterTemp, rtcState.lastGpsLat);
+  return true;
 }
