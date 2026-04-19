@@ -134,6 +134,12 @@ static String httpGetTinyGsm(const char* url) {
   return body;
 }
 
+//
+// PUBLIC FUNCTION: getServerFirmwareVersion
+// Downloads and extracts version string from remote server.
+// Endpoint must return plain text MAJOR.MINOR.PATCH on first line.
+// Returns empty string on HTTP failure or parse error.
+//
 String getServerFirmwareVersion(const char* versionUrl) {
   SerialMon.println("CHECKING FOR FIRMWARE UPDATES");
   SerialMon.printf("Version URL: %s\n", versionUrl);
@@ -144,6 +150,12 @@ String getServerFirmwareVersion(const char* versionUrl) {
   return extractVersionFromBody(body);
 }
 
+//
+// PUBLIC FUNCTION: downloadAndCheckVersion
+// Queries remote version, compares against current firmware, downloads if newer.
+// Internal helper for checkForFirmwareUpdate().
+// Returns true if download completed and device will restart, false if no update or error.
+//
 bool downloadAndCheckVersion(const char* versionUrl) {
   String serverVersion = getServerFirmwareVersion(versionUrl);
   if (serverVersion.length() == 0) { SerialMon.println("Could not retrieve server version"); return false; }
@@ -214,6 +226,15 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
   return (statusCode > 0 && sawHeaderEnd);
 }
 
+//
+// PUBLIC FUNCTION: downloadAndInstallFirmware
+// Downloads and installs firmware image from URL via HTTP.
+// Validates battery (H-04: minimum 3.85V + 50% SoC), handles 3xx redirects (H-07).
+// Verifies SHA-256 hash if provided (graceful degradation if not).
+// Writes image to flash partition, initiates reboot on success.
+// CRITICAL: Device will NOT return on success (esp_restart() called internally).
+// Returns: true if install initiated and restart triggered, false on any error.
+//
 bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expectedSha256) {
   SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
   if (!ensurePdpForHttp()) {
@@ -366,6 +387,13 @@ bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expected
   return false;
 }
 
+//
+// PUBLIC FUNCTION: checkForFirmwareUpdate
+// Main OTA entry point — checks remote for new firmware, downloads and installs if available.
+// Enforces pre-flight battery gate (H-04): 3.85V minimum + 50% SoC (prevents bricking).
+// Calls downloadAndCheckVersion(versionUrl) to query and compare versions.
+// Returns: true if update initiated and device will restart, false if no update or error.
+//
 bool checkForFirmwareUpdate(const char* baseUrl) {
   // Battery safety check: OTA download and flash write draw significant power (modem TX + flash ops).
   // If battery dies mid-flash on a sealed buoy, the device is permanently bricked.

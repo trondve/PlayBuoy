@@ -478,6 +478,11 @@ static bool gnssWarmup60s(GpsFixResult* outResult, uint32_t gnssStartTime) {
 // ---------- Public API ----------
 // (gpsBegin removed; not needed)
 
+//
+// PUBLIC FUNCTION: gpsEnd
+// Shuts down GNSS engine (AT+CGNSPWR=0).
+// Must be called before PDP teardown to allow SIM7000G to release radio for cellular.
+//
 void gpsEnd() { gnssStop(); }
 
 static void syncTimeAndMaybeApplyXTRA() {
@@ -512,11 +517,17 @@ static void syncTimeAndMaybeApplyXTRA() {
   tearDownPDP();
 }
 
+//
+// PUBLIC FUNCTION: getGpsFix
+// Acquires GPS/GNSS position with full pipeline: NTP → XTRA → warmup → polling.
+// Returns lat/lon if successful within timeout, otherwise returns zeros with success=false.
+// GNSS engine is shut down before returning.
+//
 GpsFixResult getGpsFix(uint16_t timeoutSec) {
   GpsFixResult result{}; result.success = false; result.accuracy = 0; result.hdop = 99.0f; result.fixTimeEpoch = 0; result.latitude = result.longitude = 0; result.ttfSeconds = 0;
   uint32_t gnssStartTime = millis(); // Track time-to-fix
 
-  // Ensure time and XTRA freshness before GNSS
+  // PIPELINE STEP 1: NTP time sync + XTRA ephemeris (H-05 fix: URC parsing race fixed)
   syncTimeAndMaybeApplyXTRA();
 
   // GNSS on
@@ -598,6 +609,14 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
   return result;
 }
 
+//
+// PUBLIC FUNCTION: getGpsFixTimeout
+// Returns appropriate timeout (seconds) based on battery level and fix type.
+// Cold-start (isFirstFix=true): longer timeouts (up to 30 min at full charge)
+// Warm fix (isFirstFix=false): shorter timeouts (5-10 min, XTRA already cached)
+// Low battery (<30%): very short timeout (2 min, skip GPS to preserve power)
+// Used by getGpsFixDynamic() to adapt GPS acquisition time to power budget.
+//
 uint16_t getGpsFixTimeout(bool isFirstFix) {
   extern float getStableBatteryVoltage();
   extern int estimateBatteryPercent(float);
@@ -614,6 +633,12 @@ uint16_t getGpsFixTimeout(bool isFirstFix) {
   }
 }
 
+//
+// PUBLIC FUNCTION: getGpsFixDynamic
+// Wrapper around getGpsFix() with auto-computed timeout based on battery and fix history.
+// Encapsulates getGpsFixTimeout() logic for cleaner call site (one function instead of two).
+// Calls getGpsFix(timeout) with timeout from getGpsFixTimeout(isFirstFix).
+//
 GpsFixResult getGpsFixDynamic(bool isFirstFix) {
   return getGpsFix(getGpsFixTimeout(isFirstFix));
 }
