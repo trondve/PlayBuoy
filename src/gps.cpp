@@ -132,6 +132,8 @@ static ClockInfo parseCCLK(const String& cclk) {
 
 static bool doNTPSync(ClockInfo* outCi = nullptr) {
   SerialMon.println("=== NTP SYNC (no.pool.ntp.org) ===");
+  // Explicitly disable echo to avoid parsing issues
+  sendAT("ATE0");
   sendAT("AT+CNTPCID=1");
   sendAT(String("AT+CNTP=\"") + NTP_HOST + "\",0");
 
@@ -322,7 +324,7 @@ static const char* gnssStartCommand() {
   if (ageSec < 4 * 3600) {
     SerialMon.printf("Last fix %lu sec ago — hot start\n", ageSec);
     return "AT+CGNSHOT";    // Ephemeris still valid (<4h)
-  } else if (ageSec < 24 * 3600) {
+  } else if (ageSec < SECONDS_PER_DAY) {
     SerialMon.printf("Last fix %lu sec ago — warm start\n", ageSec);
     return "AT+CGNSWARM";   // Almanac valid, ephemeris stale
   }
@@ -394,7 +396,7 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
   int p = inf.indexOf("+CGNSINF:"); if (p < 0) return false;
   int start = inf.indexOf(':', p); if (start < 0) return false; start++;
   // CGNSINF fields: 0=run, 1=fix, 2=utc, 3=lat, 4=lon, 5=alt, 6=speed, 7=course, 8=fixmode, 9=reserved, 10=HDOP
-  int field = 0; bool run=false, hasFix=false; double lat=0, lon=0; float hdop=99.0f; String ts;
+  int field = 0; bool run=false, hasFix=false; double lat=0, lon=0; float hdop=99.0f, alt=0.0f; String ts;
   String token; token.reserve(32);
   for (int i = start; i <= (int)inf.length(); ++i) {
     char c = (i == (int)inf.length()) ? ',' : inf[i];
@@ -405,6 +407,7 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
         case 2: ts = token; break; // YYYYMMDDhhmmss.sss
         case 3: lat = token.toDouble(); break;
         case 4: lon = token.toDouble(); break;
+        case 5: alt = token.toFloat(); break;
         case 10: { token.trim(); if (token.length() > 0) hdop = token.toFloat(); } break;
         default: break;
       }
@@ -421,6 +424,11 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
   if (lat == 0.0 && lon == 0.0) { SerialMon.println("GPS fix rejected: (0,0) Null Island"); return false; }
   if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
     SerialMon.printf("GPS fix rejected: out of range (lat=%.4f, lon=%.4f)\n", lat, lon);
+    return false;
+  }
+  // Validate altitude: Norwegian lakes are ~0–600 m above sea level; altitude >5km indicates garbage fix
+  if (alt < -100.0f || alt > 5000.0f) {
+    SerialMon.printf("GPS fix rejected: altitude out of range (%.1f m)\n", alt);
     return false;
   }
   if (outLat) *outLat = (float)lat;
