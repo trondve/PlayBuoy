@@ -1,12 +1,20 @@
 #define TINY_GSM_MODEM_SIM7000
 #include "ota.h"
 #include "config.h"
+#include "rtc_state.h"
 #include <TinyGsmClient.h>
 #include <Update.h>
+#include "mbedtls/sha256.h"
 
 #define SerialMon Serial
 
+// Maximum time for firmware binary download (5 minutes).
+// A 300KB binary over LTE-M at ~10KB/s should take ~30s.
+// 5 minutes gives generous margin for slow links without draining the battery.
+static const unsigned long OTA_DOWNLOAD_TIMEOUT_MS = 5UL * 60UL * 1000UL;
+
 extern TinyGsm modem;
+extern void powerOffModem();
 
 static bool ensurePdpForHttp() {
   if (modem.isGprsConnected()) return true;
@@ -26,6 +34,26 @@ static String extractVersionFromBody(const String& body) {
   int b = candidate.lastIndexOf('.');
   if (a > 0 && b > a) return candidate;
   return "";
+}
+
+// Parse a hex SHA-256 string (64 chars) into 32 bytes. Returns true on success.
+static bool parseHexSha256(const String& hex, uint8_t out[32]) {
+  String h = hex; h.trim();
+  if (h.length() < 64) return false;
+  // Take only the first 64 hex chars (sha256sum output may have filename after)
+  for (int i = 0; i < 32; ++i) {
+    char hi = h[i * 2], lo = h[i * 2 + 1];
+    auto nibble = [](char c) -> int {
+      if (c >= '0' && c <= '9') return c - '0';
+      if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+      if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+      return -1;
+    };
+    int hn = nibble(hi), ln = nibble(lo);
+    if (hn < 0 || ln < 0) return false;
+    out[i] = (uint8_t)((hn << 4) | ln);
+  }
+  return true;
 }
 
 static int compareVersions(const String& a, const String& b) {
@@ -69,23 +97,19 @@ static String httpGetTinyGsm(const char* url) {
   req += "Connection: close\r\n\r\n";
   client.print(req);
 
-  unsigned long t0 = millis(); String headers;
-  while (millis() - t0 < 15000 && client.connected()) {
-    while (client.available()) {
-      char c = client.read();
-      headers += c;
-      if (headers.endsWith("\r\n\r\n")) goto headers_done;
-    }
+  // Read entire response (headers + body) into one buffer, then split once
+  String raw; unsigned long t0 = millis();
+  while (millis() - t0 < 20000) {
+    while (client.available()) raw += (char)client.read();
+    if (!client.connected()) break;
     delay(5);
   }
-headers_done:
-  String body; unsigned long t1 = millis();
-  while (millis() - t1 < 20000) {
-    while (client.available()) body += (char)client.read();
-    if (!client.connected()) break; delay(5);
-  }
   client.stop();
-  int p = body.indexOf("\r\n\r\n"); if (p >= 0) body = body.substring(p + 4);
+  // Split at first \r\n\r\n to separate headers from body
+  String body;
+  int p = raw.indexOf("\r\n\r\n");
+  if (p >= 0) body = raw.substring(p + 4);
+  else body = raw; // no header terminator found, use entire response
   body.trim();
   SerialMon.printf("HTTP body: '%s'\n", body.c_str());
   return body;
@@ -158,7 +182,7 @@ read_headers:;
   return (statusCode > 0);
 }
 
-bool downloadAndInstallFirmware(const char* firmwareUrl) {
+bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expectedSha256) {
   SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
   if (!ensurePdpForHttp()) {
     SerialMon.println("No PDP for firmware download");
@@ -198,15 +222,43 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
     return false;
   }
 
-  size_t written = 0; uint8_t buf[1024]; unsigned long lastLog = millis();
+  // Initialize SHA-256 context for integrity verification
+  mbedtls_sha256_context sha256ctx;
+  bool verifySha = (expectedSha256 != nullptr);
+  if (verifySha) {
+    mbedtls_sha256_init(&sha256ctx);
+    mbedtls_sha256_starts(&sha256ctx, 0);  // 0 = SHA-256 (not SHA-224)
+  }
+
+  size_t written = 0; uint8_t buf[1024];
+  unsigned long lastLog = millis();
+  unsigned long downloadStart = millis();
+  bool timedOut = false;
+
   while (client.connected()) {
+    // Wall-clock timeout: abort if download takes too long (prevents stalled TCP
+    // from draining battery — the 45-min WDT is too late for OTA safety)
+    if (millis() - downloadStart > OTA_DOWNLOAD_TIMEOUT_MS) {
+      SerialMon.printf("OTA download timeout after %lu ms (%u bytes received)\n",
+                       millis() - downloadStart, (unsigned)written);
+      timedOut = true;
+      break;
+    }
+
     int n = client.readBytes(buf, sizeof(buf));
     if (n < 0) break;
     if (n == 0) { delay(5); continue; }
+
+    // Hash the raw bytes before writing to flash
+    if (verifySha) {
+      mbedtls_sha256_update(&sha256ctx, buf, (size_t)n);
+    }
+
     size_t w = Update.write(buf, (size_t)n);
     if (w != (size_t)n) {
       SerialMon.printf("Update.write mismatch (w=%u n=%d) err=%s\n", (unsigned)w, n, Update.errorString());
       client.stop();
+      if (verifySha) mbedtls_sha256_free(&sha256ctx);
       Update.abort();
       return false;
     }
@@ -216,21 +268,59 @@ bool downloadAndInstallFirmware(const char* firmwareUrl) {
   }
   client.stop();
 
-  if (contentLength > 0 && written != contentLength) {
-    SerialMon.printf("Short read: expected %u, got %u\n", (unsigned)contentLength, (unsigned)written);
+  if (timedOut) {
+    if (verifySha) mbedtls_sha256_free(&sha256ctx);
     Update.abort();
     return false;
+  }
+
+  if (contentLength > 0 && written != contentLength) {
+    SerialMon.printf("Short read: expected %u, got %u\n", (unsigned)contentLength, (unsigned)written);
+    if (verifySha) mbedtls_sha256_free(&sha256ctx);
+    Update.abort();
+    return false;
+  }
+
+  // Verify SHA-256 before committing the update
+  if (verifySha) {
+    uint8_t computedHash[32];
+    mbedtls_sha256_finish(&sha256ctx, computedHash);
+    mbedtls_sha256_free(&sha256ctx);
+
+    if (memcmp(computedHash, expectedSha256, 32) != 0) {
+      SerialMon.println("SHA-256 MISMATCH — firmware corrupted, aborting OTA!");
+      SerialMon.print("  Expected: ");
+      for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", expectedSha256[i]);
+      SerialMon.println();
+      SerialMon.print("  Computed: ");
+      for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", computedHash[i]);
+      SerialMon.println();
+      Update.abort();
+      return false;
+    }
+    SerialMon.println("SHA-256 verified OK");
   }
 
   if (!Update.end(true)) { // true => set boot partition, image pending verify
     SerialMon.printf("Update.end failed: %s\n", Update.errorString());
     return false;
   }
-  SerialMon.println("OTA image written; rebooting into pending verify");
+  SerialMon.printf("OTA image written (%u bytes); rebooting into pending verify\n", (unsigned)written);
   return true;
 }
 
 bool checkForFirmwareUpdate(const char* baseUrl) {
+  // Battery safety check: OTA flash write draws power and takes time.
+  // If battery dies mid-flash on a sealed buoy, the device is permanently bricked.
+  extern float getStableBatteryVoltage();
+  extern int estimateBatteryPercent(float);
+  float voltage = getStableBatteryVoltage();
+  int pct = estimateBatteryPercent(voltage);
+  if (pct < 50) {
+    SerialMon.printf("OTA skipped: battery too low (%d%% / %.2fV). Need >=50%% for safe flash.\n", pct, voltage);
+    return false;
+  }
+
   String versionUrl = String(baseUrl);
   if (versionUrl.endsWith(".bin")) versionUrl = versionUrl.substring(0, versionUrl.length() - 4) + ".version";
   else versionUrl += ".version";
@@ -239,8 +329,27 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
 
   String firmwareUrl = String(baseUrl);
   if (!firmwareUrl.endsWith(".bin")) firmwareUrl += ".bin";
-  if (downloadAndInstallFirmware(firmwareUrl.c_str())) {
-    SerialMon.println("OTA update successful. Rebooting...");
+
+  // Download SHA-256 hash for integrity verification.
+  // File format: 64 hex chars (optionally followed by filename, like sha256sum output).
+  // If .sha256 file is unavailable, proceed without verification (graceful degradation).
+  String sha256Url = firmwareUrl.substring(0, firmwareUrl.length() - 4) + ".sha256";
+  String sha256Body = httpGetTinyGsm(sha256Url.c_str());
+  uint8_t expectedHash[32];
+  bool haveSha = parseHexSha256(sha256Body, expectedHash);
+  if (haveSha) {
+    SerialMon.print("SHA-256 from server: ");
+    for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", expectedHash[i]);
+    SerialMon.println();
+  } else {
+    SerialMon.println("No .sha256 file available — proceeding without integrity check");
+  }
+
+  if (downloadAndInstallFirmware(firmwareUrl.c_str(), haveSha ? expectedHash : nullptr)) {
+    SerialMon.println("OTA update successful. Saving state and rebooting...");
+    markFirmwareUpdateAttempted();
+    saveStateToNvs();
+    powerOffModem();
     delay(500);
     ESP.restart();
     return true;

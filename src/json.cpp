@@ -2,8 +2,9 @@
 #include <ArduinoJson.h>
 #include "rtc_state.h"
 #include "config.h"
-#include "sensors.h"
 #include "power.h"
+#include "battery.h"
+#include "wave.h"
 #include <time.h>
 
 String buildJsonPayload(
@@ -26,11 +27,11 @@ String buildJsonPayload(
   String ip,
   int signalQuality,
   float rtcWaterTemp,
-  int hoursToSleep,
+  int minutesToSleep,
   uint32_t nextWakeUtc,
   float batteryChangeSinceLast
 ) {
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<2048> doc;
 
   doc["nodeId"] = nodeId;
   doc["name"] = name;
@@ -46,36 +47,35 @@ String buildJsonPayload(
   wave["direction"] = waveDirection;
   wave["power"] = wavePower;
 
+  // Buoy diagnostics from IMU
+  JsonObject buoy = doc.createNestedObject("buoy");
+  buoy["tilt"] = computeMeanTilt();       // degrees from vertical
+  buoy["accel_rms"] = computeAccelRms();  // m/s², proxy for conditions
+
   doc["temp"] = waterTemp;
+  doc["temp_trend"] = getTemperatureTrend(); // °C change over last 5 readings
   doc["battery"] = batteryVoltage;
-  // Calibration factor removed; using direct measured value
+  doc["battery_percent"] = estimateBatteryPercent(batteryVoltage);
 
-  // Flag invalid temperature
-  if (isnan(waterTemp)) {
-    doc["temp_valid"] = false;
-  } else {
-    doc["temp_valid"] = true;
-  }
-
-  float tideHeight = readTideHeight();
-  if (!isnan(tideHeight)) {
-    JsonObject tide = doc.createNestedObject("tide");
-    tide["current_height"] = tideHeight;
-  }
-
-  // Removed heading fields
+  doc["temp_valid"] = !isnan(waterTemp);
 
   doc["uptime"] = uptime;
+  doc["boot_count"] = rtcState.bootCounter;
   doc["reset_reason"] = resetReason;
 
   // New fields
-  doc["hours_to_sleep"] = hoursToSleep;
+  doc["minutes_to_sleep"] = minutesToSleep;
   doc["next_wake_utc"] = nextWakeUtc;
   doc["battery_change_since_last"] = batteryChangeSinceLast;
 
   // RTC snapshot values for visibility (keep waterTemp only)
   JsonObject rtc = doc.createNestedObject("rtc");
   rtc["waterTemp"] = rtcWaterTemp;
+
+  // GPS diagnostics
+  JsonObject gps = doc.createNestedObject("gps");
+  gps["hdop"] = rtcState.lastGpsHdop;
+  gps["ttf"] = rtcState.lastGpsTtf;
 
   // Modem/network diagnostics
   JsonObject net = doc.createNestedObject("net");

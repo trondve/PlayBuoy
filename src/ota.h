@@ -7,6 +7,6 @@
 bool checkForFirmwareUpdate(const char* baseUrl);
 bool downloadAndCheckVersion(const char* versionUrl);
 String getServerFirmwareVersion(const char* versionUrl);
-bool downloadAndInstallFirmware(const char* firmwareUrl);
+bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expectedSha256 = nullptr);
 
 #endif // OTA_H

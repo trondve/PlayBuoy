@@ -25,27 +25,38 @@ static const unsigned long NETWORK_TIMEOUT_MS = 60000;
 //
 // Connect to NB-IoT or LTE-M network using given APN
 //
-bool connectToNetwork(const char* apn) {
+bool connectToNetwork(const char* apn, bool skipPreCycle) {
   const int maxRetries = 3;
-  // Pre-cycle the modem once at entry to mirror the known-good path of attempt 2
-  SerialMon.println("Pre-cycling modem before first registration attempt...");
-  powerOffModem();
-  delay(2000);
-  powerOnModem();
-  delay(3000);
+  if (!skipPreCycle) {
+    // Pre-cycle the modem once at entry to mirror the known-good path of attempt 2
+    // Skipped when modem is already warm (e.g. after GPS phase) to save ~14s
+    SerialMon.println("Pre-cycling modem before first registration attempt...");
+    powerOffModem();
+    delay(2000);
+    powerOnModem();
+    delay(3000);
+  } else {
+    SerialMon.println("Modem already warm, skipping pre-cycle.");
+  }
+  bool triedNBIoT = false;
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     SerialMon.printf("Connecting to cellular network (attempt %d/%d)...\n", attempt + 1, maxRetries);
 
-    // Initialize modem
-    SerialMon.println("Initializing modem...");
-    modem.init();
-    // Guard: give UART/modem a moment before first AT test (conservative)
-    delay(5000);
+    // Initialize modem (skip when warm from GPS — init sends ATZ which resets
+    // all AT parameters including RAT preference, wasting time and causing re-registration)
+    if (!skipPreCycle) {
+      SerialMon.println("Initializing modem...");
+      modem.init();
+      // Brief settle after init before AT commands
+      delay(2000);
+    } else {
+      SerialMon.println("Modem warm, skipping init (ATZ).");
+    }
 
     // Prefer LTE-M (CAT-M1) as primary RAT (no band/operator locks)
     modem.sendAT("+CNMP=38"); // LTE-M
     modem.waitResponse(1000);
-    
+
     // Test basic communication first (conservative pacing)
     SerialMon.println("Testing AT communication...");
     if (!modem.testAT()) {
@@ -69,8 +80,8 @@ bool connectToNetwork(const char* apn) {
 
     // Use modem defaults (matches previously working configuration)
 
-    // Brief settle after GNSS teardown and RAT setup before network registration (conservative)
-    delay(3000);
+    // Brief settle after RAT setup before network registration
+    delay(1000);
     // Wake modem for network operations (drop DTR)
     extern void wakeModemForNetwork();
     wakeModemForNetwork();
@@ -88,7 +99,8 @@ bool connectToNetwork(const char* apn) {
       SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
       SerialMon.println("Operator: " + modem.getOperator());
       // Fallback: try NB-IoT once if LTE-M fails first (no band/operator locks)
-      static bool triedNBIoT = false;
+      // NOTE: NB-IoT is not used in our deployment. If it registers, the code
+      // falls through to continue (never reaches gprsConnect). Left as-is intentionally.
       if (!triedNBIoT) {
         triedNBIoT = true;
         SerialMon.println("Trying NB-IoT fallback (AT+CNMP=51)...");
@@ -100,13 +112,14 @@ bool connectToNetwork(const char* apn) {
           SerialMon.println(" NB-IoT fallback failed.");
         }
       }
-      
+
       if (attempt < maxRetries - 1) {
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
         delay(2000);
         powerOnModem();
         delay(3000);
+        triedNBIoT = false; // Reset NB-IoT fallback after power-cycle
       }
       continue;
     }
@@ -123,7 +136,7 @@ bool connectToNetwork(const char* apn) {
     {
       unsigned long t0 = millis();
       String line;
-      while (millis() - t0 < 2000) {
+      while (millis() - t0 < 500) {
         while (Serial1.available()) {
           char c = (char)Serial1.read();
           if (c == '\n') {
@@ -252,20 +265,38 @@ bool sendJsonToServer(const char* server, uint16_t port, const char* endpoint, c
 
     client.print(request);
 
+    // Read response and parse HTTP status code
     unsigned long timeout = millis();
     bool gotResponse = false;
+    int httpStatus = 0;
+    bool statusParsed = false;
     while (client.connected() && millis() - timeout < 10000) {
       if (client.available()) {
         String line = client.readStringUntil('\n');
         SerialMon.println(line);
         gotResponse = true;
+        // Parse status code from first HTTP response line (e.g. "HTTP/1.1 200 OK")
+        if (!statusParsed) {
+          line.trim();
+          if (line.startsWith("HTTP/1.")) {
+            int sp = line.indexOf(' ');
+            if (sp > 0) {
+              httpStatus = line.substring(sp + 1).toInt();
+              statusParsed = true;
+              SerialMon.printf("HTTP status code: %d\n", httpStatus);
+            }
+          }
+        }
       }
     }
 
     client.stop();
 
-    if (gotResponse) {
+    if (gotResponse && httpStatus >= 200 && httpStatus < 300) {
       return true;
+    } else if (gotResponse) {
+      SerialMon.printf("Server returned HTTP %d (attempt %d/%d).\n", httpStatus, attempt + 1, maxRetries);
+      delay(2000);
     } else {
       SerialMon.printf("No response from server (attempt %d/%d).\n", attempt + 1, maxRetries);
       delay(2000);

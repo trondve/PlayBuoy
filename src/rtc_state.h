@@ -12,20 +12,22 @@ typedef struct {
 
   // Battery and power monitoring
   float lastBatteryVoltage;          // Last measured battery voltage
-  uint32_t lastSolarChargeTime;      // millis() timestamp when solar charge was last detected
 
   // GPS state for anchor drift detection
   float lastGpsLat;                  // Last known GPS latitude
   float lastGpsLon;                  // Last known GPS longitude
   uint32_t lastGpsFixTime;           // Unix epoch timestamp of last GPS fix
+  float lastGpsHdop;                 // HDOP from last fix (lower = better)
+  uint16_t lastGpsTtf;              // Time-to-fix in seconds
 
   // Water temperature monitoring
   float lastWaterTemp;               // Last recorded water temperature
-  bool tempSpikeDetected;            // Flag for sudden temperature spike
+  float tempHistory[5];              // Last 5 temperature readings for trend analysis
+  uint8_t tempHistoryCount;          // Number of valid entries in tempHistory (0-5)
+  bool tempSpikeDetected;            // Flag for sudden temperature spike (>2°C change)
   bool overTempDetected;             // Flag for temperature exceeding threshold
 
-  // Firmware update and upload status
-  bool firmwareUpdateAttempted;      // Flag indicating OTA update was attempted
+  // Upload status
   bool lastUploadFailed;             // Flag indicating last upload failure
 
   // Anchor drift alert and counter
@@ -35,12 +37,15 @@ typedef struct {
   // Battery charging alert
   bool chargingProblemDetected;      // Flag if no charge detected over 24 hours
 
+  // OTA firmware update tracking
+  bool firmwareUpdateAttempted;      // Set before OTA restart, cleared on successful boot
+
   // Data buffering for failed uploads
   char lastUnsentJson[512];         // Buffer for last unsent JSON payload
   bool hasUnsentData;               // Flag if there is unsent data
 
   // Sleep planning snapshot (for wake reason context)
-  uint16_t lastSleepHours;          // Planned sleep hours before last deep sleep
+  uint16_t lastSleepMinutes;        // Planned sleep minutes before last deep sleep
   uint32_t lastNextWakeUtc;         // Planned next wake epoch
 
 } rtc_state_t;
@@ -63,10 +68,11 @@ void updateLastGpsFix(float lat, float lon, uint32_t epochSec);
 void checkAnchorDrift(float currentLat, float currentLon);
 
 //
-// Power and temperature monitoring
+// Temperature monitoring
 //
-void checkBatteryChargeState();
 void checkTemperatureAnomalies();
+void pushTemperatureHistory(float temp);  // Add reading to history ring
+float getTemperatureTrend();              // Returns °C/hour rate of change (+ = warming)
 
 //
 // Upload status and firmware update flags
@@ -81,3 +87,10 @@ void storeUnsentJson(const String& json);
 void clearUnsentJson();
 bool hasUnsentJson();
 String getUnsentJson();
+
+//
+// NVS persistence — survives hard resets (OTA, brownout, watchdog).
+// RTC memory is the primary store; NVS is only a safety net for rare events.
+//
+void saveStateToNvs();               // Snapshot critical RTC state to flash
+void restoreStateFromNvs();          // Restore from NVS if pending, then clear

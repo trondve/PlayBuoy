@@ -30,6 +30,11 @@ extern "C" {
 #include "utils.h" // Utility functions (e.g., logging, time management)
 #include "config.h"  // Your NODE_ID, FIRMWARE_VERSION, GPS_SYNC_INTERVAL_SECONDS
 
+// Default DEBUG_NO_DEEP_SLEEP to 0 if not defined in config.h
+#ifndef DEBUG_NO_DEEP_SLEEP
+#define DEBUG_NO_DEEP_SLEEP 0
+#endif
+
 // Add watchdog include
 #include "esp_task_wdt.h"
 
@@ -50,12 +55,11 @@ extern "C" {
 
 // Power management pins
 #define POWER_3V3_ENABLE 25  // GPIO 25 to control 3.3V rail power
-#define GPS_POWER_PIN 4      // GPIO 4 for GPS power control (same as MODEM_PWRKEY)
+// GPS_POWER_PIN removed — was GPIO 4 (same as MODEM_PWRKEY), causing conflict.
+// SIM7000G GNSS is internal, controlled via AT commands (AT+CGNSPWR, AT+SGPIO).
 
 #define SerialMon Serial
 #define SerialAT Serial1
-
-#define GPS_FIX_TIMEOUT_SEC 60
 
 TinyGsm modem(SerialAT);
 
@@ -63,7 +67,6 @@ TinyGsm modem(SerialAT);
 static bool g_modemReady = false;
 static bool g_3v3RailPowered = false;
 static bool g_sensorsPowered = false;
-static bool g_gpsPinHigh = false;
 static bool g_sensorsInitialized = false;
 static float g_prevBatteryVoltage = 0.0f;
 
@@ -74,14 +77,12 @@ void powerOn3V3Rail();
 void powerOff3V3Rail();
 void powerOnSensors();
 void powerOffSensors();
-void powerOnGPS();
-void powerOffGPS();
+// GPS power is controlled via AT commands in gps.cpp, not GPIO
 
 // Put buses/pins into low-leakage state before deep sleep
 void preparePinsAndSubsystemsForDeepSleep() {
-  // Defensive radio off (WiFi/Bluetooth)
+  // Defensive radio off (WiFi already off, BT released at startup)
   WiFi.mode(WIFI_OFF);
-  btStop();
 
   // I2C high-Z
   Wire.end();
@@ -107,10 +108,11 @@ void preparePinsAndSubsystemsForDeepSleep() {
   gpio_hold_en(GPIO_NUM_25);
   gpio_deep_sleep_hold_en();
 
-  // Power domains: keep RTC memories, drop RTC peripherals
+  // Power domains: keep only RTC slow memory (holds RTC_DATA_ATTR), drop everything else
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_ON);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);   // rtcState lives here
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);  // not used, save ~0.5uA
+  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL,         ESP_PD_OPTION_OFF);  // save ~250uA
 }
 
 // Adjust next wake UTC to avoid 00:00-05:59 local; push to 06:00 if inside window
@@ -184,9 +186,9 @@ void powerOnModem() {
   delay(2000);
   digitalWrite(MODEM_PWRKEY, HIGH);
 
-  // Keep modem asleep (DTR HIGH) and idle longer before UART/attach (conservative 10 s)
+  // Modem ready for AT commands within ~5s after PWRKEY release (datasheet)
   SerialMon.println("Power sequence complete. Settling modem...");
-  delay(10000);
+  delay(6000);
 }
 
 // Ensure modem is awake before registration/attach (DTR LOW)
@@ -200,7 +202,11 @@ void wakeModemForNetwork() {
 
 void powerOffModem() {
   SerialMon.println("Powering off modem...");
-  
+
+  // Disable radio before power-off to cleanly deregister from network
+  SerialAT.println("AT+CFUN=0");
+  delay(1500);  // Wait for radio shutdown
+
   // Try graceful shutdown first (optional)
 #if ENABLE_CPOWD_SHUTDOWN
   // Send CPOWD via raw AT if available
@@ -219,11 +225,11 @@ void powerOffModem() {
   }
   if (!normalDown) {
 #endif
-  // Power off sequence (fallback)
+  // Power off sequence (fallback) — datasheet requires PWRKEY LOW >= 1.2s
   digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1000);
+  delay(1300);  // 1.3s LOW pulse (spec minimum: 1.2s)
   digitalWrite(MODEM_PWRKEY, HIGH);
-  delay(1500); // Hold high for at least 1.2s to power off SIM7000G
+  delay(1500);
   
   // Also power down the power control pin
   digitalWrite(MODEM_POWER_ON, LOW);
@@ -292,31 +298,9 @@ void powerOffSensors() {
   SerialMon.println("Sensors powered off.");
 }
 
-// Power management functions for GPS
-void powerOnGPS() {
-  if (g_gpsPinHigh) {
-    SerialMon.println("GPS power pin already HIGH.");
-    return;
-  }
-  
-  SerialMon.println("Setting GPS power pin HIGH...");
-  pinMode(GPS_POWER_PIN, OUTPUT);
-  digitalWrite(GPS_POWER_PIN, HIGH);
-  g_gpsPinHigh = true;
-  SerialMon.println("GPS power pin set HIGH.");
-}
-
-void powerOffGPS() {
-  if (!g_gpsPinHigh) {
-    SerialMon.println("GPS power pin already LOW.");
-    return;
-  }
-  
-  SerialMon.println("Setting GPS power pin LOW...");
-  digitalWrite(GPS_POWER_PIN, LOW);
-  g_gpsPinHigh = false;
-  SerialMon.println("GPS power pin set LOW.");
-}
+// powerOnGPS()/powerOffGPS() removed — GPIO 4 is MODEM_PWRKEY.
+// Setting it HIGH/LOW from here corrupted modem power state.
+// SIM7000G GNSS is internal, controlled via AT+CGNSPWR/AT+SGPIO in gps.cpp.
 
 // Set ESP32 RTC time from GPS epoch
 void syncRtcWithGps(uint32_t gpsEpoch) {
@@ -333,8 +317,12 @@ String getResetReasonString() {
     esp_sleep_wakeup_cause_t wc = esp_sleep_get_wakeup_cause();
     switch (wc) {
       case ESP_SLEEP_WAKEUP_TIMER: {
-        if (rtcState.lastSleepHours > 0) {
-          return String("WokeUpFromTimerSleep(") + String((int)rtcState.lastSleepHours) + String("h)");
+        if (rtcState.lastSleepMinutes > 0) {
+          int m = (int)rtcState.lastSleepMinutes;
+          if (m >= 60)
+            return String("WokeUpFromTimerSleep(") + String(m / 60) + "h" + String(m % 60) + "m)";
+          else
+            return String("WokeUpFromTimerSleep(") + String(m) + "m)";
         }
         return String("WokeUpFromTimerSleep");
       }
@@ -368,14 +356,21 @@ String getResetReasonString() {
 void setup() {
   Serial.begin(115200);
   delay(3000);
+
+  // Permanently release Bluetooth radio and memory (~30KB freed, BT never used)
+  btStop();
+  esp_bt_controller_disable();
+  esp_bt_controller_deinit();
+  esp_bt_mem_release(ESP_BT_MODE_BTDM);
+
   logWakeupReason();  // Log why we woke up
-  
-  // Check if we're recovering from a brownout
+
+  // Track brownout for fast-path sleep decision after battery measurement
   esp_reset_reason_t reason = esp_reset_reason();
-  if (reason == ESP_RST_BROWNOUT) {
+  bool brownoutRecovery = (reason == ESP_RST_BROWNOUT);
+  if (brownoutRecovery) {
     SerialMon.println("=== BROWNOUT RECOVERY DETECTED ===");
-    SerialMon.println("Device recovered from brownout reset");
-    SerialMon.println("Implementing conservative power management");
+    SerialMon.println("Battery sagged under load — will check voltage and may sleep immediately.");
     SerialMon.println("================================");
   }
 
@@ -388,14 +383,8 @@ void setup() {
   digitalWrite(POWER_3V3_ENABLE, LOW);  // Start with 3.3V rail off
   g_3v3RailPowered = false;
   g_sensorsPowered = false;
-  g_gpsPinHigh = false;
 
   rtcStateBegin();
-
-  if (rtcState.firmwareUpdateAttempted) {
-    clearFirmwareUpdateAttempted();
-    SerialMon.println("OTA flag cleared after reboot.");
-  }
 
   const esp_partition_t* running = esp_ota_get_running_partition();
   esp_ota_img_states_t otaState;
@@ -415,20 +404,49 @@ void setup() {
   
 
   // Measure battery early using the new method and store as stable value
+  // NOTE: Do NOT read temperature here — the 3V3 rail is off, DS18B20 is unpowered.
+  // Temperature is read later in loop() after powering the 3V3 rail and initializing sensors.
   if (!beginPowerMonitor()) SerialMon.println("Power monitor init failed.");
   float stableBatteryVoltage = readBatteryVoltage();
   g_prevBatteryVoltage = rtcState.lastBatteryVoltage; // capture previous persisted value
   setStableBatteryVoltage(stableBatteryVoltage);
-  rtcState.lastBatteryVoltage = stableBatteryVoltage;
-  float tempC = getWaterTemperature();
-  if (!isnan(tempC)) {
-    rtcState.lastWaterTemp = tempC;
-  }
+  // NOTE: rtcState.lastBatteryVoltage is NOT updated here — it still holds the
+  // previous cycle's voltage, used by determineSleepDuration() for SoC hysteresis.
+  // It gets updated after the sleep decision in loop().
   SerialMon.println("=== END BATTERY MEASUREMENT ===");
 
   checkBatteryChargeState();
+  logBatteryStatus();
 
-  logBatteryStatus();  // Battery status
+  // Brownout fast-track: if we just brown-out reset and battery is below 40%,
+  // skip the full cycle and go straight to deep sleep to preserve the battery.
+  // A brownout means the voltage sagged under load (modem 2A peak), so running
+  // the full cycle with modem/GPS would likely cause another brownout.
+  if (brownoutRecovery) {
+    int pct = estimateBatteryPercent(stableBatteryVoltage);
+    if (pct < 40) {
+      SerialMon.printf("BROWNOUT + LOW BATTERY (%d%% / %.3fV) — sleeping immediately.\n",
+                       pct, stableBatteryVoltage);
+      // fastPath=true: skip 10s RTC retry loop (NTP hasn't run yet)
+      int sleepMinutes = determineSleepDuration(pct, true);
+      rtcState.lastBatteryVoltage = stableBatteryVoltage; // persist for next boot's hysteresis
+      rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+      // Apply quiet hours adjustment (same as normal path)
+      uint32_t now = (uint32_t)time(NULL);
+      uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
+      uint32_t nextWake = adjustNextWakeUtcForQuietHours(candidate);
+      rtcState.lastNextWakeUtc = nextWake;
+      uint32_t sleepSec = 300;
+      now = (uint32_t)time(NULL);
+      if (nextWake > now) sleepSec = nextWake - now;
+      if (sleepSec < 300) sleepSec = 300;
+      preparePinsAndSubsystemsForDeepSleep();
+      esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
+      esp_deep_sleep_start();
+    } else {
+      SerialMon.printf("Brownout recovery but battery OK (%d%%) — proceeding with full cycle.\n", pct);
+    }
+  }
 
   if (handleUndervoltageProtection()) {
     // Device will deep sleep if battery critically low
@@ -451,31 +469,20 @@ void loop() {
   }
 
   // 1) Collect wave data first (modem is still off for lower power)
-  // OPTIMIZED: Reduced from 5 minutes to 3 minutes for wave data collection
-  SerialMon.println("=== Starting wave data collection with power management (3 minutes) ===");
-  
-  // Check voltage before high-power operation using stable reading
-  float voltage = getStableBatteryVoltage();
-  if (!isnan(voltage)) {
-    if (voltage < 3.2f) {
-      SerialMon.printf("WARNING: Low voltage (%.2fV) before wave data collection\n", voltage);
-      SerialMon.println("Consider reducing power consumption or delaying operation");
-    } else if (voltage < 3.5f) {
-      SerialMon.printf("CAUTION: Moderate voltage (%.2fV) - monitoring closely\n", voltage);
-    } else {
-      SerialMon.printf("Voltage OK (%.2fV) for wave data collection\n", voltage);
-    }
-  }
-  
-  // Power on 3.3V rail, wait 5 seconds, then power on sensors
+  SerialMon.println("=== Starting wave data collection ===");
+
+  // Power on 3.3V rail, wait for stabilization, then power on sensors
   powerOn3V3Rail();
-  delay(5000);  // 5 second delay as requested
+  delay(150);  // LDO rail stabilizes in <10ms, DS18B20 needs ~50ms, 150ms is safe
   powerOnSensors();
   if (!g_sensorsInitialized) {
     if (!beginSensors()) SerialMon.println("Sensor init failed.");
     g_sensorsInitialized = true;
     float t0 = getWaterTemperature();
-    if (!isnan(t0)) rtcState.lastWaterTemp = t0;
+    if (!isnan(t0)) {
+      rtcState.lastWaterTemp = t0;
+      pushTemperatureHistory(t0);
+    }
   }
   
   esp_task_wdt_reset();
@@ -483,9 +490,9 @@ void loop() {
   esp_task_wdt_reset();
   logWaveStats();
   
-  // Power off sensors, wait 5 seconds, then power off 3.3V rail
+  // Power off sensors, then power off 3.3V rail
   powerOffSensors();
-  delay(5000);  // 5 second delay as requested
+  delay(100);  // brief settle before rail off (no datasheet requirement)
   powerOff3V3Rail();
   
   SerialMon.println("=== Wave data collection complete ===");
@@ -500,17 +507,17 @@ void loop() {
   if (shouldGetNewGpsFix) {
     bool isFirstFix = (rtcState.lastGpsFixTime == 0);
     
-    // Bring up modem and configure GNSS just before NTP/XTRA/GPS flow to save power
+    // Bring up modem just before NTP/XTRA/GPS flow to save power
+    // CGNSMOD is configured inside gps.cpp gnssConfigure() — no need to set it here
     ensureModemReady();
-    // Enable GPS, GLONASS, BeiDou; disable Galileo
-    modem.sendAT("+CGNSMOD=1,1,0,1");
-    modem.waitResponse(1000);
 
     fix = getGpsFixDynamic(isFirstFix);
     if (fix.success) {
       // Always log drift (or no-previous-anchor) before overwriting stored anchor
       checkAnchorDrift(fix.latitude, fix.longitude);
       updateLastGpsFix(fix.latitude, fix.longitude, fix.fixTimeEpoch);
+      rtcState.lastGpsHdop = fix.hdop;
+      rtcState.lastGpsTtf = fix.ttfSeconds;
       if (fix.fixTimeEpoch > 1000000000) {
         syncRtcWithGps(fix.fixTimeEpoch);
       }
@@ -526,18 +533,17 @@ void loop() {
       fix.fixTimeEpoch = rtcState.lastGpsFixTime;
       fix.success = false;
     }
-    // Turn off GNSS, wait 5 seconds, set GPS power pin back to LOW, wait 5 seconds
+    // Turn off GNSS engine via AT command
     gpsEnd();
-    delay(5000);  // 5 second delay as requested
-    powerOffGPS();
-    delay(5000);  // 5 second delay as requested
+    delay(500);   // brief settle after GNSS stop before re-establishing cellular
     
     // Re-establish cellular data connection for firmware updates and JSON upload
+    // Modem is already powered from GPS phase — skip pre-cycle to save ~14s
     SerialMon.println("Re-establishing cellular data connection for upload...");
     ensureModemReady();
-    delay(4000);  // increased settle before first connect attempt
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
-    
+    delay(1000);  // brief settle before connect (modem already warm from GPS)
+    networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
+
     // If regular connection fails, try APN testing
     if (!networkConnected) {
       SerialMon.println("Regular connection failed, testing multiple APNs...");
@@ -548,12 +554,12 @@ void loop() {
     fix.longitude = rtcState.lastGpsLon;
     fix.fixTimeEpoch = rtcState.lastGpsFixTime;
     fix.success = true;
-    
+
     // GPS was skipped, but we still need cellular data for firmware updates and JSON upload
     SerialMon.println("GPS skipped, establishing cellular data connection for upload...");
     ensureModemReady();
-    delay(4000);  // increased settle before first connect attempt
-    networkConnected = connectToNetwork(NETWORK_PROVIDER);
+    delay(1000);  // brief settle before connect (modem just powered on)
+    networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
     
     // If regular connection fails, try APN testing
     if (!networkConnected) {
@@ -588,40 +594,30 @@ void loop() {
     SerialMon.printf("Using RTC timestamp (UTC epoch): %lu\n", currentTimestamp);
   }
 
+  // Re-measure battery right before sleep decision for most accurate SoC.
+  // The initial measurement was taken before modem/GPS (~30 minutes ago).
+  {
+    float freshVoltage = readBatteryVoltage();
+    SerialMon.printf("Battery re-measure before sleep: %.3fV (was %.3fV at boot)\n",
+                     freshVoltage, getStableBatteryVoltage());
+    setStableBatteryVoltage(freshVoltage);
+  }
+
   // Compute planned sleep and next wake based on current state/time
   int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());
-  int sleepHours = determineSleepDuration(batteryPercent);
+  int sleepMinutes = determineSleepDuration(batteryPercent);
+  // Now that hysteresis has used the previous cycle's voltage, persist the fresh one
+  rtcState.lastBatteryVoltage = getStableBatteryVoltage();
 #if DEBUG_NO_DEEP_SLEEP
-  sleepHours = 3;
+  sleepMinutes = 180;
 #endif
   uint32_t nowUtc = (uint32_t)time(NULL);
-  uint32_t candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
+  uint32_t candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
   uint32_t nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
-  String json = buildJsonPayload(
-    fix.latitude,
-    fix.longitude,
-    computeWaveHeight(),
-    computeWavePeriod(),
-    computeWaveDirection(),
-    computeWavePower(computeWaveHeight(), computeWavePeriod()),
-    getWaterTemperature(),
-    getStableBatteryVoltage(),  // Use stable voltage instead of measuring during upload
-    currentTimestamp,  // Use current RTC time instead of last GPS time
-    NODE_ID,
-    NAME,
-    FIRMWARE_VERSION,
-    uptime,           // <-- new
-    resetReason,       // <-- new
-    String(""), String(""), String(""), 0, // net fields will be set later when connected
-    rtcState.lastWaterTemp,
-    sleepHours,
-    nextWakeUtc,
-    batteryDelta
-  );
-
-  // (Initial JSON suppressed; final JSON will be printed before upload)
+  // JSON is built once, after network connect attempt (see below)
+  String json;
   // Print a human-friendly current local date/time
   time_t nowTs = time(NULL);
   if (nowTs >= 24 * 3600) {
@@ -640,6 +636,7 @@ void loop() {
       esp_ota_mark_app_valid_cancel_rollback();
     }
   }
+  clearFirmwareUpdateAttempted();
 
   // Try to send any buffered unsent JSON first
   bool bufferedDataSent = false;
@@ -678,60 +675,68 @@ void loop() {
     
     // Time should already be synced from NTP during GPS flow
 
-    // Check for firmware updates if network is connected
-    if (networkConnected) {
+    // Check for firmware updates if network is still connected
+    // Re-validate network status — connection may have dropped since initial check
+    if (networkConnected && modem.isGprsConnected()) {
        SerialMon.printf(" OTA: OTA_SERVER = %s\n", OTA_SERVER);
        SerialMon.printf(" OTA: OTA_PATH = %s\n", OTA_PATH);
        SerialMon.printf(" OTA: NODE_ID = %s\n", NODE_ID);
-       
+
        String baseUrl = "http://" + String(OTA_SERVER) + "/" + String(NODE_ID);
        SerialMon.printf(" OTA: Constructed baseUrl: %s\n", baseUrl.c_str());
-       
+
        if (checkForFirmwareUpdate(baseUrl.c_str())) {
          // OTA update in progress, will restart on completion
        }
+    } else if (networkConnected) {
+       SerialMon.println("OTA skipped: network connection lost since registration");
     }
     
+    // Build JSON once with network info if available, empty strings if not
+    String op = "", ipStr = "";
+    int rssi = 0;
     if (networkConnected) {
-      // If we synced time from network just above, prefer to rebuild currentTimestamp now
+      // Refresh timestamp from network-synced RTC
       uint32_t ts = time(NULL);
       if (ts >= 24 * 3600) {
         currentTimestamp = ts;
       }
-      // Rebuild JSON so it includes updated timestamp and network diagnostics
-      String op = modem.getOperator();
-      String ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
-      int rssi = modem.getSignalQuality();
-      // Refresh next wake after potential time update and apply quiet-hours adjustment
-      nowUtc = (uint32_t)time(NULL);
-      candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepHours * 3600UL;
-      nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
-      json = buildJsonPayload(
-        fix.latitude,
-        fix.longitude,
-        computeWaveHeight(),
-        computeWavePeriod(),
-        computeWaveDirection(),
-        computeWavePower(computeWaveHeight(), computeWavePeriod()),
-        getWaterTemperature(),
-        getStableBatteryVoltage(),
-        currentTimestamp,
-        NODE_ID,
-        NAME,
-        FIRMWARE_VERSION,
-        uptime,
-        resetReason,
-        op,
-        String(NETWORK_PROVIDER),
-        ipStr,
-        rssi,
-        rtcState.lastWaterTemp,
-        sleepHours,
-        nextWakeUtc,
-        batteryDelta
-      );
-      SerialMon.println("Final JSON (with network diagnostics):");
-      SerialMon.println(json);
+      op = modem.getOperator();
+      ipStr = String((int)modem.localIP()[0]) + "." + String((int)modem.localIP()[1]) + "." + String((int)modem.localIP()[2]) + "." + String((int)modem.localIP()[3]);
+      rssi = modem.getSignalQuality();
+    }
+    // Refresh next wake after potential time update and apply quiet-hours adjustment
+    nowUtc = (uint32_t)time(NULL);
+    candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
+    nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
+    json = buildJsonPayload(
+      fix.latitude,
+      fix.longitude,
+      computeWaveHeight(),
+      computeWavePeriod(),
+      computeWaveDirection(),
+      computeWavePower(computeWaveHeight(), computeWavePeriod()),
+      rtcState.lastWaterTemp,
+      getStableBatteryVoltage(),
+      currentTimestamp,
+      NODE_ID,
+      NAME,
+      FIRMWARE_VERSION,
+      uptime,
+      resetReason,
+      op,
+      networkConnected ? String(NETWORK_PROVIDER) : String(""),
+      ipStr,
+      rssi,
+      rtcState.lastWaterTemp,
+      sleepMinutes,
+      nextWakeUtc,
+      batteryDelta
+    );
+    SerialMon.println("JSON payload:");
+    SerialMon.println(json);
+
+    if (networkConnected) {
       SerialMon.println("=== CRITICAL: Attempting JSON upload ===");
       bool success = sendJsonToServer(
         API_SERVER,
@@ -747,10 +752,9 @@ void loop() {
         markUploadFailed();
         storeUnsentJson(json);
       }
-      
-      // Tear down cellular data after JSON upload and firmware check, wait 2 seconds
-      SerialMon.println("Tearing down cellular data after upload...");
-      delay(2000);  // 2 second delay as requested
+
+      // Cellular data will be torn down when modem powers off before sleep
+      SerialMon.println("Upload complete, proceeding to sleep.");
     } else {
       SerialMon.println("Network connection failed.");
       markUploadFailed();
@@ -758,10 +762,13 @@ void loop() {
     }
   }
   // Store planned sleep/wake info in RTC for next boot's wake reason context
-  rtcState.lastSleepHours = (uint16_t)sleepHours;
+  rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
   rtcState.lastNextWakeUtc = nextWakeUtc;
 
-  SerialMon.printf("Sleeping for %d hour(s)...\n", sleepHours);
+  if (sleepMinutes >= 60)
+    SerialMon.printf("Sleeping for %dh %dm...\n", sleepMinutes / 60, sleepMinutes % 60);
+  else
+    SerialMon.printf("Sleeping for %d minute(s)...\n", sleepMinutes);
   if (rtcState.lastNextWakeUtc >= 24 * 3600) {
     struct tm tm_local;
     time_t t = (time_t)rtcState.lastNextWakeUtc;
@@ -772,17 +779,26 @@ void loop() {
   }
   delay(100);
 
-  // Before sleep: cut power to 3.3V rail to disable GY-91 LED, wait 2 seconds
+  // Ensure 3V3 rail is off (should already be off from sensor phase)
   powerOff3V3Rail();
-  delay(2000);  // 2 second delay as requested
-  
-  // Before sleep: power down modem/GPS/Cellular data completely to conserve power
+
+  // Tear down PDP context before modem power-off to prevent registered-during-sleep leak.
+  // Order: CNACT → CGACT → CGATT → CIPSHUT (same as gps.cpp tearDownPDP)
+  if (g_modemReady) {
+    SerialMon.println("Tearing down PDP context before sleep...");
+    modem.sendAT("+CNACT=0,0");    modem.waitResponse(5000);
+    modem.sendAT("+CGACT=0,1");    modem.waitResponse(5000);
+    modem.sendAT("+CGATT=0");      modem.waitResponse(5000);
+    modem.sendAT("+CIPSHUT");      modem.waitResponse(8000);
+  }
+
+  // Power down modem completely before sleep
   powerOffModem();
 
 #if DEBUG_NO_DEEP_SLEEP
   SerialMon.println("DEBUG_NO_DEEP_SLEEP active: staying awake and delaying instead of deep sleep.");
   // Stay awake but idle for the sleep duration, resetting WDT periodically
-  uint32_t remainingMs = (uint32_t)sleepHours * 3600UL * 1000UL;
+  uint32_t remainingMs = (uint32_t)sleepMinutes * 60UL * 1000UL;
   const uint32_t chunkMs = 10000UL; // 10s chunks to keep logs responsive
   while (remainingMs > 0) {
     esp_task_wdt_reset();
@@ -793,9 +809,10 @@ void loop() {
 #else
   // Prepare all pins/subsystems for minimum leakage, then sleep
   preparePinsAndSubsystemsForDeepSleep();
-  uint32_t sleepSec = 0;
+  uint32_t sleepSec = 300; // minimum 5 minutes to prevent reboot loops
   nowUtc = (uint32_t)time(NULL);
   if (nextWakeUtc > nowUtc) sleepSec = nextWakeUtc - nowUtc;
+  if (sleepSec < 300) sleepSec = 300; // enforce minimum sleep floor
   esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
   esp_deep_sleep_start();
 #endif
