@@ -451,7 +451,7 @@ void setup() {
       rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
       // Apply quiet hours adjustment (same as normal path)
       uint32_t now = (uint32_t)time(NULL);
-      uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
+      uint32_t candidate = (now >= SECONDS_PER_DAY ? now : 0) + (uint32_t)sleepMinutes * 60UL;
       uint32_t nextWake = adjustNextWakeUtcForQuietHours(candidate);
       rtcState.lastNextWakeUtc = nextWake;
       uint32_t sleepSec = 300;
@@ -598,7 +598,7 @@ void loop() {
   // Get current timestamp from RTC, with fallback to GPS time
   SerialMon.println("Building JSON payload...");
   uint32_t currentTimestamp = time(NULL);
-  if (currentTimestamp < 24 * 3600) {  // If RTC time is not valid
+  if (currentTimestamp < SECONDS_PER_DAY) {  // If RTC time is not valid
     if (rtcState.lastGpsFixTime > 1000000000) {
       // Use last GPS time as fallback
       currentTimestamp = rtcState.lastGpsFixTime;
@@ -630,7 +630,7 @@ void loop() {
   sleepMinutes = 180;
 #endif
   uint32_t nowUtc = (uint32_t)time(NULL);
-  uint32_t candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
+  uint32_t candidateWakeUtc = (currentTimestamp >= SECONDS_PER_DAY ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
   uint32_t nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
@@ -638,7 +638,7 @@ void loop() {
   String json;
   // Print a human-friendly current local date/time
   time_t nowTs = time(NULL);
-  if (nowTs >= 24 * 3600) {
+  if (nowTs >= SECONDS_PER_DAY) {
     struct tm lt; localtime_r(&nowTs, &lt);
     char buf[64]; strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &lt);
     SerialMon.printf("The current date and time is: %s\n", buf);
@@ -716,7 +716,7 @@ void loop() {
     if (networkConnected) {
       // Refresh timestamp from network-synced RTC
       uint32_t ts = time(NULL);
-      if (ts >= 24 * 3600) {
+      if (ts >= SECONDS_PER_DAY) {
         currentTimestamp = ts;
       }
       op = modem.getOperator();
@@ -725,7 +725,7 @@ void loop() {
     }
     // Refresh next wake after potential time update and apply quiet-hours adjustment
     nowUtc = (uint32_t)time(NULL);
-    candidateWakeUtc = (currentTimestamp >= 24 * 3600 ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
+    candidateWakeUtc = (currentTimestamp >= SECONDS_PER_DAY ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
     nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
     json = buildJsonPayload(
       fix.latitude,
@@ -787,7 +787,7 @@ void loop() {
     SerialMon.printf("Sleeping for %dh %dm...\n", sleepMinutes / 60, sleepMinutes % 60);
   else
     SerialMon.printf("Sleeping for %d minute(s)...\n", sleepMinutes);
-  if (rtcState.lastNextWakeUtc >= 24 * 3600) {
+  if (rtcState.lastNextWakeUtc >= SECONDS_PER_DAY) {
     struct tm tm_local;
     time_t t = (time_t)rtcState.lastNextWakeUtc;
     localtime_r(&t, &tm_local);

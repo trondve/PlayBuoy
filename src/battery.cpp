@@ -55,12 +55,12 @@ bool handleUndervoltageProtection() {
     rtcState.lastBatteryVoltage = voltage; // persist for next boot's hysteresis
     // Compute next wake epoch from current RTC time
     uint32_t now = (uint32_t)time(NULL);
-    uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
+    uint32_t candidate = (now >= SECONDS_PER_DAY ? now : 0) + (uint32_t)sleepMinutes * 60UL;
     uint32_t nextWake = adjustNextWakeUtcForQuietHours(candidate);
     rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
     rtcState.lastNextWakeUtc = nextWake;
     // Print local next wake for convenience
-    if (rtcState.lastNextWakeUtc >= 24 * 3600) {
+    if (rtcState.lastNextWakeUtc >= SECONDS_PER_DAY) {
       struct tm tm_local;
       time_t t = (time_t)rtcState.lastNextWakeUtc;
       localtime_r(&t, &tm_local);
@@ -166,7 +166,7 @@ int getCurrentMonth(bool fastPath) {
   if (!fastPath) {
     // Wait for time to be set (this can take a few seconds after configTime)
     int retry = 0;
-    while (now < 24 * 3600 && retry < 10) {
+    while (now < SECONDS_PER_DAY && retry < 10) {
       delay(1000);
       time(&now);
       retry++;
@@ -176,7 +176,7 @@ int getCurrentMonth(bool fastPath) {
     SerialMon.printf("RTC time check (fast): now=%lu\n", now);
   }
 
-  if (now > 24 * 3600) {  // Valid time (more than 24 hours since epoch)
+  if (now > SECONDS_PER_DAY) {  // Valid time (more than 24 hours since epoch)
     localtime_r(&now, &timeinfo);
     int month = timeinfo.tm_mon + 1;  // tm_mon is 0-11, we want 1-12
     bool isDST = timeinfo.tm_isdst > 0;
