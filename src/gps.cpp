@@ -330,18 +330,28 @@ static bool gnssStart() {
   SerialMon.printf("GNSS start mode: %s\n", startCmd);
   sendAT(startCmd);
 
-  for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-  SerialMon.println("GNSS not running; trying opposite SGPIO polarity...");
-  sendAT("AT+CGNSPWR=0"); delay(150);
-  sendAT("AT+SGPIO=0,4,1,0"); delay(150);
-  sendAT("AT+CGNSPWR=1");
-  for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-  SerialMon.println("Still not running; trying CGPIO control...");
-  sendAT("AT+CGNSPWR=0"); delay(150);
-  sendAT("AT+CGPIO=4,1,1"); delay(150);
-  sendAT("AT+CGNSPWR=1");
-  for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-configured_nmea:
+  // Helper: poll engine status up to 10 times; return true if running
+  auto pollRunning = [&]() -> bool {
+    for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) return true; delay(300); }
+    return false;
+  };
+
+  bool running = pollRunning();
+  if (!running) {
+    SerialMon.println("GNSS not running; trying opposite SGPIO polarity...");
+    sendAT("AT+CGNSPWR=0"); delay(150);
+    sendAT("AT+SGPIO=0,4,1,0"); delay(150);
+    sendAT("AT+CGNSPWR=1");
+    running = pollRunning();
+  }
+  if (!running) {
+    SerialMon.println("Still not running; trying CGPIO control...");
+    sendAT("AT+CGNSPWR=0"); delay(150);
+    sendAT("AT+CGPIO=4,1,1"); delay(150);
+    sendAT("AT+CGNSPWR=1");
+    pollRunning(); // final attempt — configure NMEA regardless of outcome
+  }
+  // Configure NMEA output (send regardless; engine may start asynchronously)
   sendAT("AT+CGNSNMEA=511");
   sendAT("AT+CGNSRTMS=1000");
   return gnssEngineRunning();
