@@ -43,5 +43,11 @@
 // Optional SIM PIN (leave empty string if not required)
 #define SIM_PIN ""
 
+// Wave analysis configuration
+#define WAVE_HS_MAX_M 2.0f              // Max significant wave height (m); capped for lake deployments (raise for ocean)
+#define WAVE_FREQ_MIN 0.05f             // Min frequency for spectral analysis (Hz); cutoff to prevent low-freq blowup
+#define BROWNOUT_SKIP_PCT 40            // Skip cycle if battery is low AND voltage is sinking (prevent brownout loops)
+#define HYSTERESIS_SAMPLE_COUNT 3       // Require N consecutive samples before schedule change (prevent oscillation)
+
 // Debug: set to 1 to stay awake instead of entering deep sleep (useful for serial monitoring)
 #define DEBUG_NO_DEEP_SLEEP 0
