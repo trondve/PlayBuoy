@@ -1,5 +1,3 @@
-#define TINY_GSM_MODEM_SIM7000
-
 #include "config.h"
 #include "modem.h"
 #include <TinyGsmClient.h>
@@ -137,16 +135,9 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
       unsigned long t0 = millis();
       String line;
       while (millis() - t0 < 500) {
-        while (Serial1.available()) {
-          char c = (char)Serial1.read();
-          if (c == '\n') {
-            line.trim();
-            if (line.length()) SerialMon.println(line);
-            line = "";
-          } else if (c != '\r') {
-            line += c;
-          }
-        }
+        // Use TinyGsm-aware drain instead of direct Serial1.read()
+        // Direct reads can interfere with TinyGsm's internal buffering
+        modem.streamClear();
         delay(10);
       }
     }

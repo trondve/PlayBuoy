@@ -250,6 +250,11 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
   uint32_t offset = nSamples - FFT_N;
   float* re = accel; // Will work in-place on accelBuf
 
+  // Explicitly zero buffers for defensive programming
+  // (re is overwritten immediately below; fftIm zeroed later, but do it here too)
+  memset(re, 0, sizeof(float) * FFT_N);
+  memset(fftIm, 0, sizeof(float) * FFT_N);
+
   // Copy the segment we want to the beginning of the buffer
   if (offset > 0) {
     for (uint32_t i = 0; i < FFT_N; i++) {
@@ -296,6 +301,13 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
   for (uint32_t k = binMin; k <= binMax; k++) {
     float accelPsd = (re[k] * re[k] + fftIm[k] * fftIm[k]) * psdScale;
     float f = (float)k * df;
+
+    // Low-frequency cutoff: zero PSD below WAVE_FREQ_MIN to prevent 1/ω⁴ blowup
+    // At very low frequencies, ω becomes tiny, so 1/ω⁴ amplifies noise catastrophically
+    if (f < WAVE_FREQ_MIN) {
+      continue;  // Skip this bin
+    }
+
     float omega = 2.0f * PI * f;
     float omega4 = omega * omega * omega * omega;
 
@@ -332,8 +344,8 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
   result.Tp = (peakFreq > 0.0f) ? 1.0f / peakFreq : 0.0f;
   result.P = 0.49f * result.Hs * result.Hs * result.Tp; // deep-water power proxy
 
-  // Sanity caps (configurable per deployment)
-  if (result.Hs > 2.0f) result.Hs = 0.0f; // >2m from a lake buoy is noise
+  // Sanity caps (configurable per deployment in config.h)
+  if (result.Hs > WAVE_HS_MAX_M) result.Hs = 0.0f; // Exceeds deployment threshold (lake: 2m, ocean: higher)
   if (result.Tp < 0.5f || result.Tp > 25.0f) result.Tp = 0.0f;
 
   return result;

@@ -117,14 +117,23 @@ static ClockInfo parseCCLK(const String& cclk) {
   String times=t.substring(0,tzpos), tzs=t.substring(tzpos);
   int c1=times.indexOf(':'), c2=times.indexOf(':',c1+1); if(c1<0||c2<0) return ci;
   int hh=times.substring(0,c1).toInt(), mm=times.substring(c1+1,c2).toInt(), ss=times.substring(c2+1).toInt();
-  int sign=(tzs[0]=='-')?-1:+1, q=tzs.substring(1).toInt();
-  ci.year=2000+yy; ci.month=MM; ci.day=dd; ci.hour=hh; ci.min=mm; ci.sec=ss; ci.tz_q=sign*q;
-  ci.valid=(ci.year>=2000 && MM>=1 && MM<=12 && dd>=1 && dd<=31);
+
+  // Parse TZ: handle both "+8" and "+08" formats (toInt handles both)
+  int sign=(tzs[0]=='-')?-1:+1, tzVal=tzs.substring(1).toInt();
+  // TZ offset is in 15-minute units (e.g., +8 means UTC+2h = +8*15min). Sanity check range: [-48, +56] (UTC-12h to +14h)
+  if (tzVal<-48 || tzVal>56) return ci;
+
+  ci.year=2000+yy; ci.month=MM; ci.day=dd; ci.hour=hh; ci.min=mm; ci.sec=ss; ci.tz_q=sign*tzVal;
+  // Validate date/time ranges
+  ci.valid=(ci.year>=2000 && ci.year<=2100 && MM>=1 && MM<=12 && dd>=1 && dd<=31 &&
+            hh>=0 && hh<=23 && mm>=0 && mm<=59 && ss>=0 && ss<=59);
   return ci;
 }
 
 static bool doNTPSync(ClockInfo* outCi = nullptr) {
   SerialMon.println("=== NTP SYNC (no.pool.ntp.org) ===");
+  // Explicitly disable echo to avoid parsing issues
+  sendAT("ATE0");
   sendAT("AT+CNTPCID=1");
   sendAT(String("AT+CNTP=\"") + NTP_HOST + "\",0");
 
@@ -133,21 +142,46 @@ static bool doNTPSync(ClockInfo* outCi = nullptr) {
   sendAT("AT+CCLK?", &preNtpCclk, 1000);
   ClockInfo preCi = parseCCLK(preNtpCclk);
 
-  // Trigger NTP sync and wait for +CNTP: result
+  // Trigger NTP sync and capture the AT+CNTP command response.
+  // The +CNTP: URC may arrive before or after the "OK" confirmation — both cases
+  // are handled: if sendAT() captures it in rsp we check rsp first; if it arrives
+  // later we read it in the wait loop below.
   String rsp; sendAT("AT+CNTP", &rsp, 8000);
 
-  // Wait for +CNTP: unsolicited response (1 = success, others = failure)
-  bool ntpSuccess = false;
+  // Check if +CNTP: 1 was already captured in the command response buffer.
+  bool ntpSuccess = (rsp.indexOf("+CNTP: 1") >= 0);
+  if (!ntpSuccess && rsp.indexOf("+CNTP:") >= 0) {
+    // An error URC arrived with the OK — fail immediately
+    SerialMon.print("NTP failed (in-band): "); SerialMon.println(rsp);
+    return false;
+  }
+
+  // Wait for +CNTP: unsolicited response (1 = success, others = failure).
+  // Timeout raised to 60s: datasheet documents NTP response as 1-60s.
+  // Other URCs like +SAPBR: may interleave; discard non-CNTP lines.
   uint32_t t0 = millis();
-  while (millis() - t0 < 15000) {
+  while (!ntpSuccess && millis() - t0 < 60000) {
     while (SerialAT.available()) {
       String line = SerialAT.readStringUntil('\n');
-      if (line.indexOf("+CNTP: 1") >= 0) { ntpSuccess = true; break; }
-      // +CNTP: 61 = network error, +CNTP: 62 = DNS error, +CNTP: 63 = connect error
-      if (line.indexOf("+CNTP:") >= 0 && line.indexOf("+CNTP: 1") < 0) {
-        SerialMon.print("NTP failed: "); SerialMon.println(line);
-        return false;
+      line.trim();
+      // Check for explicit +CNTP: <digit> format
+      if (line.startsWith("+CNTP:")) {
+        int sp = line.indexOf(' ');
+        if (sp > 0) {
+          String codeStr = line.substring(sp + 1);
+          codeStr.trim();
+          int code = codeStr.toInt();
+          if (code == 1) {
+            ntpSuccess = true;
+            break;
+          } else {
+            // Known error codes: 61=network, 62=DNS, 63=connect
+            SerialMon.printf("NTP failed with code %d: %s\n", code, line.c_str());
+            return false;
+          }
+        }
       }
+      // Else: discard other URCs (e.g., +SAPBR:, +PDP, etc.)
     }
     if (ntpSuccess) break;
     delay(500);
@@ -187,6 +221,14 @@ static long daysFromCivil(int y, int m, int d) {
 }
 
 static bool shouldDownloadXTRA(const ClockInfo& nowCi) {
+  // Validate that RTC has been NTP-synced; unsynced RTC defaults to 1970
+  // which would always trigger spurious XTRA downloads.
+  const int MIN_VALID_YEAR = 2020;
+  if (nowCi.year < MIN_VALID_YEAR) {
+    SerialMon.printf("XTRA: RTC appears unsynced (year=%d < %d). Force refresh.\n", nowCi.year, MIN_VALID_YEAR);
+    return true;  // Force download
+  }
+
   s_prefs.begin("xtra", false);
   long lastDay = s_prefs.getLong("last_day", -1);
   long today   = daysFromCivil(nowCi.year, nowCi.month, nowCi.day);
@@ -235,9 +277,18 @@ static bool downloadAndApplyXTRA() {
   }
   if (!(done && ok)) return false;
 
-  SerialMon.println("=== APPLY XTRA (CGNSCPY → CGNSXTRA=1 → CGNSCOLD) ===");
+  SerialMon.println("=== APPLY XTRA (CGNSPWR=1 → CGNSCPY → CGNSXTRA=1 → CGNSCOLD) ===");
+  // CGNSCPY requires the GNSS engine to be powered on (per SIM7000G datasheet).
+  // Power it on cleanly first; if it was already on, CGNSPWR=0 + CGNSPWR=1 restarts it.
+  sendAT("AT+CGNSPWR=0");
+  delay(300);
+  sendAT("AT+CGNSPWR=1");
+  delay(300);
   String cp;
-  if (!sendAT("AT+CGNSCPY", &cp, 7000)) return false;
+  if (!sendAT("AT+CGNSCPY", &cp, 7000)) {
+    sendAT("AT+CGNSPWR=0"); // ensure GNSS is off on failure
+    return false;
+  }
   sendAT("AT+CGNSXTRA=1");
   // Configure GNSS mode and NMEA *before* CGNSCOLD starts the engine,
   // so the cold start runs with correct settings from the beginning.
@@ -273,7 +324,7 @@ static const char* gnssStartCommand() {
   if (ageSec < 4 * 3600) {
     SerialMon.printf("Last fix %lu sec ago — hot start\n", ageSec);
     return "AT+CGNSHOT";    // Ephemeris still valid (<4h)
-  } else if (ageSec < 24 * 3600) {
+  } else if (ageSec < SECONDS_PER_DAY) {
     SerialMon.printf("Last fix %lu sec ago — warm start\n", ageSec);
     return "AT+CGNSWARM";   // Almanac valid, ephemeris stale
   }
@@ -310,18 +361,28 @@ static bool gnssStart() {
   SerialMon.printf("GNSS start mode: %s\n", startCmd);
   sendAT(startCmd);
 
-  for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-  SerialMon.println("GNSS not running; trying opposite SGPIO polarity...");
-  sendAT("AT+CGNSPWR=0"); delay(150);
-  sendAT("AT+SGPIO=0,4,1,0"); delay(150);
-  sendAT("AT+CGNSPWR=1");
-  for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-  SerialMon.println("Still not running; trying CGPIO control...");
-  sendAT("AT+CGNSPWR=0"); delay(150);
-  sendAT("AT+CGPIO=4,1,1"); delay(150);
-  sendAT("AT+CGNSPWR=1");
-  for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) goto configured_nmea; delay(300); }
-configured_nmea:
+  // Helper: poll engine status up to 10 times; return true if running
+  auto pollRunning = [&]() -> bool {
+    for (int i = 0; i < 10; ++i) { if (gnssEngineRunning()) return true; delay(300); }
+    return false;
+  };
+
+  bool running = pollRunning();
+  if (!running) {
+    SerialMon.println("GNSS not running; trying opposite SGPIO polarity...");
+    sendAT("AT+CGNSPWR=0"); delay(150);
+    sendAT("AT+SGPIO=0,4,1,0"); delay(150);
+    sendAT("AT+CGNSPWR=1");
+    running = pollRunning();
+  }
+  if (!running) {
+    SerialMon.println("Still not running; trying CGPIO control...");
+    sendAT("AT+CGNSPWR=0"); delay(150);
+    sendAT("AT+CGPIO=4,1,1"); delay(150);
+    sendAT("AT+CGNSPWR=1");
+    pollRunning(); // final attempt — configure NMEA regardless of outcome
+  }
+  // Configure NMEA output (send regardless; engine may start asynchronously)
   sendAT("AT+CGNSNMEA=511");
   sendAT("AT+CGNSRTMS=1000");
   return gnssEngineRunning();
@@ -335,7 +396,7 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
   int p = inf.indexOf("+CGNSINF:"); if (p < 0) return false;
   int start = inf.indexOf(':', p); if (start < 0) return false; start++;
   // CGNSINF fields: 0=run, 1=fix, 2=utc, 3=lat, 4=lon, 5=alt, 6=speed, 7=course, 8=fixmode, 9=reserved, 10=HDOP
-  int field = 0; bool run=false, hasFix=false; double lat=0, lon=0; float hdop=99.0f; String ts;
+  int field = 0; bool run=false, hasFix=false; double lat=0, lon=0; float hdop=99.0f, alt=0.0f; String ts;
   String token; token.reserve(32);
   for (int i = start; i <= (int)inf.length(); ++i) {
     char c = (i == (int)inf.length()) ? ',' : inf[i];
@@ -346,6 +407,7 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
         case 2: ts = token; break; // YYYYMMDDhhmmss.sss
         case 3: lat = token.toDouble(); break;
         case 4: lon = token.toDouble(); break;
+        case 5: alt = token.toFloat(); break;
         case 10: { token.trim(); if (token.length() > 0) hdop = token.toFloat(); } break;
         default: break;
       }
@@ -356,11 +418,17 @@ static bool parseCgnsInfFix(const String& inf, float* outLat, float* outLon, uin
     }
   }
   if (!(run && hasFix)) return false;
-  // Validate coordinates: reject (0,0) which is a common GPS default when no real fix,
-  // and reject anything outside valid geographic range
-  if (lat == 0.0 && lon == 0.0) { SerialMon.println("GPS fix rejected: (0,0) coordinates"); return false; }
+  // Validate coordinates: reject (0,0) which is Null Island (common GPS default on no fix),
+  // and reject anything outside valid geographic range (±90° lat, ±180° lon).
+  // Note: ±180° is valid at antimeridian; ±90° are valid at poles.
+  if (lat == 0.0 && lon == 0.0) { SerialMon.println("GPS fix rejected: (0,0) Null Island"); return false; }
   if (lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
-    SerialMon.printf("GPS fix rejected: out of range (%.4f, %.4f)\n", lat, lon);
+    SerialMon.printf("GPS fix rejected: out of range (lat=%.4f, lon=%.4f)\n", lat, lon);
+    return false;
+  }
+  // Validate altitude: Norwegian lakes are ~0–600 m above sea level; altitude >5km indicates garbage fix
+  if (alt < -100.0f || alt > 5000.0f) {
+    SerialMon.printf("GPS fix rejected: altitude out of range (%.1f m)\n", alt);
     return false;
   }
   if (outLat) *outLat = (float)lat;
@@ -410,6 +478,11 @@ static bool gnssWarmup60s(GpsFixResult* outResult, uint32_t gnssStartTime) {
 // ---------- Public API ----------
 // (gpsBegin removed; not needed)
 
+//
+// PUBLIC FUNCTION: gpsEnd
+// Shuts down GNSS engine (AT+CGNSPWR=0).
+// Must be called before PDP teardown to allow SIM7000G to release radio for cellular.
+//
 void gpsEnd() { gnssStop(); }
 
 static void syncTimeAndMaybeApplyXTRA() {
@@ -444,11 +517,17 @@ static void syncTimeAndMaybeApplyXTRA() {
   tearDownPDP();
 }
 
+//
+// PUBLIC FUNCTION: getGpsFix
+// Acquires GPS/GNSS position with full pipeline: NTP → XTRA → warmup → polling.
+// Returns lat/lon if successful within timeout, otherwise returns zeros with success=false.
+// GNSS engine is shut down before returning.
+//
 GpsFixResult getGpsFix(uint16_t timeoutSec) {
   GpsFixResult result{}; result.success = false; result.accuracy = 0; result.hdop = 99.0f; result.fixTimeEpoch = 0; result.latitude = result.longitude = 0; result.ttfSeconds = 0;
   uint32_t gnssStartTime = millis(); // Track time-to-fix
 
-  // Ensure time and XTRA freshness before GNSS
+  // PIPELINE STEP 1: NTP time sync + XTRA ephemeris (H-05 fix: URC parsing race fixed)
   syncTimeAndMaybeApplyXTRA();
 
   // GNSS on
@@ -530,6 +609,14 @@ GpsFixResult getGpsFix(uint16_t timeoutSec) {
   return result;
 }
 
+//
+// PUBLIC FUNCTION: getGpsFixTimeout
+// Returns appropriate timeout (seconds) based on battery level and fix type.
+// Cold-start (isFirstFix=true): longer timeouts (up to 30 min at full charge)
+// Warm fix (isFirstFix=false): shorter timeouts (5-10 min, XTRA already cached)
+// Low battery (<30%): very short timeout (2 min, skip GPS to preserve power)
+// Used by getGpsFixDynamic() to adapt GPS acquisition time to power budget.
+//
 uint16_t getGpsFixTimeout(bool isFirstFix) {
   extern float getStableBatteryVoltage();
   extern int estimateBatteryPercent(float);
@@ -546,6 +633,12 @@ uint16_t getGpsFixTimeout(bool isFirstFix) {
   }
 }
 
+//
+// PUBLIC FUNCTION: getGpsFixDynamic
+// Wrapper around getGpsFix() with auto-computed timeout based on battery and fix history.
+// Encapsulates getGpsFixTimeout() logic for cleaner call site (one function instead of two).
+// Calls getGpsFix(timeout) with timeout from getGpsFixTimeout(isFirstFix).
+//
 GpsFixResult getGpsFixDynamic(bool isFirstFix) {
   return getGpsFix(getGpsFixTimeout(isFirstFix));
 }

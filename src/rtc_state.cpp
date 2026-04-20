@@ -31,18 +31,19 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
 };
 
 // Haversine formula to calculate distance in meters between two lat/lon points
+// Uses double-precision internally to avoid precision loss at small angles (<100m)
 static float distanceBetween(float lat1, float lon1, float lat2, float lon2) {
-  const float R = 6371000; // Earth radius in meters
-  float dLat = radians(lat2 - lat1);
-  float dLon = radians(lon2 - lon1);
+  const double R = 6371000.0; // Earth radius in meters
+  double dLat = radians((double)(lat2 - lat1));
+  double dLon = radians((double)(lon2 - lon1));
 
-  float a = sin(dLat / 2) * sin(dLat / 2) +
-            cos(radians(lat1)) * cos(radians(lat2)) *
-            sin(dLon / 2) * sin(dLon / 2);
-  float c = 2 * atan2(sqrt(a), sqrt(1 - a));
-  float distance = R * c;
+  double a = sin(dLat / 2.0) * sin(dLat / 2.0) +
+            cos(radians((double)lat1)) * cos(radians((double)lat2)) *
+            sin(dLon / 2.0) * sin(dLon / 2.0);
+  double c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+  double distance = R * c;
 
-  return distance;
+  return (float)distance;  // Cast back to float for storage
 }
 
 #define ANCHOR_DRIFT_DISTANCE_THRESHOLD 50.0f
@@ -50,9 +51,18 @@ static float distanceBetween(float lat1, float lon1, float lat2, float lon2) {
 void rtcStateBegin() {
   // Restore state from NVS if this boot follows a hard reset (OTA, brownout).
   // Must happen before incrementing bootCounter so the saved count is correct.
-  restoreStateFromNvs();
+  bool wasHardReset = restoreStateFromNvs();
 
+  // Save bootCounter before increment to detect first boot
+  uint32_t bootCounterBefore = rtcState.bootCounter;
   rtcState.bootCounter++;
+
+  // On first boot (power-on reset) or hard reset, zero the unsent JSON buffer.
+  // RTC memory may not be cleared on every boot path, leaving stale data.
+  if (bootCounterBefore == 0 || wasHardReset) {
+    rtcState.lastUnsentJson[0] = '\0';
+    rtcState.hasUnsentData = false;
+  }
 
   // Initialize counters on first boot
   if (rtcState.bootCounter == 1) {
@@ -146,14 +156,18 @@ void checkTemperatureAnomalies() {
     SerialMon.println("Temp anomaly check: no valid temperature");
     return;
   }
-  // Check spike: >2°C change from previous reading
+
+  // Reset spike flag at start of each check; only set if detected this cycle
+  rtcState.tempSpikeDetected = false;
+
+  // Check spike: >2°C change from previous reading (single-sample transient)
   if (rtcState.tempHistoryCount >= 2) {
     float prev = rtcState.tempHistory[rtcState.tempHistoryCount - 2];
     if (!isnan(prev)) {
       float delta = fabsf(currentTemp - prev);
-      rtcState.tempSpikeDetected = (delta > 2.0f);
-      if (rtcState.tempSpikeDetected) {
-        SerialMon.printf("TEMP SPIKE: %.1f°C change (%.1f -> %.1f)\n", delta, prev, currentTemp);
+      if (delta > 2.0f) {
+        rtcState.tempSpikeDetected = true;
+        SerialMon.printf("TEMP SPIKE: %.1f°C change this cycle (%.1f -> %.1f)\n", delta, prev, currentTemp);
       }
     }
   }
@@ -195,7 +209,14 @@ void clearFirmwareUpdateAttempted() {
 
 void storeUnsentJson(const String& json) {
   size_t len = json.length();
-  if (len >= sizeof(rtcState.lastUnsentJson)) len = sizeof(rtcState.lastUnsentJson) - 1;
+  if (len >= sizeof(rtcState.lastUnsentJson)) {
+    // Payload exceeds buffer — storing a truncated fragment would produce invalid JSON
+    // that the server rejects (HTTP 400), causing an infinite retry loop. Drop it instead.
+    SerialMon.printf("storeUnsentJson: payload %u bytes exceeds buffer %u — dropping to avoid retry loop\n",
+                     (unsigned)len, (unsigned)sizeof(rtcState.lastUnsentJson));
+    rtcState.hasUnsentData = false;
+    return;
+  }
   strncpy(rtcState.lastUnsentJson, json.c_str(), len);
   rtcState.lastUnsentJson[len] = '\0';
   rtcState.hasUnsentData = true;
@@ -252,23 +273,23 @@ void saveStateToNvs() {
   SerialMon.println("NVS: state saved before hard reset");
 }
 
-void restoreStateFromNvs() {
+bool restoreStateFromNvs() {
   Preferences prefs;
   if (!prefs.begin(NVS_NAMESPACE, true)) {
-    return;  // no NVS namespace yet — first boot ever, nothing to restore
+    return false;  // no NVS namespace yet — first boot ever, nothing to restore
   }
 
   bool pending = prefs.getBool("otaPend", false);
   prefs.end();
 
   if (!pending) {
-    return;  // normal deep-sleep wake, RTC memory is fine
+    return false;  // normal deep-sleep wake, RTC memory is fine
   }
 
   // Re-open read-write to restore and clear
   if (!prefs.begin(NVS_NAMESPACE, false)) {
     SerialMon.println("NVS: failed to reopen for restore");
-    return;
+    return false;
   }
 
   SerialMon.println("NVS: restoring state after hard reset");
@@ -288,10 +309,26 @@ void restoreStateFromNvs() {
   rtcState.chargingProblemDetected = prefs.getBool("chgProb", false);
   rtcState.firmwareUpdateAttempted = true;  // we know we got here via OTA
 
+  // Validate restored data; treat corrupted NVS as cold-boot fallback
+  bool validRestore = true;
+  if (rtcState.bootCounter > 1e6) validRestore = false;  // Unreasonable boot count
+  if (rtcState.lastWaterTemp < -50.0f || rtcState.lastWaterTemp > 100.0f) validRestore = false;  // Out-of-range temp
+  if (rtcState.lastGpsLat < -90.0f || rtcState.lastGpsLat > 90.0f) validRestore = false;  // Invalid latitude
+  if (rtcState.lastGpsLon < -180.0f || rtcState.lastGpsLon > 180.0f) validRestore = false;  // Invalid longitude
+  if (rtcState.lastGpsFixTime > 0 && rtcState.lastGpsFixTime < 1000000000) validRestore = false;  // Before year 2001
+
+  if (!validRestore) {
+    SerialMon.println("NVS: restored data validation FAILED — treating as cold boot");
+    prefs.putBool("otaPend", false);
+    prefs.end();
+    return false;  // Treat as validation failure; caller will use RTC defaults
+  }
+
   // Clear the pending flag so next deep-sleep wake doesn't re-restore
   prefs.putBool("otaPend", false);
   prefs.end();
 
   SerialMon.printf("NVS: restored bootCounter=%lu, waterTemp=%.1f, gpsLat=%.4f\n",
                    rtcState.bootCounter, rtcState.lastWaterTemp, rtcState.lastGpsLat);
+  return true;
 }

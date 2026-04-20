@@ -41,11 +41,11 @@ typedef struct {
   bool firmwareUpdateAttempted;      // Set before OTA restart, cleared on successful boot
 
   // Data buffering for failed uploads
-  char lastUnsentJson[512];         // Buffer for last unsent JSON payload
+  char lastUnsentJson[1024];        // Buffer for last unsent JSON payload (typical payload ~700-900 bytes)
   bool hasUnsentData;               // Flag if there is unsent data
 
   // Sleep planning snapshot (for wake reason context)
-  uint16_t lastSleepMinutes;        // Planned sleep minutes before last deep sleep
+  uint32_t lastSleepMinutes;        // Planned sleep minutes before last deep sleep (uint32 — max winter value 129600 exceeds uint16 max)
   uint32_t lastNextWakeUtc;         // Planned next wake epoch
 
 } rtc_state_t;
@@ -93,4 +93,4 @@ String getUnsentJson();
 // RTC memory is the primary store; NVS is only a safety net for rare events.
 //
 void saveStateToNvs();               // Snapshot critical RTC state to flash
-void restoreStateFromNvs();          // Restore from NVS if pending, then clear
+bool restoreStateFromNvs();           // Restore from NVS if pending, then clear; returns true if restored
