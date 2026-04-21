@@ -11,7 +11,7 @@ The original wave measurement used time-domain double integration of acceleromet
 
 ## Decision
 Replace time-domain double integration with FFT spectral analysis:
-- Collect 3 minutes of heave acceleration at 10Hz (1800 samples)
+- Collect 160s of heave acceleration at 10Hz (1600 samples)
 - Use last 1024 samples for 1024-point FFT
 - Hanning window → FFT → acceleration PSD → displacement PSD via 1/(2πf)⁴
 - Hs = 4·√m₀ (standard oceanographic definition)
@@ -22,7 +22,7 @@ Replace time-domain double integration with FFT spectral analysis:
 - FFT is drift-free — no accumulated error from double integration
 - No fudge factor needed — Hs = 4·√m₀ is the accepted oceanographic standard
 - Frequency-domain filtering cleanly separates wave energy from noise
-- Same 3-minute sampling window, no additional power cost
+- Same 160s sampling window, no additional power cost
 
 ## Trade-offs
 - 1024-point FFT requires ~8KB RAM (acceptable on ESP32 with 520KB)

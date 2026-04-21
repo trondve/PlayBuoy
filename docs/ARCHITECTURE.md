@@ -49,9 +49,10 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
   - All I/O pins high-Z (INPUT)
   - Estimated: ~10-15µA total
 
-- **Sleep schedule**: Battery-aware, season-aware
-  - Summer (May-Sep): 2-24 hour cycles
-  - Winter (Oct-Apr): 12h-3month cycles
+- **Sleep schedule**: Battery-aware, season-aware (3-season model)
+  - Summer (Jun-Aug): 2h–24h cycles
+  - Shoulder (Apr-May, Sep-Oct): 6h–2 week cycles
+  - Winter (Nov-Mar): 12h–3 month cycles
   - Optimal range: 40-60% SoC
   - Never above 80%, never below 20%
 
@@ -94,18 +95,28 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 
 ## Key Data Structures
 
-### JSON Payload (~30 fields)
+### JSON Payload
 ```json
 {
   "nodeId": "playbuoy_grinde",
+  "name": "Litla Grindevatnet",
+  "version": "1.2.0",
   "timestamp": 1683273600,
   "lat": 59.400, "lon": 5.271,
-  "temp": 12.5, "temp_trend": 0.3,
-  "wave.height": 0.45, "wave.period": 8.2, "wave.power": 1.8,
+  "wave": { "height": 0.45, "period": 8.2, "direction": "N/A", "power": 1.8 },
+  "buoy": { "tilt": 2.3, "accel_rms": 0.12 },
+  "temp": 12.5, "temp_trend": 0.3, "temp_valid": true,
   "battery": 3.75, "battery_percent": 50,
-  "buoy.tilt": 2.3, "buoy.accel_rms": 0.12,
-  "gps.hdop": 1.2, "gps.ttf": 145,
-  "boot_count": 1234, "reset_reason": "TimerWakeup(2h)"
+  "battery_change_since_last": -0.02,
+  "uptime": 312, "boot_count": 1234, "reset_reason": "TimerWakeup(2h 0m)",
+  "minutes_to_sleep": 360, "next_wake_utc": 1683286800,
+  "rtc": { "waterTemp": 12.3 },
+  "gps": { "hdop": 1.2, "ttf": 145 },
+  "net": { "operator": "Telenor", "apn": "telenor", "ip": "10.0.0.1", "signal": 18 },
+  "alerts": {
+    "anchorDrift": false, "chargingIssue": false,
+    "tempSpike": false, "overTemp": false, "uploadFailed": false
+  }
 }
 ```
 
@@ -120,7 +131,7 @@ rtc_state_t {
   bool tempSpikeDetected;         // >2°C change
   uint8_t anchorDriftCounter;     // Consecutive drifts
   char lastUnsentJson[512];       // Failed upload buffer
-  uint16_t lastSleepMinutes;      // Sleep context (minutes)
+  uint32_t lastSleepMinutes;      // Sleep context (minutes)
 }
 ```
 
@@ -129,8 +140,8 @@ rtc_state_t {
 ### Network & Servers
 - **Cellular**: Telenor Norway, LTE-M preferred (AT+CNMP=38)
 - **API**: `playbuoyapi.no:80` HTTP POST to `/upload`
-- **NTP**: `no.pool.ntp.org` (AT+CNTP)
-- **XTRA**: `http://trondve.ddns.net/xtra3grc.bin` (≥7 days)
+- **NTP**: `no.pool.ntp.org` (AT+CNTP, via gps.cpp)
+- **XTRA**: `http://trondve.ddns.net/xtra3grc.bin` (re-downloaded every 3 days)
 - **OTA**: `trondve.ddns.net` HTTP (no HTTPS)
 
 ### Deployments
@@ -161,7 +172,6 @@ rtc_state_t {
 
 ## Future Improvements
 1. **Wave direction**: Magnetometer non-functional in sealed enclosure
-2. **OTA integrity**: Add SHA-256 verification before update
-3. **Anchor drift**: Use GPS speed-over-ground (CGNSINF field 6)
-4. **Power logging**: Track wake cycles in RTC (detect solar harvest patterns)
-5. **Seasonal tuning**: Auto-detect deployment location for schedule optimization
+2. **Anchor drift**: Use GPS speed-over-ground (CGNSINF field 6) for improved detection
+3. **Power logging**: Track wake cycles in RTC (detect solar harvest patterns)
+4. **Seasonal tuning**: Auto-detect deployment location for schedule optimization

@@ -30,8 +30,8 @@ readBatteryVoltage()
 - Cell: Samsung INR18650-35E (3500mAh, inside LiitoKala Lii-35S)
 - 101 points (0-100%), 1% resolution, linear interpolation between points
 - Cold-adjusted (~20mV down from 25°C datasheet) for 5-15°C operating range
-- Key values: 2.95V = 0%, 3.57V ≈ 25%, 3.68V ≈ 50%, 3.92V ≈ 70%, 4.07V ≈ 80%, 4.20V = 100%
-- Flat plateau 3.55-3.72V maps to 25-50% — small voltage changes = large SoC swings
+- Key values: 2.95V = 0%, 3.555V = 25%, 3.72V = 50%, 3.932V = 70%, 4.071V = 80%, 4.20V = 100%
+- Flat plateau 3.555-3.72V maps to 25-50% — small voltage changes = large SoC swings
 - Binary search + linear interpolation for O(log n) lookup
 
 ## Sleep schedule design

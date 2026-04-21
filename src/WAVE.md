@@ -5,7 +5,7 @@ Measure significant wave height (Hs) and peak period (Tp) using FFT spectral ana
 
 ## What can go wrong
 - **Reducing sample duration below 2 min**: FFT frequency resolution = fs/N. At 10Hz with 1024 points, resolution is ~0.01Hz. Shorter windows reduce spectral resolution and miss longer wave periods (>10s).
-- **Changing FFT_N from 1024**: Must be power of 2 for radix-2 Cooley-Tukey. 512 halves resolution. 2048 needs 16KB RAM and 204s of data (>3 min collection).
+- **Changing FFT_N from 1024**: Must be power of 2 for radix-2 Cooley-Tukey. 512 halves resolution. 2048 needs 16KB RAM and 204s of data (collection would need to increase from 160s).
 - **Wrong scale factors**: IMU registers use fixed-point. ±2g range: exact scale = 9.80665/16384 m/s² per LSB. Wrong values = wrong wave heights.
 - **Gravity tracker drift**: The 0.02Hz low-pass gravity tracker takes ~50s to converge. The first ~576 samples are transient — that's why we collect 1600 samples but FFT uses only the last 1024.
 - **Sanity cap too low/high**: Hs > 2.0m → 0 (noise on lakes). For ocean deployment, this needs raising to 10-15m. Hardcoded in `spectralAnalysis()`.

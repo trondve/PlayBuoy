@@ -7,7 +7,7 @@ Connect to Telenor Norway via LTE-M (preferred) or NB-IoT (fallback), upload JSO
 - **Brownout during TX**: SIM7000G draws up to 2A peak. If battery is marginal, modem TX causes voltage sag → ESP32 brownout → reset loop.
 - **PWRKEY timing violation**: Power-on pulse <1000ms or power-off pulse <1200ms = modem ignores the command. Appears "stuck" in wrong power state.
 - **Stale PDP context**: If PDP isn't torn down before GPS, GNSS engine won't start (radio shared). If PDP is left active before sleep, modem stays registered → drains battery.
-- **NB-IoT flag never resets**: `static bool triedNBIoT` is local to `connectToNetwork()`. Once set, NB-IoT fallback is never retried in same boot — even after modem power-cycle.
+- **NB-IoT fallback**: `triedNBIoT` is a non-static local variable, reset on each `connectToNetwork()` call. NB-IoT is tried once if LTE-M fails; after a modem power-cycle the flag resets automatically.
 - **No HTTP status check on upload**: Fixed — `sendJsonToServer()` now parses HTTP status line and only treats 2xx as success.
 
 ## Critical timings (from SIM7000G datasheet)

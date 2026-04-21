@@ -28,14 +28,16 @@ Adopt a **battery health-first** strategy:
 5. **Conservative sleep schedule** prioritizes survival over data frequency
 
 ### Sleep Schedule Implementation
-- **Summer (May-Sep)**: Aggressive data collection (2-24h cycles) when solar is abundant
-- **Winter (Oct-Apr)**: Deep hibernation (12h-3month cycles) when solar is minimal
+- **Summer (Jun-Aug)**: Aggressive data collection (2h–24h cycles) when solar is abundant
+- **Shoulder (Apr-May, Sep-Oct)**: Intermediate schedule (6h–2 week cycles)
+- **Winter (Nov-Mar)**: Deep hibernation (12h–3 month cycles) when solar is minimal
 - **Fallback to winter** if RTC time is invalid (safer than guessing summer)
 
-### Charging Philosophy
+### Charging Philosophy (summer example)
 - **>80% SoC**: 2h intervals (discharge toward healthy range)
-- **40-60% SoC**: 6-24h intervals (maintain optimal range)
-- **<40% SoC**: 24h+ intervals (allow recharge)
+- **60-80% SoC**: 3h–6h intervals (good solar, frequent updates)
+- **40-60% SoC**: 6h–12h intervals (maintain optimal range)
+- **<40% SoC**: 12h+ intervals (allow recharge)
 
 ### Brownout Protection
 If battery sagged under modem load → brownout reset:
@@ -51,8 +53,8 @@ If battery sagged under modem load → brownout reset:
 - **Recovery**: Brownout fast-track prevents reset loops
 
 ## Trade-offs
-✗ Lower data frequency in winter (4-6 readings/day vs. 24+)
-✗ Delayed response to critical changes (temperature, wave height)
+✗ Lower data frequency in winter (1 reading/day or less vs. summer 24+)
+✗ Delayed response to critical changes (temperature, wave height) in winter
 ✓ Guaranteed survival through months of darkness
 ✓ Preserved cell health for multi-year operation
 

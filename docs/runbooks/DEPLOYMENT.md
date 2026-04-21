@@ -73,7 +73,7 @@ Monitor via API telemetry:
 - **Battery**: Should slowly discharge during summer, stable or charging in winter
 - **Temperature**: Compare to local water temperature (validate sensor accuracy)
 - **Waves**: Hs/Tp reasonable for sea state (0.1-0.6m typical, >2m caps to zero)
-- **Upload frequency**: Should match sleep schedule (4-6/day winter, 12-24/day summer)
+- **Upload frequency**: Matches sleep schedule — summer 2-12/day, shoulder 1-4/day, winter as low as 1/week at low SoC
 - **Boot count**: Increments per wake (no stuck reboots)
 
 ### Alert Conditions
@@ -124,14 +124,14 @@ pio run --target upload -e lilygo-t-sim7000g
 **Diagnosis**:
 1. Check sky visibility (near shore is best)
 2. Verify antenna connection (solder joint)
-3. XTRA data may be stale (refreshes every 7 days)
+3. XTRA data may be stale (refreshes every 3 days)
 
 **Recovery**:
 ```
 First fix (cold start): 20+ minutes normal
 Subsequent fixes: Should be 10min or less
 If stuck >20min:
-  - Wait 7 days for fresh XTRA data
+  - Wait 3 days for fresh XTRA data (or force re-download by clearing Preferences key)
   - Try relocating to higher elevation
   - Or reflash CGNSCOLD after XTRA download
 ```
@@ -177,8 +177,12 @@ If stuck >20min:
    ```bash
    scp firmware/playbuoy_*.bin user@trondve.ddns.net:/www/firmware/
    scp firmware/playbuoy_*.version user@trondve.ddns.net:/www/firmware/
+   # Generate and upload SHA-256 hash for integrity verification
+   sha256sum firmware/playbuoy_grinde.bin > firmware/playbuoy_grinde.sha256
+   sha256sum firmware/playbuoy_vatna.bin > firmware/playbuoy_vatna.sha256
+   scp firmware/playbuoy_*.sha256 user@trondve.ddns.net:/www/firmware/
    ```
-4. Verify server has both `.bin` and `.version` files
+4. Verify server has `.bin`, `.version`, and `.sha256` files for each buoy
 
 ### Rollback (If OTA Fails)
 If a buoy gets stuck in `OTA_IMG_PENDING_VERIFY`:
@@ -208,7 +212,7 @@ If a buoy gets stuck in `OTA_IMG_PENDING_VERIFY`:
 | Boot + BT init | 3s | CPU + serial |
 | Battery measurement | 30ms | 30mA ADC |
 | Brownout check | <100ms | minimal |
-| Wave collection | 3m | sensors active (~40mA) |
+| Wave collection | 160s | sensors active (~40mA) |
 | Modem power-on | 9.2s | 50mA (powering up) |
 | NTP sync + XTRA | 5-90s | modem active (~200-500mA) |
 | GPS fix (warm) | 5-20m | modem + GPS (~500mA) |
