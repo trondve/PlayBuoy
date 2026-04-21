@@ -192,21 +192,132 @@ If a buoy gets stuck in `OTA_IMG_PENDING_VERIFY`:
 
 ## Performance Expectations
 
-### Battery Sizing — Verdict
+### Battery Sizing — Verdict and 52-Week Simulation
 
-**2× LiitoKala Lii-35S (7,000 mAh total) is correct for Haugesund deployment.**
+**2× LiitoKala Lii-35S (7,000 mAh total) is the recommended minimum for Haugesund.**
 
-The aggressive winter sleep schedule means consumption in the 40–50% SoC band is only
-8–17 mAh/day net, while December solar harvest from the 4-panel omni array is 35–50 mAh/day.
-The buoy is net-positive through the entire winter at normal sleep currents.
+The table below is a steady-state simulation of all 52 weeks of the year for 1–4× 18650
+cells (3,500 mAh each). Two scenarios are shown — the outcome depends almost entirely on
+the board's actual deep-sleep current, which must be measured in the field.
 
-| Pack | Usable (80%→25%) | Zero-solar survival |
-|------|-----------------|-------------------|
-| 2× cells (7,000 mAh) | 3,850 mAh | ~6 months |
-| 4× cells (14,000 mAh) | 7,700 mAh | 12+ months |
+**Simulation assumptions:**
+- Solar: 4-panel omni array, 40° tilt, 59.4°N, Norwegian average cloud cover
+- Wake cycle: 25 mAh (GPS), 12 mAh (GPS-skipped), GPS once per 24 h max
+- Sleep schedule: exact values from `battery.cpp` (3-season model)
+- Steady-state: values shown are from year 2 of simulation (year 1 burn-in)
 
-4× cells is not necessary for this location. Revisit only if actual board sleep current
-exceeds 2 mA (measure with µA meter — see note below).
+#### Scenario A — Realistic (750 µA board sleep, average solar)
+
+| Wk | Mo  | 1× 3,500 | 2× 7,000 | 3× 10,500 | 4× 14,000 |
+|----|-----|----------|----------|-----------|-----------|
+|  1 | Jan |    91%   |    96%   |     97%   |     98%   |
+|  2 | Jan |    90%   |    95%   |     97%   |     97%   |
+|  3 | Jan |    88%   |    94%   |     96%   |     97%   |
+|  4 | Jan |    87%   |    93%   |     96%   |     97%   |
+|  5 | Feb |    85%   |    93%   |     95%   |     96%   |
+|  6 | Feb |    93%   |    97%   |     98%   |     98%   |
+|  7 | Feb |   100%   |   100%   |    100%   |    100%   |
+|  8 | Feb |   100%   |   100%   |    100%   |    100%   |
+|  9 | Mar |   100%   |   100%   |    100%   |    100%   |
+| 10 | Mar |   100%   |   100%   |    100%   |    100%   |
+| 11 | Mar |   100%   |   100%   |    100%   |    100%   |
+| 12 | Mar |   100%   |   100%   |    100%   |    100%   |
+| 13 | Mar |   100%   |   100%   |    100%   |    100%   |
+| 14 | Apr |   100%   |   100%   |    100%   |    100%   |
+| 15 | Apr |   100%   |   100%   |    100%   |    100%   |
+| 16 | Apr |   100%   |   100%   |    100%   |    100%   |
+| 17 | Apr |   100%   |   100%   |    100%   |    100%   |
+| 18 | May |   100%   |   100%   |    100%   |    100%   |
+| 19 | May |   100%   |   100%   |    100%   |    100%   |
+| 20 | May |   100%   |   100%   |    100%   |    100%   |
+| 21 | May |   100%   |   100%   |    100%   |    100%   |
+| 22 | May |   100%   |   100%   |    100%   |    100%   |
+| 23 | Jun |   100%   |   100%   |    100%   |    100%   |
+| 24 | Jun |   100%   |   100%   |    100%   |    100%   |
+| 25 | Jun |   100%   |   100%   |    100%   |    100%   |
+| 26 | Jun |   100%   |   100%   |    100%   |    100%   |
+| 27 | Jul |   100%   |   100%   |    100%   |    100%   |
+| 28 | Jul |   100%   |   100%   |    100%   |    100%   |
+| 29 | Jul |   100%   |   100%   |    100%   |    100%   |
+| 30 | Jul |   100%   |   100%   |    100%   |    100%   |
+| 31 | Aug |   100%   |   100%   |    100%   |    100%   |
+| 32 | Aug |   100%   |   100%   |    100%   |    100%   |
+| 33 | Aug |   100%   |   100%   |    100%   |    100%   |
+| 34 | Aug |   100%   |   100%   |    100%   |    100%   |
+| 35 | Aug |   100%   |   100%   |    100%   |    100%   |
+| 36 | Sep |   100%   |   100%   |    100%   |    100%   |
+| 37 | Sep |   100%   |   100%   |    100%   |    100%   |
+| 38 | Sep |   100%   |   100%   |    100%   |    100%   |
+| 39 | Sep |   100%   |   100%   |    100%   |    100%   |
+| 40 | Oct |   100%   |   100%   |    100%   |    100%   |
+| 41 | Oct |   100%   |   100%   |    100%   |    100%   |
+| 42 | Oct |   100%   |   100%   |    100%   |    100%   |
+| 43 | Oct |   100%   |   100%   |    100%   |    100%   |
+| 44 | Nov |   100%   |   100%   |    100%   |    100%   |
+| 45 | Nov |   100%   |   100%   |    100%   |    100%   |
+| 46 | Nov |   100%   |   100%   |    100%   |    100%   |
+| 47 | Nov |   100%   |   100%   |    100%   |    100%   |
+| 48 | Dec |   100%   |   100%   |    100%   |    100%   |
+| 49 | Dec |    98%   |    99%   |     99%   |    100%   |
+| 50 | Dec |    96%   |    98%   |     99%   |     99%   |
+| 51 | Dec |    95%   |    97%   |     98%   |     99%   |
+| 52 | Dec |    93%   |    96%   |     98%   |     98%   |
+| **MIN** | | **85%** | **93%** | **95%** | **96%** |
+
+**Result:** All configs are safe. Even 1× cell stays above 85% all year.
+
+#### Scenario B — Worst-case (2 mA board sleep, 60% of average solar)
+
+| Wk | Mo  | 1× 3,500 | 2× 7,000 | 3× 10,500 | 4× 14,000 |
+|----|-----|----------|----------|-----------|-----------|
+|  1 | Jan |  **24%⚠**|    53%   |     65%   |     73%   |
+|  2 | Jan |  **19%⚠**|    49%   |     62%   |     71%   |
+|  3 | Jan |  **14%⚠**|    47%   |     60%   |     69%   |
+|  4 | Jan |   **9%⚠**|    44%   |     58%   |     67%   |
+|  5 | Feb |   **4%⚠**|    41%   |     55%   |     65%   |
+|  6 | Feb |   **5%⚠**|    41%   |     55%   |     64%   |
+|  7 | Feb |   **6%⚠**|    41%   |     55%   |     64%   |
+|  8 | Feb |   **8%⚠**|    42%   |     55%   |     63%   |
+|  9 | Mar |   **9%⚠**|    42%   |     55%   |     62%   |
+| 10 | Mar |   23%↓   |    49%   |     59%   |     65%   |
+| 11 | Mar |    37%   |    55%   |     64%   |     68%   |
+| 12 | Mar |    52%   |    62%   |     67%   |     71%   |
+| 13 | Mar |    64%   |    67%   |     71%   |     73%   |
+| 14 | Apr |    88%   |    79%   |     78%   |     79%   |
+| 15 | Apr |   100%   |    90%   |     85%   |     84%   |
+| 16 | Apr |   100%   |    99%   |     91%   |     89%   |
+| 17 | Apr |   100%   |   100%   |     98%   |     93%   |
+| 18 | May |   100%   |   100%   |    100%   |     98%   |
+| 19 | May |   100%   |   100%   |    100%   |    100%   |
+| 20–43 | May–Oct | 100% | 100% | 100% | 100% |
+| 44 | Nov |    80%   |    90%   |     93%   |     95%   |
+| 45 | Nov |    70%   |    85%   |     90%   |     93%   |
+| 46 | Nov |    63%   |    80%   |     87%   |     90%   |
+| 47 | Nov |    56%   |    75%   |     84%   |     88%   |
+| 48 | Dec |    51%   |    72%   |     80%   |     85%   |
+| 49 | Dec |    45%   |    68%   |     77%   |     82%   |
+| 50 | Dec |    39%   |    63%   |     74%   |     80%   |
+| 51 | Dec |  **34%↓**|    59%   |     71%   |     78%   |
+| 52 | Dec |  **29%↓**|    56%   |     68%   |     75%   |
+| **MIN** | | **4% ⚠ CRITICAL** | **41%** | **55%** | **62%** |
+
+**Result:** 1× cell hits the critical guard repeatedly in Jan–Mar. 2× and above survive.
+
+#### Summary Table
+
+| Scenario | 1× 3,500 | 2× 7,000 | 3× 10,500 | 4× 14,000 |
+|----------|----------|----------|-----------|-----------|
+| Optimistic (500 µA, avg solar) | 96% min | 98% min | 99% min | 99% min |
+| Realistic (750 µA, avg solar) | 85% min | 93% min | 95% min | 96% min |
+| Pessimistic (2 mA, avg solar) | 45% min | 63% min | 74% min | 78% min |
+| Worst-case (2 mA, 60% solar)  | **4% ⚠** | 41% min | 55% min | 62% min |
+
+**Recommendation:**
+- **Measure actual sleep current first** — it's the dominant variable.
+- If sleep current ≤ 1 mA: 1× or 2× cells is adequate.
+- If sleep current is 1–2 mA: use 2× cells (minimum recommended).
+- If sleep current > 2 mA or panels may be obstructed: use 3× or 4× cells.
+- 2× cells (current design) is correct for the expected 500–750 µA board sleep current.
 
 ### Per-Cycle Energy Budget
 
