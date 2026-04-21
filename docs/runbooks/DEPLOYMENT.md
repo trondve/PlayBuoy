@@ -192,33 +192,101 @@ If a buoy gets stuck in `OTA_IMG_PENDING_VERIFY`:
 
 ## Performance Expectations
 
-### Power Budget (2× 18650, ~6000 mAh nominal)
-| Scenario | Daily Harvest | Daily Drain | Trend |
-|----------|---------------|------------|-------|
-| Summer sun | 2-3 Wh | 0.5-1.0 Wh | ↑ charging |
-| Summer cloudy | 0.5-1.0 Wh | 0.5-1.0 Wh | ↔ stable |
-| Winter sun | 0.5 Wh | 0.3-0.5 Wh | ↑ slow charge |
-| Winter dark | 0.0 Wh | 0.3-0.5 Wh | ↓ drains |
+### Battery Sizing — Verdict
 
-### Sleep Longevity
-- **80-100% SoC**: Aggressive use (2h cycles) to discharge
-- **40-60% SoC**: Sustainable operation (6-12h cycles)
-- **25-40% SoC**: Conservation mode (24h-7day cycles)
-- **≤25% SoC**: Hibernation (3-month sleep, awaits solar recovery)
+**2× LiitoKala Lii-35S (7,000 mAh total) is correct for Haugesund deployment.**
 
-### Typical Cycle Times
-| Phase | Duration | Power Draw |
-|-------|----------|-----------|
-| Boot + BT init | 3s | CPU + serial |
-| Battery measurement | 30ms | 30mA ADC |
-| Brownout check | <100ms | minimal |
-| Wave collection | 160s | sensors active (~40mA) |
-| Modem power-on | 9.2s | 50mA (powering up) |
-| NTP sync + XTRA | 5-90s | modem active (~200-500mA) |
-| GPS fix (warm) | 5-20m | modem + GPS (~500mA) |
-| Cellular + upload | 10-30s | modem + network (~500-1000mA) |
-| **Total wake** | 8-30 minutes | varies |
-| Deep sleep | 2h-3mo | ~15µA |
+The aggressive winter sleep schedule means consumption in the 40–50% SoC band is only
+8–17 mAh/day net, while December solar harvest from the 4-panel omni array is 35–50 mAh/day.
+The buoy is net-positive through the entire winter at normal sleep currents.
+
+| Pack | Usable (80%→25%) | Zero-solar survival |
+|------|-----------------|-------------------|
+| 2× cells (7,000 mAh) | 3,850 mAh | ~6 months |
+| 4× cells (14,000 mAh) | 7,700 mAh | 12+ months |
+
+4× cells is not necessary for this location. Revisit only if actual board sleep current
+exceeds 2 mA (measure with µA meter — see note below).
+
+### Per-Cycle Energy Budget
+
+| Phase | Current | Duration | Energy |
+|-------|---------|----------|--------|
+| Boot + modem register | 250 mA | 60 s | 4.2 mAh |
+| NTP sync | 250 mA | 15 s | 1.0 mAh |
+| XTRA download (every 3 days) | 250 mA | 60 s | 4.2 mAh |
+| GPS warmup (60s mandatory) | 150 mA | 60 s | 2.5 mAh |
+| GPS fix — warm start (avg 3 min) | 150 mA | 180 s | 7.5 mAh |
+| Reconnect cellular after GPS | 250 mA | 45 s | 3.1 mAh |
+| Wave sampling (160s) | 90 mA | 160 s | 4.0 mAh |
+| OTA check + upload | 250 mA | 45 s | 3.1 mAh |
+| **GPS cycle total** | | | **~25 mAh** |
+| **GPS-skipped cycle** (fix <24h ago) | | | **~12 mAh** |
+
+### Deep Sleep Current — Critical Field Measurement
+
+The firmware disables the 32kHz crystal (~250µA saved), holds GPIO 25 LOW (3V3 rail off),
+and sets all I/O pins to high-Z. The ESP32 core reaches 10–15µA.
+
+Board total depends on auxiliary ICs that stay powered:
+
+| Component | Current |
+|-----------|---------|
+| ESP32 core (deep sleep) | 10–15 µA |
+| Voltage divider 100K+100K | ~18 µA |
+| Charging IC quiescent | 50–200 µA |
+| USB-serial chip (CP2102/CH9102) | 200–1000 µA |
+| **Realistic board total** | **300 µA – 1.5 mA** |
+
+**Measure your board before deployment.** Use a µA meter in series with the battery.
+Community reports for T-SIM7000G range from ~500 µA to ~2 mA depending on revision.
+If above 2 mA, investigate which IC is drawing and whether it can be disabled.
+
+### Solar Harvest (Haugesund, 59.4°N)
+
+4× 0.3W panels, 68×36mm, 40° tilt, N/S/E/W orientation. South panel dominates in winter;
+north panel contributes almost nothing Nov–Feb. Assumes 80% charging efficiency and
+Norwegian average cloud cover.
+
+| Month | Estimated daily harvest |
+|-------|------------------------|
+| December | 35–50 mAh |
+| January | 40–60 mAh |
+| February | 80–120 mAh |
+| March | 150–220 mAh |
+| April | 280–420 mAh |
+| June | 600–900 mAh |
+
+Clear days are 2–3× higher. Prolonged overcast (common in western Norway) can drop
+below 15 mAh/day for days at a time.
+
+### Winter Survival Model
+
+At 40–50% SoC the firmware uses 3-day sleep. Per 3-day cycle:
+
+| | @500 µA sleep | @1.5 mA sleep |
+|-|--------------|--------------|
+| Sleep consumption | 36 mAh | 108 mAh |
+| Active cycle | 25 mAh | 25 mAh |
+| Solar (December avg) | 120 mAh | 120 mAh |
+| **Net** | **+59 mAh gain** | **−13 mAh loss** |
+
+At 500 µA the buoy is net-positive all winter. At 1.5 mA it is break-even in December
+with average cloud cover; a 2-week overcast costs ~180 mAh, recoverable when sun returns.
+
+### Sleep Schedule Reference
+
+| SoC | Winter sleep | Shoulder sleep | Summer sleep |
+|-----|-------------|---------------|-------------|
+| >80% | 12h | 6h | 2h |
+| 70–80% | 24h | 9h | 3h |
+| 60–70% | 24h | 12h | 6h |
+| 50–60% | 2 days | 18h | 9h |
+| 40–50% | 3 days | 24h | 12h |
+| 35–40% | 1 week | 2 days | 24h |
+| 30–35% | 2 weeks | 3 days | 2 days |
+| 25–30% | 1 month | 1 week | 3 days |
+| ≤25% | 3 months | 2 weeks | 1 week |
 
 ## Contact & Support
 - Hardware: LilyGo T-SIM7000G documentation in `docs/components/`
