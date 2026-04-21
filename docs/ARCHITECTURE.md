@@ -32,7 +32,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 4. Brownout fast-track (skip full cycle if battery <40%)
 5. Critical guard check (sleep if ≤3.70V/25%)
 6. Power 3V3 rail → init sensors → read temperature
-7. Collect wave data (3 min, 10Hz accelerometer, FFT)
+7. Collect wave data (160s, 10Hz accelerometer, FFT)
 8. Power off sensors/rail
 9. Modem: NTP sync → XTRA download → GNSS fix
 10. Cellular: re-establish (skip pre-cycle if modem warm)
@@ -71,7 +71,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 - Total time: ~30ms
 
 #### Wave Analysis (`wave.cpp`)
-- 3 min @ 10Hz accelerometer sampling (1800 samples)
+- 160s @ 10Hz accelerometer sampling (1600 samples)
 - Mahony AHRS + slow gravity tracker (0.02Hz LP)
 - FFT spectral analysis (1024-point)
 - Displacement PSD via 1/(2πf)⁴

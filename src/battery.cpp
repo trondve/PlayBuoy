@@ -58,7 +58,7 @@ bool handleUndervoltageProtection() {
     uint32_t now = (uint32_t)time(NULL);
     uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
     uint32_t nextWake = adjustNextWakeUtcForQuietHours(candidate);
-    rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+    rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
     rtcState.lastNextWakeUtc = nextWake;
     // Print local next wake for convenience
     if (rtcState.lastNextWakeUtc >= 24 * 3600) {

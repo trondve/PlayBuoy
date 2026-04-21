@@ -430,7 +430,7 @@ void setup() {
       // fastPath=true: skip 10s RTC retry loop (NTP hasn't run yet)
       int sleepMinutes = determineSleepDuration(pct, true);
       rtcState.lastBatteryVoltage = stableBatteryVoltage; // persist for next boot's hysteresis
-      rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+      rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
       // Apply quiet hours adjustment (same as normal path)
       uint32_t now = (uint32_t)time(NULL);
       uint32_t candidate = (now >= 24 * 3600 ? now : 0) + (uint32_t)sleepMinutes * 60UL;
@@ -762,7 +762,7 @@ void loop() {
     }
   }
   // Store planned sleep/wake info in RTC for next boot's wake reason context
-  rtcState.lastSleepMinutes = (uint16_t)sleepMinutes;
+  rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;
   rtcState.lastNextWakeUtc = nextWakeUtc;
 
   if (sleepMinutes >= 60)

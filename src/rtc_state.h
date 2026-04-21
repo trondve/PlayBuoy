@@ -45,7 +45,7 @@ typedef struct {
   bool hasUnsentData;               // Flag if there is unsent data
 
   // Sleep planning snapshot (for wake reason context)
-  uint16_t lastSleepMinutes;        // Planned sleep minutes before last deep sleep
+  uint32_t lastSleepMinutes;        // Planned sleep minutes before last deep sleep
   uint32_t lastNextWakeUtc;         // Planned next wake epoch
 
 } rtc_state_t;
