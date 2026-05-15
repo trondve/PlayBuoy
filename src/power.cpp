@@ -92,7 +92,7 @@ float readBatteryVoltage() {
                      i + 1, v[i], adcMv, isValidVoltage(v[i]) ? "OK" : "INVALID");
   }
 
-  float vmed = medianOfThree(v[0], v[1], v[2]);
+  float vmed = medianOfThree(v[0], v[1], v[2]) * BATTERY_CALIBRATION_FACTOR;
 
   // Log spread for remote diagnostics — if bursts differ by >20mV something is off
   float vmin = v[0], vmax = v[0];

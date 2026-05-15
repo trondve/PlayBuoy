@@ -34,6 +34,10 @@
 #define TIMEZONE "UTC0"
 
 // Power/ADC calibration
+// Scalar correction for hardware voltage divider tolerance.
+// Measure battery with a DMM and adjust until firmware readings match.
+// Set to 1.0f if uncalibrated (no correction applied).
+#define BATTERY_CALIBRATION_FACTOR 1.0f
 
 // Critical battery guard (device enters deep sleep when battery drops below threshold)
 #define ENABLE_CRITICAL_GUARD 1

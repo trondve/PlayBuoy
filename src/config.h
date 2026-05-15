@@ -33,7 +33,12 @@
 #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // Power/ADC calibration
-#define BATTERY_CALIBRATION_FACTOR 0.454398f
+// Scalar correction for hardware voltage divider tolerance.
+// Measured: buoy read 4.044V while DMM showed 4.085V → factor 1.0101
+//           buoy read 4.084V while DMM showed 4.127V → factor 1.0105
+// Average: ~1.0103. Applied as a post-median multiplier in power.cpp.
+// Set to 1.0f if uncalibrated.
+#define BATTERY_CALIBRATION_FACTOR 1.0103f
 
 // Critical battery guard (deep sleep when low)
 #define ENABLE_CRITICAL_GUARD 1
