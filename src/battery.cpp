@@ -2,6 +2,7 @@
 #include "power.h"
 #include "config.h"
 #include "rtc_state.h"
+#include "utils.h"
 #include <time.h>
 
 // Power helpers are declared in power.h
@@ -83,8 +84,13 @@ bool handleUndervoltageProtection() {
     if (nextWake > now) sleepSec = nextWake - now;
     if (sleepSec < 300) sleepSec = 300; // enforce minimum sleep floor
     esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
+#if DEBUG_NO_DEEP_SLEEP
+    SerialMon.println("⚠ DEBUG_NO_DEEP_SLEEP: skipping critical-guard sleep, continuing cycle.");
+    return false;
+#else
     esp_deep_sleep_start();
     return true; // not reached
+#endif
   }
 #endif
   return false;
@@ -255,8 +261,8 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
   if (season == SEASON_WINTER) {
     // Winter: minimal solar harvest, conserve battery.
     if (batteryPercent > 80) return 720;          // 12 hours — discharge toward healthy range
-    if (batteryPercent > 70) return 1440;         // 24 hours
-    if (batteryPercent > 60) return 1440;         // 24 hours — still some margin
+    if (batteryPercent > 70) return 1080;         // 18 hours — gradient between 80% (12h) and 60% (24h)
+    if (batteryPercent > 60) return 1440;         // 24 hours
     if (batteryPercent > 50) return 2880;         // 2 days
     if (batteryPercent > 40) return 4320;         // 3 days — entering optimal storage range
     if (batteryPercent > 35) return 10080;        // 1 week
@@ -272,11 +278,11 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
     if (batteryPercent > 70) return 540;          // 9 hours
     if (batteryPercent > 60) return 720;          // 12 hours
     if (batteryPercent > 50) return 1080;         // 18 hours
-    if (batteryPercent > 40) return 1440;         // 24 hours
-    if (batteryPercent > 35) return 2880;         // 2 days
-    if (batteryPercent > 30) return 4320;         // 3 days
-    if (batteryPercent > 25) return 10080;        // 1 week
-    return 20160;                                  // 2 weeks — conserve, solar should recover
+    if (batteryPercent > 40) return 2880;         // 2 days — more conservative below 50%
+    if (batteryPercent > 35) return 5760;         // 4 days
+    if (batteryPercent > 30) return 10080;        // 1 week — significant escalation near 30%
+    if (batteryPercent > 25) return 20160;        // 2 weeks — near critical, hibernate
+    return 20160;                                  // 2 weeks — critical guard handles true emergency
   }
 
   // Summer: solar harvest available, more frequent reporting.
@@ -287,11 +293,11 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
   if (batteryPercent > 70) return 180;           // 3 hours — good solar, capture temp changes
   if (batteryPercent > 60) return 360;           // 6 hours — sustainable equilibrium
   if (batteryPercent > 50) return 540;           // 9 hours — in optimal storage range
-  if (batteryPercent > 40) return 720;           // 12 hours — bottom of optimal range, conserve
-  if (batteryPercent > 35) return 1440;          // 24 hours — below optimal, needs recharge
-  if (batteryPercent > 30) return 2880;          // 2 days
-  if (batteryPercent > 25) return 4320;          // 3 days
-  return 10080;                                    // 1 week — near critical, let solar recover
+  if (batteryPercent > 40) return 1440;          // 24 hours — more conservative below 50%
+  if (batteryPercent > 35) return 2880;          // 2 days
+  if (batteryPercent > 30) return 5760;          // 4 days — escalation near 30%
+  if (batteryPercent > 25) return 10080;         // 1 week — near critical, let solar recover
+  return 10080;                                    // 1 week — critical guard handles true emergency
 }
 
 // Function to log battery voltage and estimated percentage
