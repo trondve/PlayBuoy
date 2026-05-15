@@ -9,7 +9,7 @@ Generated from full codebase review before sealing. Each item is one commit.
 | 03 | Brownout | No battery re-check between the 3 modem retry attempts; sag mid-retry can cause repeated brownouts | TODO |
 | 04 | OCV table | Key breakpoints plausible; verify upper range (70-100%) against Samsung INR18650-35E datasheet at 10°C | PASS |
 | 05 | Sleep schedule | Winter 70-79% and 60-69% both sleep 24h — no extra incentive to discharge when above optimal SoC | PASS |
-| 06 | Sleep schedule | Long sleep timer: 2-week/1-month/3-month — verify ESP32 RTC timer handles durations >12 days | TODO |
+| 06 | Sleep schedule | Long sleep timer: 2-week/1-month/3-month — verify ESP32 RTC timer handles durations >12 days | PASS |
 | 07 | Time | NTP→UTC→JSON→sleep-duration chain: nextWakeUtc and minutesToSleep agree ✓ | PASS |
 | 08 | Deep sleep | Pins high-Z ✓, GPIO25 held LOW ✓, BT released ✓, power domains set ✓, XTAL off ✓ | PASS |
 | 09 | Unsent JSON | Buffer is 1024 bytes, typical payload 756 bytes — fits ✓ | PASS |
