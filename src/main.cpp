@@ -717,6 +717,31 @@ void loop() {
 
   logRtcState();
 
+  // Power off modem before the battery re-check so both measurements are taken under
+  // identical load conditions (ESP32 only, no modem). Modem restarts in Phase 6 for upload.
+  // Without this, network registration current causes the second reading to be lower than
+  // true OCV, making it incomparable to the initial boot measurement.
+  if (g_modemReady) {
+    SerialMon.println("\n--- PRE-PHASE 5: MODEM SHUTDOWN FOR CLEAN BATTERY MEASUREMENT ---");
+    SerialMon.println("  Tearing down PDP context...");
+    modem.sendAT("+CNACT=0,0");
+    if (modem.waitResponse(5000) != 1) {
+      modem.sendAT("+CNACT=0"); modem.waitResponse(5000);
+    }
+    delay(400);
+    modem.sendAT("+CGACT=0,1"); modem.waitResponse(5000);
+    delay(400);
+    modem.sendAT("+CGATT=0");   modem.waitResponse(5000);
+    delay(400);
+    modem.sendAT("+CIPSHUT");   modem.waitResponse(8000);
+    delay(400);
+    SerialMon.println("  ✓ PDP torn down");
+    powerOffModem();   // sends AT+CFUN=0 + PWRKEY sequence (~4.5s total)
+    networkConnected = false;
+    delay(1000);       // allow battery to recover to near-OCV after modem load removed
+    SerialMon.println("  ✓ Modem off — battery measurement now matches boot conditions");
+  }
+
   uint32_t uptime = millis() / 1000; // seconds since boot
   String resetReason = getResetReasonString();
 
@@ -766,6 +791,17 @@ void loop() {
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
   SerialMon.println("\n--- PHASE 6: JSON PAYLOAD CONSTRUCTION AND UPLOAD ---");
+  // Restart modem and re-establish cellular (was shut down before Phase 5 battery measurement)
+  SerialMon.println("Re-powering modem for data upload...");
+  ensureModemReady();
+  delay(500);
+  networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
+  if (!networkConnected) {
+    SerialMon.println("  ⚠ Reconnect failed, testing multiple APNs...");
+    networkConnected = testMultipleAPNs();
+  }
+  SerialMon.printf("  Cellular: %s\n", networkConnected ? "connected" : "failed");
+
   // JSON is built once, after network connect attempt (see below)
   String json;
   // Print a human-friendly current local date/time
