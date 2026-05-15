@@ -11,11 +11,12 @@ The original wave measurement used time-domain double integration of acceleromet
 
 ## Decision
 Replace time-domain double integration with FFT spectral analysis:
-- Collect 3 minutes of heave acceleration at 10Hz (1800 samples)
-- Use last 1024 samples for 1024-point FFT
-- Hanning window → FFT → acceleration PSD → displacement PSD via 1/(2πf)⁴
+- Collect 160s of heave acceleration at 10Hz (1600 samples)
+- Use last 1024 samples for 1024-point FFT (first 576 samples discarded — gravity tracker settling)
+- IIR bandpass pre-filter at 0.03–2.0Hz (HP below WAVE_FREQ_MIN to avoid attenuation at band edge)
+- Hanning window (8/3 power correction) → FFT → acceleration PSD → displacement PSD via 1/(2πf)⁴
 - Hs = 4·√m₀ (standard oceanographic definition)
-- Tp = 1/f_peak (period of peak spectral density)
+- Tp = 1/f_peak (parabolic interpolation on displacement PSD for sub-bin accuracy)
 - Wave band: 0.05–1.0 Hz (periods 1–20s)
 
 ## Rationale
@@ -27,8 +28,8 @@ Replace time-domain double integration with FFT spectral analysis:
 ## Trade-offs
 - 1024-point FFT requires ~8KB RAM (acceptable on ESP32 with 520KB)
 - Frequency resolution limited to ~0.01Hz (sufficient for wave periods 1–20s)
-- Mahony AHRS filter is now redundant (gravity tracker does orientation independently)
-- Sanity cap at Hs > 2.0m appropriate for lakes, needs raising for ocean deployment
+- Mahony AHRS filter is redundant and has been removed (gravity tracker handles orientation)
+- Sanity caps (`WAVE_HS_MAX_M`, `WAVE_TP_MAX_S`) configurable per deployment — defaults for lakes
 
 ## Implementation
 - `src/wave.cpp`: FFT pipeline, spectral moment calculation

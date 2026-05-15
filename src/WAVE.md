@@ -8,7 +8,7 @@ Measure significant wave height (Hs) and peak period (Tp) using FFT spectral ana
 - **Changing FFT_N from 1024**: Must be power of 2 for radix-2 Cooley-Tukey. 512 halves resolution. 2048 needs 16KB RAM and 204s of data (>3 min collection).
 - **Wrong scale factors**: IMU registers use fixed-point. ±2g range: exact scale = 9.80665/16384 m/s² per LSB. Wrong values = wrong wave heights.
 - **Gravity tracker drift**: The 0.02Hz low-pass gravity tracker takes ~50s to converge. The first ~576 samples are transient — that's why we collect 1600 samples but FFT uses only the last 1024.
-- **Sanity cap too low/high**: Hs > 2.0m → 0 (noise on lakes). For ocean deployment, this needs raising to 10-15m. Hardcoded in `spectralAnalysis()`.
+- **Sanity caps**: Configurable via `config.h`. `WAVE_HS_MAX_M` (default 2.0m for lakes) caps Hs; `WAVE_TP_MAX_S` (default 8.0s for lakes) caps Tp. Raise both for ocean deployments.
 
 ## Signal processing pipeline
 ```
@@ -17,7 +17,7 @@ IMU (10Hz, 160s)
   → Gravity tracker: 0.02Hz LP on acceleration → slowly tracks g vector
   → Specific force: accel - gravity_estimate
   → Heave: project specific force onto gravity direction
-  → IIR bandpass: 0.05-2.0Hz (anti-alias for FFT)
+  → IIR bandpass: 0.03-2.0Hz (HP cutoff below WAVE_FREQ_MIN to avoid -3dB at lowest wave bin)
   → Store in accelBuf[1600]
 
 FFT spectral analysis (last 1024 samples)
@@ -28,7 +28,7 @@ FFT spectral analysis (last 1024 samples)
   → Displacement PSD = Accel PSD / (2πf)⁴
   → m₀ = ∫ displacement_PSD df  (over 0.05-1.0 Hz)
   → Hs = 4·√m₀  (standard oceanographic definition)
-  → Tp = 1/f_peak  (parabolic interpolation for sub-bin accuracy)
+  → Tp = 1/f_peak  (parabolic interpolation on displacement PSD for sub-bin accuracy)
   → Power = 0.49 · Hs² · Tp  (deep-water approximation)
 ```
 
@@ -55,3 +55,5 @@ FFT spectral analysis (last 1024 samples)
 - Never change FFT_N without recalculating memory and frequency resolution
 - Never change IMU scale factors without checking the datasheet register values
 - Wave direction is always "N/A" — magnetometer doesn't work through the sealed case
+- Keep HP_CUTOFF_HZ < WAVE_FREQ_MIN — if they match, the lowest wave bins are attenuated -3dB
+- Parabolic Tp interpolation must use displacement PSD (accelPSD/ω⁴), not raw FFT magnitudes

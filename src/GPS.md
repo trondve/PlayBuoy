@@ -29,12 +29,12 @@ The firmware selects the optimal start mode based on last fix age (stored in `rt
 Fixes are only accepted if HDOP ≤ 3.0 (good accuracy for anchor drift detection). After 80% of the timeout has elapsed, any fix is accepted regardless of HDOP (better than nothing).
 
 ## GPS fix timeout (battery-adaptive)
-| Scenario | Battery >60% | 40-60% | <40% |
+| Scenario | Battery >60% | 40-60% | ≤40% |
 |----------|-------------|--------|------|
-| First fix | 20 min | 15 min | 10 min |
-| Subsequent | 10 min | 7.5 min | 5 min |
+| First fix | 20 min | 15 min | skipped |
+| Subsequent | 10 min | 7.5 min | skipped |
 
-GPS skipped entirely if last fix was <24 hours ago.
+GPS skipped entirely when battery ≤ 40% — falls to NTP-only time sync to save power. GPS is also skipped when the last fix age is within the configured interval: 7 days normally, 1 day when anchor drift is active (`GPS_SYNC_INTERVAL_SECONDS` / `GPS_ANCHOR_DRIFT_INTERVAL_SECONDS`).
 
 ## Key code paths
 - `getGpsFix(timeoutSec)` → `syncTimeAndMaybeApplyXTRA()` → `gnssStart()` → `gnssWarmup60s()` → polling loop
@@ -47,3 +47,4 @@ GPS skipped entirely if last fix was <24 hours ago.
 - Never reduce the 60s warmup — satellites need acquisition time
 - Never reduce GPS fix timeout — it's the user's #1 request
 - After GPS fix, call `connectToNetwork(apn, true)` to reuse warm modem
+- GPS is skipped (NTP-only sync) when battery ≤ 40% — do not remove this guard

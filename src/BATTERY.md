@@ -6,7 +6,7 @@ Measure battery voltage accurately before powering any subsystems (open-circuit 
 ## What can go wrong
 - **Measuring under load**: Battery must be measured BEFORE powering modem, GPS, or sensors. Under 2A modem load, voltage sags 150-300mV — gives false critical readings.
 - **Lowering critical guard**: The 3.70V / 25% threshold protects against SIM7000G failure (needs ≥3.55V under 2A peak) and irreversible 18650 cell damage (below 20% = permanent capacity loss). Hooks block this, but be aware.
-- **Wrong OCV table**: Current table is based on Samsung INR18650-35E (LiitoKala Lii-35S), adjusted ~20mV downward for 5-15°C operating temperature. 2× cells in parallel (same voltage, double capacity).
+- **Wrong OCV table**: Current table is based on Samsung INR18650-35E (LiitoKala Lii-35S), calibrated at ~10°C. Dynamic compensation adds 1.5mV/°C when water temp is below 10°C. 2× cells in parallel (same voltage, double capacity).
 - **Fallback month = summer**: If RTC time is invalid and fallback is August, summer schedule kicks in (2h sleep at >80%) — drains battery in winter darkness. Fixed: fallback is now January.
 
 ## ADC measurement pipeline (power.cpp)
@@ -28,11 +28,10 @@ readBatteryVoltage()
 
 ## OCV table (battery.cpp)
 - Cell: Samsung INR18650-35E (3500mAh, inside LiitoKala Lii-35S)
-- 101 points (0-100%), 1% resolution, linear interpolation between points
-- Cold-adjusted (~20mV down from 25°C datasheet) for 5-15°C operating range
-- Key values: 2.95V = 0%, 3.57V ≈ 25%, 3.68V ≈ 50%, 3.92V ≈ 70%, 4.07V ≈ 80%, 4.20V = 100%
-- Flat plateau 3.55-3.72V maps to 25-50% — small voltage changes = large SoC swings
-- Binary search + linear interpolation for O(log n) lookup
+- 101 points (0-100%), 1% resolution, binary search + linear interpolation — O(log n) lookup
+- Table calibrated at ~10°C; temperature compensation adds 1.5mV/°C for tempC < 10°C
+- Key values: 2.950V = 0%, 3.555V = 25%, 3.720V = 50%, 3.932V = 70%, 4.071V = 80%, 4.200V = 100%
+- Flat plateau 3.55-3.72V maps to 25-50% — small voltage changes = large SoC swings (normal for this cell)
 
 ## Sleep schedule design
 - **Target SoC: 40-60%** — optimal for 18650 longevity (data center standard)

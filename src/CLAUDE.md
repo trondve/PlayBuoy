@@ -37,11 +37,11 @@ ESP32 firmware for the PlayBuoy IoT buoy. Each boot cycle: measure battery → r
 - **≤3.70V / ≤25%** → deep sleep (protects SIM7000G minimum 3.55V under 2A peak)
 - **Brownout + <40%** → skip cycle, sleep immediately (prevent brownout loop)
 - **Temperature valid range:** -30 to +60°C. Reject -127°C (disconnected) and 85°C (DS18B20 error)
-- **Wave sanity cap:** Hs > 2.0m = noise on lakes (raise for ocean deployments)
+- **Wave sanity caps:** `WAVE_HS_MAX_M` (default 2.0m) and `WAVE_TP_MAX_S` (default 8.0s) — raise both for ocean deployments
 
 ### Timing constraints — do not reduce these
 - Modem power-on: 2s PWRKEY LOW + 6s settle (spec min: 1s + ~5s)
-- Modem power-off: 1.3s PWRKEY LOW (spec min: 1.2s)
+- Modem power-off: 1.5s PWRKEY LOW (spec min: 1.2s)
 - DS18B20: 750ms conversion at 12-bit resolution
 - GPS smoke test: 60s NMEA warmup before polling CGNSINF
 - Watchdog: 45 minutes (entire boot cycle)

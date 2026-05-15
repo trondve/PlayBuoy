@@ -50,10 +50,12 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
   - Estimated: ~10-15µA total
 
 - **Sleep schedule**: Battery-aware, season-aware
-  - Summer (May-Sep): 2-24 hour cycles
-  - Winter (Oct-Apr): 12h-3month cycles
-  - Optimal range: 40-60% SoC
-  - Never above 80%, never below 20%
+  - Summer (Jun–Aug): 2–9 hour cycles (>50% SoC)
+  - Shoulder (Apr–May, Sep–Oct): 6–18 hour cycles (>50% SoC)
+  - Winter (Nov–Mar): 12h–3 month cycles
+  - Below 50% in any season: sleep doubles at each SoC band; steepest near 25–30%
+  - GPS skipped when battery ≤ 40% (NTP-only sync to save power)
+  - Optimal range: 40–60% SoC; never above 80%, never below 20%
 
 ### Critical Components
 
@@ -71,12 +73,14 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 - Total time: ~30ms
 
 #### Wave Analysis (`wave.cpp`)
-- 3 min @ 10Hz accelerometer sampling (1800 samples)
-- Mahony AHRS + slow gravity tracker (0.02Hz LP)
-- FFT spectral analysis (1024-point)
+- 160s @ 10Hz accelerometer sampling (1600 samples); last 1024 used for FFT
+- Slow gravity tracker (0.02Hz LP) — Mahony AHRS removed
+- IIR bandpass 0.03–2.0Hz pre-filter (HP below WAVE_FREQ_MIN to avoid low-bin attenuation)
+- FFT spectral analysis (1024-point, Hanning window, 8/3 power correction)
 - Displacement PSD via 1/(2πf)⁴
 - Hs = 4·√m₀ (oceanographic standard)
-- Sanity cap: >2.0m treated as noise (lake deployment)
+- Tp via parabolic interpolation on displacement PSD
+- Sanity caps: `WAVE_HS_MAX_M` (default 2.0m) and `WAVE_TP_MAX_S` (default 8.0s) — configurable for ocean
 
 #### GPS/Time (`gps.cpp`)
 - NTP sync → XTRA download → GNSS fix pipeline
@@ -119,7 +123,7 @@ rtc_state_t {
   float tempHistory[5];           // Trend calculation
   bool tempSpikeDetected;         // >2°C change
   uint8_t anchorDriftCounter;     // Consecutive drifts
-  char lastUnsentJson[512];       // Failed upload buffer
+  char lastUnsentJson[1024];      // Failed upload buffer
   uint16_t lastSleepMinutes;      // Sleep context (minutes)
 }
 ```
@@ -161,7 +165,6 @@ rtc_state_t {
 
 ## Future Improvements
 1. **Wave direction**: Magnetometer non-functional in sealed enclosure
-2. **OTA integrity**: Add SHA-256 verification before update
-3. **Anchor drift**: Use GPS speed-over-ground (CGNSINF field 6)
-4. **Power logging**: Track wake cycles in RTC (detect solar harvest patterns)
-5. **Seasonal tuning**: Auto-detect deployment location for schedule optimization
+2. **Anchor drift**: Use GPS speed-over-ground (CGNSINF field 6)
+3. **Power logging**: Track wake cycles in RTC (detect solar harvest patterns)
+4. **Seasonal tuning**: Auto-detect deployment location for schedule optimization
