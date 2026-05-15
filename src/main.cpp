@@ -163,8 +163,30 @@ void ensureModemReady() {
     g_modemReady = false;
   }
   powerOnModem();
+  // Try 57600 first (configured rate); fall back to 115200 (SIM7000G factory default)
+  // and lock to 57600 so subsequent boots are consistent.
   SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
   delay(2000);
+  {
+    SerialAT.print("AT\r\n");
+    unsigned long t0 = millis(); bool ok = false; String r;
+    while (millis() - t0 < 1500) {
+      while (SerialAT.available()) { r += (char)SerialAT.read(); if (r.indexOf("OK") >= 0) { ok = true; break; } }
+      if (ok) break; delay(10);
+    }
+    if (!ok) {
+      SerialMon.println("57600 baud probe failed — trying 115200 (factory default)");
+      SerialAT.end();
+      SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
+      delay(200);
+      SerialAT.print("AT\r\n"); delay(300);
+      SerialAT.print("AT+IPR=57600\r\n"); delay(300); // persist baud rate
+      SerialAT.end();
+      SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
+      delay(200);
+      SerialMon.println("Modem baud rate locked to 57600");
+    }
+  }
   g_modemReady = true;
 }
 
