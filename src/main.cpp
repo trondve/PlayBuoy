@@ -518,16 +518,33 @@ void loop() {
 
   SerialMon.println("\n--- PHASE 1: GPS DECISION LOGIC ---");
   bool shouldGetNewGpsFix = true;
-  if (rtcState.lastGpsFixTime > 1000000000) {  // sanity check for valid epoch time
+  if (rtcState.lastGpsFixTime > 1000000000) {
     uint32_t age = now - rtcState.lastGpsFixTime;
-    if (age < GPS_SYNC_INTERVAL_SECONDS) {
-      SerialMon.printf("ℹ Last GPS fix is recent (%u seconds ago). Skipping new fix.\n", age);
+    // Anchor drift → daily; normal → weekly
+    uint32_t interval = rtcState.anchorDriftDetected
+                        ? (uint32_t)GPS_ANCHOR_DRIFT_INTERVAL_SECONDS
+                        : (uint32_t)GPS_SYNC_INTERVAL_SECONDS;
+    if (age < interval) {
       shouldGetNewGpsFix = false;
+      uint32_t remaining = interval - age;
+      uint32_t rh = remaining / 3600, rm = (remaining % 3600) / 60;
+      if (rtcState.anchorDriftDetected) {
+        SerialMon.printf("Anchor drift active — daily GPS (last fix %uh ago, next in %uh %um)\n",
+                         age / 3600, rh, rm);
+      } else {
+        SerialMon.printf("GPS fresh — last fix %uh ago, next in %uh %um (weekly interval)\n",
+                         age / 3600, rh, rm);
+      }
     } else {
-      SerialMon.printf("GPS fix is stale (%u seconds old, threshold %u). Will attempt new fix.\n", age, GPS_SYNC_INTERVAL_SECONDS);
+      if (rtcState.anchorDriftDetected) {
+        SerialMon.printf("Anchor drift active — daily GPS fix due (last fix %uh ago)\n", age / 3600);
+      } else {
+        SerialMon.printf("GPS stale (%uh > %uh threshold) — getting new fix\n",
+                         age / 3600, interval / 3600);
+      }
     }
   } else {
-    SerialMon.println("No previous GPS fix found. Will attempt first fix (cold-start).");
+    SerialMon.println("No previous GPS fix — cold-start required");
   }
 
   // 1) Collect wave data first (modem is still off for lower power)
@@ -654,16 +671,20 @@ void loop() {
       SerialMon.println("  ✗ Cellular connection failed");
     }
   } else {
-    SerialMon.println("Skipping GPS (recent fix available), using cached coordinates...");
+    SerialMon.println("Skipping GPS (fix within interval) — using cached coordinates...");
     fix.latitude = rtcState.lastGpsLat;
     fix.longitude = rtcState.lastGpsLon;
     fix.fixTimeEpoch = rtcState.lastGpsFixTime;
     fix.success = true;
 
-    // GPS was skipped, but we still need cellular data for firmware updates and JSON upload
-    SerialMon.println("Establishing cellular data connection for upload (fresh modem power-on)...");
+    // Sync RTC via NTP/NITZ even when GPS is skipped (prevents RTC drift over 7-day interval)
+    SerialMon.println("  Syncing time via NTP/NITZ (no GPS this cycle)...");
     ensureModemReady();
-    delay(1000);  // brief settle before connect (modem just powered on)
+    gpsNtpSync();
+
+    // Establish cellular data connection for firmware updates and JSON upload
+    SerialMon.println("Establishing cellular data connection for upload...");
+    delay(500);
     networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
 
     // If regular connection fails, try APN testing

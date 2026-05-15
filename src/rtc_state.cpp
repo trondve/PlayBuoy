@@ -21,6 +21,7 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .lastUploadFailed = false,
   .anchorDriftDetected = false,
   .anchorDriftCounter = 0,
+  .anchorDriftClearCounter = 0,
   .chargingProblemDetected = false,
   .firmwareUpdateAttempted = false,
   .lastUnsentJson = {0},
@@ -106,17 +107,29 @@ void checkAnchorDrift(float currentLat, float currentLon) {
   }
   float dist = distanceBetween(currentLat, currentLon, rtcState.lastGpsLat, rtcState.lastGpsLon);
   if (dist > ANCHOR_DRIFT_DISTANCE_THRESHOLD) {
-    // Accumulate consecutive drift detections across boots
     if (rtcState.anchorDriftCounter < 255) rtcState.anchorDriftCounter++;
     rtcState.anchorDriftDetected = true;
+    rtcState.anchorDriftClearCounter = 0;  // reset any clear streak
   } else {
-    // No drift on this fix — reset counter (buoy is back in place)
     rtcState.anchorDriftCounter = 0;
-    rtcState.anchorDriftDetected = false;
+    if (rtcState.anchorDriftDetected) {
+      // Require 2 consecutive clear readings before resolving the alert
+      if (rtcState.anchorDriftClearCounter < 255) rtcState.anchorDriftClearCounter++;
+      if (rtcState.anchorDriftClearCounter >= 2) {
+        rtcState.anchorDriftDetected = false;
+        rtcState.anchorDriftClearCounter = 0;
+        SerialMon.println("Anchor drift resolved (2 consecutive clear readings — back to weekly GPS)");
+      } else {
+        SerialMon.printf("Anchor drift clearing (%d/2 consecutive clear readings)...\n",
+                         rtcState.anchorDriftClearCounter);
+      }
+    } else {
+      rtcState.anchorDriftClearCounter = 0;
+    }
   }
 
-  SerialMon.printf("Anchor drift check: distance=%.2f m, counter=%d, alert=%s\n",
-                   dist, rtcState.anchorDriftCounter,
+  SerialMon.printf("Anchor drift check: distance=%.2f m, driftCounter=%d, clearCounter=%d, alert=%s\n",
+                   dist, rtcState.anchorDriftCounter, rtcState.anchorDriftClearCounter,
                    rtcState.anchorDriftDetected ? "YES" : "NO");
 }
 
@@ -266,6 +279,7 @@ void saveStateToNvs() {
   prefs.putBytes("tHist",      rtcState.tempHistory, sizeof(rtcState.tempHistory));
   prefs.putUChar("driftCnt",   rtcState.anchorDriftCounter);
   prefs.putBool("driftDet",    rtcState.anchorDriftDetected);
+  prefs.putUChar("driftClr",   rtcState.anchorDriftClearCounter);
   prefs.putBool("chgProb",     rtcState.chargingProblemDetected);
   prefs.putBool("otaPend",     true);  // flag: restore needed on next boot
 
@@ -275,8 +289,8 @@ void saveStateToNvs() {
 
 bool restoreStateFromNvs() {
   Preferences prefs;
-  if (!prefs.begin(NVS_NAMESPACE, true)) {
-    return false;  // no NVS namespace yet — first boot ever, nothing to restore
+  if (!prefs.begin(NVS_NAMESPACE, false)) {
+    return false;  // NVS open failed (unexpected — read-write mode creates namespace if absent)
   }
 
   bool pending = prefs.getBool("otaPend", false);
@@ -304,8 +318,9 @@ bool restoreStateFromNvs() {
   rtcState.lastWaterTemp         = prefs.getFloat("wTemp", 0.0f);
   rtcState.tempHistoryCount      = prefs.getUChar("thCnt", 0);
   prefs.getBytes("tHist", rtcState.tempHistory, sizeof(rtcState.tempHistory));
-  rtcState.anchorDriftCounter    = prefs.getUChar("driftCnt", 0);
-  rtcState.anchorDriftDetected   = prefs.getBool("driftDet", false);
+  rtcState.anchorDriftCounter      = prefs.getUChar("driftCnt", 0);
+  rtcState.anchorDriftDetected     = prefs.getBool("driftDet", false);
+  rtcState.anchorDriftClearCounter = prefs.getUChar("driftClr", 0);
   rtcState.chargingProblemDetected = prefs.getBool("chgProb", false);
   rtcState.firmwareUpdateAttempted = true;  // we know we got here via OTA
 

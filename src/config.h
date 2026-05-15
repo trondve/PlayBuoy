@@ -1,8 +1,13 @@
 // Configuration - Update these values for your specific setup
+
+// TinyGSM — must be defined before any TinyGsmClient.h include
+#define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_RX_BUFFER 1024
 #define NODE_ID "playbuoy_grinde"
 #define NAME "Litla Grindevatnet"
-#define FIRMWARE_VERSION "1.2.3"
-#define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
+#define FIRMWARE_VERSION "1.2.4"
+#define GPS_SYNC_INTERVAL_SECONDS       (7 * 24 * 3600)  // normal: fix every 7 days
+#define GPS_ANCHOR_DRIFT_INTERVAL_SECONDS (24 * 3600)    // daily fix while anchor drift is active
 
 // API Configuration
 #define API_SERVER "playbuoyapi.no"
@@ -42,3 +47,11 @@
 
 // Optional SIM PIN (leave empty if not required)
 #define SIM_PIN ""
+
+// Wave analysis configuration
+#define WAVE_HS_MAX_M 2.0f              // Max significant wave height (m); lake deployment cap
+#define BROWNOUT_SKIP_PCT 40            // Skip cycle if brownout reset + battery below this %
+#define HYSTERESIS_SAMPLE_COUNT 3       // Consecutive samples before schedule change
+
+// Debug: set to 1 to stay awake instead of entering deep sleep
+#define DEBUG_NO_DEEP_SLEEP 0

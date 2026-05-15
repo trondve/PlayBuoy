@@ -33,6 +33,7 @@ typedef struct {
   // Anchor drift alert and counter
   bool anchorDriftDetected;          // Flag for confirmed anchor drift alert
   uint8_t anchorDriftCounter;        // Counter for consecutive drift detections
+  uint8_t anchorDriftClearCounter;   // Consecutive clear readings; cleared when drift resolves (≥2 = resolved)
 
   // Battery charging alert
   bool chargingProblemDetected;      // Flag if no charge detected over 24 hours

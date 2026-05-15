@@ -47,4 +47,8 @@ uint16_t getGpsFixTimeout(bool isFirstFix);
 // Encapsulates getGpsFixTimeout() logic for cleaner call site.
 GpsFixResult getGpsFixDynamic(bool isFirstFix);
 
+// Performs NTP/NITZ time sync only — no GNSS, no XTRA.
+// Called on cycles where GPS is skipped (fix within interval, no anchor drift).
+void gpsNtpSync();
+
 

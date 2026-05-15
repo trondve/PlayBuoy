@@ -1,8 +1,14 @@
 // Configuration template - copy this to config.h and update with your actual values
+
+// TinyGSM — must be defined before any TinyGsmClient.h include
+#define TINY_GSM_MODEM_SIM7000
+#define TINY_GSM_RX_BUFFER 1024
+
 #define NODE_ID "your-buoy-id"
 #define NAME "Your Buoy Name"
 #define FIRMWARE_VERSION "1.1.1"
-#define GPS_SYNC_INTERVAL_SECONDS (24 * 3600)  // 24 hours
+#define GPS_SYNC_INTERVAL_SECONDS       (7 * 24 * 3600)  // normal: fix every 7 days
+#define GPS_ANCHOR_DRIFT_INTERVAL_SECONDS (24 * 3600)    // daily fix while anchor drift is active
 
 // API Configuration
 #define API_SERVER "your-api-server.com"
@@ -45,7 +51,6 @@
 
 // Wave analysis configuration
 #define WAVE_HS_MAX_M 2.0f              // Max significant wave height (m); capped for lake deployments (raise for ocean)
-#define WAVE_FREQ_MIN 0.05f             // Min frequency for spectral analysis (Hz); cutoff to prevent low-freq blowup
 #define BROWNOUT_SKIP_PCT 40            // Skip cycle if battery is low AND voltage is sinking (prevent brownout loops)
 #define HYSTERESIS_SAMPLE_COUNT 3       // Require N consecutive samples before schedule change (prevent oscillation)
 

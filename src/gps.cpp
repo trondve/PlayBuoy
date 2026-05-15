@@ -4,6 +4,7 @@
 #include "config.h"
 #include "modem.h"
 #include "rtc_state.h"
+#include "utils.h"
 
 #include <Preferences.h>
 #include <time.h>
@@ -131,83 +132,89 @@ static ClockInfo parseCCLK(const String& cclk) {
 }
 
 static bool doNTPSync(ClockInfo* outCi = nullptr) {
-  SerialMon.println("=== NTP SYNC (no.pool.ntp.org) ===");
-  // Explicitly disable echo to avoid parsing issues
+  SerialMon.println("=== TIME SYNC (NTP with NITZ fallback) ===");
   sendAT("ATE0");
-  sendAT("AT+CNTPCID=1");
-  sendAT(String("AT+CNTP=\"") + NTP_HOST + "\",0");
 
-  // Read CCLK before NTP to detect stale modem RTC
-  String preNtpCclk;
-  sendAT("AT+CCLK?", &preNtpCclk, 1000);
-  ClockInfo preCi = parseCCLK(preNtpCclk);
+  // Enable automatic timezone update from NITZ (Network Identity and Time Zone).
+  // With CTZU=1 the modem writes received NITZ broadcasts directly into CCLK,
+  // including the local-time + UTC-offset fields. Must be set before PDP is up
+  // so the first registration triggers an update; doing it here still catches
+  // late NITZ broadcasts and persists across reboots once written to NV.
+  sendAT("AT+CTZU=1");
 
-  // Trigger NTP sync and capture the AT+CNTP command response.
-  // The +CNTP: URC may arrive before or after the "OK" confirmation — both cases
-  // are handled: if sendAT() captures it in rsp we check rsp first; if it arrives
-  // later we read it in the wait loop below.
-  String rsp; sendAT("AT+CNTP", &rsp, 8000);
+  // Short pause to let a pending NITZ broadcast settle into CCLK.
+  delay(2000);
 
-  // Check if +CNTP: 1 was already captured in the command response buffer.
-  bool ntpSuccess = (rsp.indexOf("+CNTP: 1") >= 0);
-  if (!ntpSuccess && rsp.indexOf("+CNTP:") >= 0) {
-    // An error URC arrived with the OK — fail immediately
-    SerialMon.print("NTP failed (in-band): "); SerialMon.println(rsp);
-    return false;
+  // Read CCLK now — may already be correct from NITZ.
+  String cclkPre;
+  sendAT("AT+CCLK?", &cclkPre, 1000);
+  ClockInfo preCi = parseCCLK(cclkPre);
+  if (preCi.valid) {
+    SerialMon.printf("CCLK (pre-NTP): %s  TZ: %+.2fh\n", cclkPre.c_str(), preCi.tz_q * 0.25f);
   }
 
-  // Wait for +CNTP: unsolicited response (1 = success, others = failure).
-  // Timeout raised to 60s: datasheet documents NTP response as 1-60s.
-  // Other URCs like +SAPBR: may interleave; discard non-CNTP lines.
+  // Attempt NTP. LTE-M carriers often block UDP 123 (code 61); treat any hard
+  // error as an immediate fallback trigger rather than waiting the full timeout.
+  sendAT("AT+CNTPCID=1");
+  sendAT(String("AT+CNTP=\"") + NTP_HOST + "\",0");
+  String rsp; sendAT("AT+CNTP", &rsp, 8000);
+
+  bool ntpSuccess  = (rsp.indexOf("+CNTP: 1") >= 0);
+  bool ntpHardFail = (!ntpSuccess && rsp.indexOf("+CNTP:") >= 0);
+  if (ntpHardFail) SerialMon.printf("NTP failed (in-band): %s\n", rsp.c_str());
+
+  // Wait up to 20s for the async +CNTP: URC. Shorter than before because a
+  // carrier-blocked UDP returns code 61 within 1s anyway.
   uint32_t t0 = millis();
-  while (!ntpSuccess && millis() - t0 < 60000) {
+  while (!ntpSuccess && !ntpHardFail && millis() - t0 < 20000) {
     while (SerialAT.available()) {
       String line = SerialAT.readStringUntil('\n');
       line.trim();
-      // Check for explicit +CNTP: <digit> format
-      if (line.startsWith("+CNTP:")) {
-        int sp = line.indexOf(' ');
-        if (sp > 0) {
-          String codeStr = line.substring(sp + 1);
-          codeStr.trim();
-          int code = codeStr.toInt();
-          if (code == 1) {
-            ntpSuccess = true;
-            break;
-          } else {
-            // Known error codes: 61=network, 62=DNS, 63=connect
-            SerialMon.printf("NTP failed with code %d: %s\n", code, line.c_str());
-            return false;
-          }
-        }
+      if (!line.startsWith("+CNTP:")) continue;
+      int sp = line.indexOf(' ');
+      if (sp < 0) continue;
+      int code = line.substring(sp + 1).toInt();
+      if (code == 1) {
+        ntpSuccess = true;
+      } else {
+        SerialMon.printf("NTP failed (code %d)\n", code);
+        ntpHardFail = true;
       }
-      // Else: discard other URCs (e.g., +SAPBR:, +PDP, etc.)
+      break;
     }
-    if (ntpSuccess) break;
-    delay(500);
+    if (ntpSuccess || ntpHardFail) break;
+    delay(200);
   }
+  if (!ntpSuccess && !ntpHardFail) SerialMon.println("NTP timed out (no URC)");
 
-  if (!ntpSuccess) {
-    SerialMon.println("NTP sync timeout (no +CNTP: 1 response)");
-    return false;
-  }
-
-  // Read CCLK after NTP and verify time actually changed
-  delay(500);
-  String cclk;
-  if (sendAT("AT+CCLK?", &cclk, 1000)) {
-    ClockInfo ci = parseCCLK(cclk);
-    if (ci.valid) {
-      // Verify year is reasonable (NTP synced to real time, not 2000/2004 default)
-      if (ci.year < 2024) {
-        SerialMon.printf("NTP returned stale year (%d), rejecting\n", ci.year);
-        return false;
-      }
-      SerialMon.print("NTP synced CCLK: "); SerialMon.println(cclk);
-      if (outCi) *outCi = ci;
+  if (ntpSuccess) {
+    // NTP succeeded — read the updated CCLK.
+    delay(300);
+    String cclkPost;
+    sendAT("AT+CCLK?", &cclkPost, 1000);
+    ClockInfo postCi = parseCCLK(cclkPost);
+    if (postCi.valid && postCi.year >= 2024) {
+      SerialMon.printf("NTP synced CCLK: %s  TZ: %+.2fh\n", cclkPost.c_str(), postCi.tz_q * 0.25f);
+      if (outCi) *outCi = postCi;
       return true;
     }
+    SerialMon.println("NTP succeeded but post-sync CCLK invalid — falling back to NITZ");
   }
+
+  // NTP failed or CCLK unreadable after NTP.
+  // Use the pre-NTP CCLK: AT+CNTP="server",0 writes TZ=0 into the modem even on
+  // failure, clobbering the correct NITZ TZ offset. The pre-NTP reading is taken
+  // before that command runs, so it still carries the TZ from the network.
+  if (preCi.valid && preCi.year >= 2024) {
+    SerialMon.printf("NITZ time: %s  TZ: %+.2fh\n", cclkPre.c_str(), preCi.tz_q * 0.25f);
+    if (preCi.tz_q == 0) {
+      SerialMon.println("WARNING: NITZ TZ offset is +0 — may be local time without correct offset. GPS will correct.");
+    }
+    if (outCi) *outCi = preCi;
+    return true;
+  }
+
+  SerialMon.println("No valid time from NTP or NITZ");
   return false;
 }
 
@@ -217,7 +224,7 @@ static long daysFromCivil(int y, int m, int d) {
   const unsigned yoe = (unsigned)(y - era * 400);
   const unsigned doy = (153*(m + (m > 2 ? -3 : 9)) + 2)/5 + d-1;
   const unsigned doe = yoe * 365 + yoe/4 - yoe/100 + doy;
-  return era * 146097L + (long)doe - 10957L;
+  return era * 146097L + (long)doe - 719468L;
 }
 
 static bool shouldDownloadXTRA(const ClockInfo& nowCi) {
@@ -232,13 +239,20 @@ static bool shouldDownloadXTRA(const ClockInfo& nowCi) {
   s_prefs.begin("xtra", false);
   long lastDay = s_prefs.getLong("last_day", -1);
   long today   = daysFromCivil(nowCi.year, nowCi.month, nowCi.day);
-  bool due = (lastDay < 0) || ((today - lastDay) >= (long)XTRA_STALE_DAYS);
+  // lastDay > today means it was stored with the old (pre-fix) daysFromCivil constant
+  // which produced values ~708k days too large. Treat as invalid and force a download.
+  bool due = (lastDay < 0) || (lastDay > today) || ((today - lastDay) >= (long)XTRA_STALE_DAYS);
   s_prefs.end();
   if (due) {
-    SerialMon.printf("XTRA is due (last=%ld, today=%ld, Δ=%ld days). Will download.\n",
-                     lastDay, today, (lastDay<0? -1 : (today-lastDay)));
+    if (lastDay < 0)
+      SerialMon.printf("XTRA due (never downloaded): today=%ld\n", today);
+    else if (lastDay > today)
+      SerialMon.printf("XTRA due (stored day invalid, epoch migration): last=%ld today=%ld\n", lastDay, today);
+    else
+      SerialMon.printf("XTRA due (stale): last=%ld, today=%ld, Δ=%ld days\n", lastDay, today, today - lastDay);
   } else {
-    SerialMon.println("XTRA is fresh enough; skipping download.");
+    SerialMon.printf("XTRA fresh: last=%ld, today=%ld, Δ=%ld days\n",
+                     lastDay, today, today - lastDay);
   }
   return due;
 }
@@ -264,18 +278,32 @@ static bool downloadAndApplyXTRA() {
   String cmd = String("AT+HTTPTOFS=\"") + XTRA_URL + "\",\"" + XTRA_FS_DST + "\"," +
                XTRA_HTTP_TIMEOUT_S + "," + XTRA_HTTP_RETRIES;
   if (!sendAT(cmd, nullptr, 5000)) return false;
+
+  // Wait for +HTTPTOFS: <err>,<filesize> URC — arrives when download completes or fails.
+  // Do NOT poll AT+HTTPTOFSRL? — that response never contains the +HTTPTOFS status.
+  // Max wait = timeout * retries + margin.
   uint32_t t0 = millis();
-  bool done = false, ok = false;
-  while (millis() - t0 < 60000) {
-    String rl;
-    if (!sendAT("AT+HTTPTOFSRL?", &rl, 2000)) { delay(500); continue; }
-    if (rl.indexOf("+HTTPTOFS: 200") >= 0) ok = true;
-    if (rl.indexOf("+HTTPTOFSRL: 0") >= 0) done = true;
-    // Only exit when BOTH flags are set — they can arrive in either order
-    if (done && ok) break;
-    delay(1000);
+  uint32_t maxWaitMs = (uint32_t)XTRA_HTTP_TIMEOUT_S * XTRA_HTTP_RETRIES * 1000UL + 10000UL;
+  bool ok = false;
+  while (millis() - t0 < maxWaitMs) {
+    if (!SerialAT.available()) { delay(100); continue; }
+    String line = SerialAT.readStringUntil('\n');
+    line.trim();
+    if (!line.startsWith("+HTTPTOFS:")) continue;
+    int comma = line.indexOf(',');
+    int err = line.substring(10, comma > 0 ? comma : (int)line.length()).toInt();
+    long sz  = (comma > 0) ? line.substring(comma + 1).toInt() : 0;
+    // +HTTPTOFS: <http_status>,<filesize> — success is HTTP 200 with non-zero size.
+    // 6xx codes are modem-level errors (601=network, 602=DNS, 603=connect).
+    if (err == 200 && sz > 0) {
+      SerialMon.printf("XTRA downloaded: %ld bytes\n", sz);
+      ok = true;
+    } else {
+      SerialMon.printf("XTRA download failed: HTTP %d, size=%ld\n", err, sz);
+    }
+    break;
   }
-  if (!(done && ok)) return false;
+  if (!ok) return false;
 
   SerialMon.println("=== APPLY XTRA (CGNSPWR=1 → CGNSCPY → CGNSXTRA=1 → CGNSCOLD) ===");
   // CGNSCPY requires the GNSS engine to be powered on (per SIM7000G datasheet).
@@ -299,6 +327,13 @@ static bool downloadAndApplyXTRA() {
   s_xtraJustApplied = true;
   SerialMon.println("XTRA applied ✅ (GNSS engine started via CGNSCOLD)");
   return true;
+}
+
+static bool xtraFileAvailable() {
+  s_prefs.begin("xtra", true);
+  long lastDay = s_prefs.getLong("last_day", -1);
+  s_prefs.end();
+  return lastDay >= 0;
 }
 
 // ---------- GNSS helpers ----------
@@ -355,6 +390,14 @@ static bool gnssStart() {
   sendAT("AT+SGPIO=0,4,1,1");
   sendAT("AT+CGNSPWR=1");
   delay(300);
+
+  // Re-inject XTRA on every start: GNSS engine RAM is cleared on CGNSPWR=0.
+  // The file persists in modem flash; CGNSCPY copies it back into GNSS RAM each boot.
+  if (xtraFileAvailable()) {
+    SerialMon.println("Injecting XTRA ephemeris into GNSS engine RAM...");
+    sendAT("AT+CGNSCPY");
+    sendAT("AT+CGNSXTRA=1");
+  }
 
   // Issue warm/hot/cold start based on last fix age
   const char* startCmd = gnssStartCommand();
@@ -479,6 +522,37 @@ static bool gnssWarmup60s(GpsFixResult* outResult, uint32_t gnssStartTime) {
 // (gpsBegin removed; not needed)
 
 //
+// PUBLIC FUNCTION: gpsNtpSync
+// Performs NTP/NITZ time sync without starting GNSS or downloading XTRA.
+// Called on cycles where a GPS fix is not needed (fresh fix within interval)
+// so the RTC stays accurate without the cost of a full GPS acquisition.
+//
+void gpsNtpSync() {
+  SerialMon.println("=== NTP/NITZ TIME SYNC (no GPS this cycle) ===");
+  bool pdp = bringUpPDP(APN_PRIMARY) || bringUpPDP(APN_SECONDARY);
+  if (!pdp) {
+    SerialMon.println("NTP sync skipped: PDP connection failed");
+    return;
+  }
+  delay(1500);
+  ClockInfo nowCi{};
+  if (doNTPSync(&nowCi) && nowCi.valid) {
+    uint32_t epochLocal = makeEpochUTC(nowCi.year, nowCi.month, nowCi.day,
+                                       nowCi.hour, nowCi.min, nowCi.sec);
+    long tzSeconds = (long)nowCi.tz_q * 15L * 60L;
+    uint32_t epochUtc = (tzSeconds >= 0 && (uint32_t)tzSeconds > epochLocal)
+                        ? 0 : (uint32_t)((long)epochLocal - tzSeconds);
+    struct timeval tv; tv.tv_sec = epochUtc; tv.tv_usec = 0;
+    settimeofday(&tv, nullptr);
+    SerialMon.printf("RTC updated via NTP/NITZ (no-GPS cycle): %lu UTC\n",
+                     (unsigned long)epochUtc);
+  } else {
+    SerialMon.println("NTP/NITZ sync failed — RTC not updated");
+  }
+  tearDownPDP();
+}
+
+//
 // PUBLIC FUNCTION: gpsEnd
 // Shuts down GNSS engine (AT+CGNSPWR=0).
 // Must be called before PDP teardown to allow SIM7000G to release radio for cellular.
@@ -501,7 +575,7 @@ static void syncTimeAndMaybeApplyXTRA() {
         uint32_t epochUtc = (tzSeconds >= 0 && (uint32_t)tzSeconds > epochLocal) ? 0 : (uint32_t)((long)epochLocal - tzSeconds);
         struct timeval tv; tv.tv_sec = epochUtc; tv.tv_usec = 0;
         settimeofday(&tv, nullptr);
-        SerialMon.printf("RTC set from NTP via modem: %lu (UTC)\n", (unsigned long)epochUtc);
+        SerialMon.printf("RTC set from modem clock (NTP or NITZ): %lu (UTC)\n", (unsigned long)epochUtc);
       } else {
         SerialMon.println("XTRA skipped: NTP returned invalid clock data (CCLK parse failed)");
       }
@@ -509,7 +583,7 @@ static void syncTimeAndMaybeApplyXTRA() {
         if (downloadAndApplyXTRA()) markXTRAJustApplied(nowCi);
       }
     } else {
-      SerialMon.println("XTRA skipped: NTP sync failed (no valid CCLK within 90s)");
+      SerialMon.println("XTRA skipped: no valid clock (NTP failed, no NITZ from network)");
     }
   } else {
     SerialMon.println("XTRA skipped: PDP connection failed (no data connectivity)");
