@@ -55,6 +55,7 @@
 
 // Wave analysis configuration
 #define WAVE_HS_MAX_M 2.0f              // Max significant wave height (m); capped for lake deployments (raise for ocean)
+#define WAVE_TP_MAX_S 8.0f              // Max peak wave period (s); lake wind-waves rarely exceed 8s (raise for ocean swell)
 #define BROWNOUT_SKIP_PCT 40            // Skip cycle if battery is low AND voltage is sinking (prevent brownout loops)
 #define HYSTERESIS_SAMPLE_COUNT 3       // Require N consecutive samples before schedule change (prevent oscillation)
 

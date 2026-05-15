@@ -346,7 +346,10 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
 
   // Sanity caps (configurable per deployment in config.h)
   if (result.Hs > WAVE_HS_MAX_M) result.Hs = 0.0f; // Exceeds deployment threshold (lake: 2m, ocean: higher)
-  if (result.Tp < 0.5f || result.Tp > 25.0f) result.Tp = 0.0f;
+#ifndef WAVE_TP_MAX_S
+#define WAVE_TP_MAX_S 8.0f
+#endif
+  if (result.Tp < 0.5f || result.Tp > WAVE_TP_MAX_S) result.Tp = 0.0f;
 
   return result;
 }
