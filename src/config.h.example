@@ -18,7 +18,6 @@
 
 // OTA Configuration
 #define OTA_SERVER "your-ota-server.com"
-#define OTA_PATH ""
 
 // Network Configuration
 #define NETWORK_PROVIDER "your-network-provider"
@@ -45,19 +44,16 @@
 #define BATTERY_CRITICAL_VOLTAGE 3.70f       // deep sleep at or below this voltage (V)
 
 // Modem timing and shutdown feature flags
-// ENABLE_GENTLE_MODEM_TIMING: reserved — currently unused in source (timing is always conservative)
-#define ENABLE_GENTLE_MODEM_TIMING 1
 // ENABLE_CPOWD_SHUTDOWN: try AT+CPOWD=1 graceful shutdown before hard power-off
 #define ENABLE_CPOWD_SHUTDOWN 1
 
-// Optional SIM PIN (leave empty string if not required)
+// Optional SIM PIN — applied at modem startup if non-empty
 #define SIM_PIN ""
 
 // Wave analysis configuration
 #define WAVE_HS_MAX_M 2.0f              // Max significant wave height (m); capped for lake deployments (raise for ocean)
 #define WAVE_TP_MAX_S 8.0f              // Max peak wave period (s); lake wind-waves rarely exceed 8s (raise for ocean swell)
 #define BROWNOUT_SKIP_PCT 40            // Skip cycle if battery is low AND voltage is sinking (prevent brownout loops)
-#define HYSTERESIS_SAMPLE_COUNT 3       // Require N consecutive samples before schedule change (prevent oscillation)
 
 // Debug: set to 1 to stay awake instead of entering deep sleep (useful for serial monitoring)
 #define DEBUG_NO_DEEP_SLEEP 0

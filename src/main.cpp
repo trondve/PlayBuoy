@@ -66,7 +66,6 @@ TinyGsm modem(SerialAT);
 // Track modem power/serial state to avoid powering early and to save battery
 static bool g_modemReady = false;
 static bool g_3v3RailPowered = false;
-static bool g_sensorsPowered = false;
 static bool g_sensorsInitialized = false;
 static float g_prevBatteryVoltage = 0.0f;
 
@@ -75,8 +74,6 @@ void powerOnModem();
 void powerOffModem();
 void powerOn3V3Rail();
 void powerOff3V3Rail();
-void powerOnSensors();
-void powerOffSensors();
 // GPS power is controlled via AT commands in gps.cpp, not GPIO
 
 // Put buses/pins into low-leakage state before deep sleep
@@ -185,6 +182,13 @@ void ensureModemReady() {
       SerialAT.begin(57600, SERIAL_8N1, MODEM_RX, MODEM_TX);
       delay(200);
       SerialMon.println("Modem baud rate locked to 57600");
+    }
+  }
+  if (strlen(SIM_PIN) > 0) {
+    if (modem.simUnlock(SIM_PIN)) {
+      SerialMon.println("SIM PIN accepted");
+    } else {
+      SerialMon.println("SIM PIN rejected — check SIM_PIN in config.h");
     }
   }
   g_modemReady = true;
@@ -306,30 +310,6 @@ void powerOff3V3Rail() {
 }
 
 // Power management functions for sensors
-void powerOnSensors() {
-  if (g_sensorsPowered) {
-    SerialMon.println("Sensors already powered on.");
-    return;
-  }
-  
-  SerialMon.println("Powering on sensors...");
-  // Sensors are powered by the 3.3V rail, so they should be available now
-  g_sensorsPowered = true;
-  SerialMon.println("Sensors powered on.");
-}
-
-void powerOffSensors() {
-  if (!g_sensorsPowered) {
-    SerialMon.println("Sensors already powered off.");
-    return;
-  }
-  
-  SerialMon.println("Powering off sensors...");
-  // Sensors will be powered off when 3.3V rail is turned off
-  g_sensorsPowered = false;
-  SerialMon.println("Sensors powered off.");
-}
-
 // powerOnGPS()/powerOffGPS() removed — GPIO 4 is MODEM_PWRKEY.
 // Setting it HIGH/LOW from here corrupted modem power state.
 // SIM7000G GNSS is internal, controlled via AT+CGNSPWR/AT+SGPIO in gps.cpp.
@@ -433,7 +413,6 @@ void setup() {
   pinMode(POWER_3V3_ENABLE, OUTPUT);
   digitalWrite(POWER_3V3_ENABLE, LOW);  // Start with 3.3V rail off
   g_3v3RailPowered = false;
-  g_sensorsPowered = false;
   SerialMon.println("✓ Power management pins initialized (3.3V rail OFF)");
 
   SerialMon.println("Step 5: Initializing RTC state management...");
@@ -580,7 +559,6 @@ void loop() {
   SerialMon.println("  ✓ 3.3V rail powered");
 
   SerialMon.println("  Initializing IMU and temperature sensor...");
-  powerOnSensors();
   if (!g_sensorsInitialized) {
     if (!beginSensors()) {
       SerialMon.println("  ✗ Sensor initialization failed.");
@@ -607,8 +585,6 @@ void loop() {
   logWaveStats();
 
   SerialMon.println("  Powering down sensors and 3.3V rail...");
-  // Power off sensors, then power off 3.3V rail
-  powerOffSensors();
   delay(100);  // brief settle before rail off (no datasheet requirement)
   powerOff3V3Rail();
   SerialMon.println("  ✓ Sensors and 3.3V rail powered down");
@@ -844,7 +820,6 @@ void loop() {
     SerialMon.println("Checking for firmware updates (OTA)...");
     if (networkConnected && modem.isGprsConnected()) {
        SerialMon.printf("  OTA server: %s\n", OTA_SERVER);
-       SerialMon.printf("  OTA path: %s\n", OTA_PATH);
        SerialMon.printf("  Node ID: %s\n", NODE_ID);
 
        String baseUrl = "http://" + String(OTA_SERVER) + "/" + String(NODE_ID);

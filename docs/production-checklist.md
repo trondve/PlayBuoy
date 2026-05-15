@@ -16,9 +16,9 @@ Generated from full codebase review before sealing. Each item is one commit.
 | 10 | Bugs | PDP teardown in Phase 7 (before sleep) has no fallback; gps.cpp tearDownPDP() does — unify | PASS |
 | 11 | Bugs | Wave period Tp has no sanity cap (16.16s seen on desk; impossible on small lake) | PASS |
 | 12 | Bugs | Modem baud rate: ensureModemReady() uses 57600; SIM7000G factory default is 115200 — verify | PASS |
-| 13 | Unused code | ENABLE_GENTLE_MODEM_TIMING — defined in config.h but never referenced in source | TODO |
-| 14 | Unused code | HYSTERESIS_SAMPLE_COUNT — defined in config.h but never referenced in source | TODO |
-| 15 | Unused code | OTA_PATH — defined and printed in log but not used in URL construction | TODO |
-| 16 | Unused code | SIM_PIN — defined in config.h.example but never applied to modem | TODO |
-| 17 | Unused code | powerOnSensors()/powerOffSensors() — no-ops that only toggle a bool flag | TODO |
+| 13 | Unused code | ENABLE_GENTLE_MODEM_TIMING — defined in config.h but never referenced in source | PASS |
+| 14 | Unused code | HYSTERESIS_SAMPLE_COUNT — defined in config.h but never referenced in source | PASS |
+| 15 | Unused code | OTA_PATH — defined and printed in log but not used in URL construction | PASS |
+| 16 | Unused code | SIM_PIN — defined in config.h.example but never applied to modem | PASS |
+| 17 | Unused code | powerOnSensors()/powerOffSensors() — no-ops that only toggle a bool flag | PASS |
 | 18 | Wave method | Verify FFT methodology: gravity removal, IIR coefficients, 1/(2πf)⁴ PSD conversion, Hs=4√m₀, windowing | TODO |
