@@ -17,6 +17,7 @@ try:
 except Exception:
     env = None
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -34,6 +35,15 @@ BUOYS = [
 
 # Re-entry guard to avoid infinite recursion when this script triggers nested PIO builds
 ENV_GUARD_FLAG = "PB_MULTI_BUILD"
+
+def _sha256_file(path: str) -> str:
+    """Compute SHA-256 of a file, streaming in 64KB chunks."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
 
 def get_version_from_config():
     """Parse FIRMWARE_VERSION from src/config.h."""
@@ -139,11 +149,17 @@ def build_firmware(buoy):
             
             target_bin = f"{output_dir}/playbuoy_{buoy['id']}.bin"
             shutil.copy(source_bin, target_bin)
-            
-            # Get file size
+
+            # Generate SHA-256 checksum file (required by OTA updater for integrity check)
+            sha256 = _sha256_file(target_bin)
+            sha256_file_path = target_bin.replace(".bin", ".sha256")
+            Path(sha256_file_path).write_text(sha256 + "\n", encoding="ascii")
+
             size = os.path.getsize(target_bin)
             print(result.stdout)
             print(f"✅ Built: {target_bin} ({size:,} bytes)")
+            print(f"✅ SHA-256: {sha256_file_path}")
+            print(f"   {sha256}")
             return True
         else:
             print(f"❌ Build failed for {buoy['name']}:")
@@ -207,16 +223,20 @@ def main():
                 size = os.path.getsize(os.path.join(output_dir, file))
                 print(f"  - {file} ({size:,} bytes)")
         
+        print("\n📋 Checksum files (required for OTA integrity verification):")
+        for file in sorted(os.listdir(output_dir)):
+            if file.endswith('.sha256'):
+                print(f"  - {file}")
+
         print("\n📋 Version files:")
-        for file in os.listdir(output_dir):
+        for file in sorted(os.listdir(output_dir)):
             if file.endswith('.version') or file.endswith('.version.json'):
                 print(f"  - {file}")
-    
-        print(f"\n🎯 Next steps:")
-        print(f"1. Upload the .bin files to your server")
-        print(f"2. Upload the .version files to your server")
-        print(f"3. Each buoy will check version before downloading firmware")
-        print(f"4. URLs will be: http://trondve.ddns.net/")
+
+        print(f"\n🎯 Next steps — upload ALL of these to http://trondve.ddns.net/:")
+        print(f"  *.bin      firmware binaries")
+        print(f"  *.sha256   SHA-256 checksums (buoy aborts OTA if this is missing)")
+        print(f"  *.version  version strings (buoy checks before downloading)")
 
 
 def _run_multi_build(source, target, env=None, **kwargs):

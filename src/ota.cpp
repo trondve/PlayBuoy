@@ -429,22 +429,23 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
   String firmwareUrl = String(baseUrl);
   if (!firmwareUrl.endsWith(".bin")) firmwareUrl += ".bin";
 
-  // Download SHA-256 hash for integrity verification.
-  // File format: 64 hex chars (optionally followed by filename, like sha256sum output).
-  // If .sha256 file is unavailable, proceed without verification (graceful degradation).
+  // SHA-256 is mandatory for sealed buoys — a corrupt download without verification
+  // writes a bad image to flash, permanently bricking the device.
+  // Generate the .sha256 file with: python tools/scripts/generate_sha256.py firmware/
   String sha256Url = firmwareUrl.substring(0, firmwareUrl.length() - 4) + ".sha256";
   String sha256Body = httpGetTinyGsm(sha256Url.c_str());
   uint8_t expectedHash[32];
-  bool haveSha = parseHexSha256(sha256Body, expectedHash);
-  if (haveSha) {
-    SerialMon.print("SHA-256 from server: ");
-    for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", expectedHash[i]);
-    SerialMon.println();
-  } else {
-    SerialMon.println("No .sha256 file available — proceeding without integrity check");
+  if (!parseHexSha256(sha256Body, expectedHash)) {
+    SerialMon.println("OTA aborted: .sha256 file missing or invalid on server.");
+    SerialMon.println("  Run: python tools/scripts/generate_sha256.py firmware/");
+    SerialMon.println("  Then upload the .sha256 file alongside the .bin file.");
+    return false;
   }
+  SerialMon.print("SHA-256 expected: ");
+  for (int i = 0; i < 32; ++i) SerialMon.printf("%02x", expectedHash[i]);
+  SerialMon.println();
 
-  if (downloadAndInstallFirmware(firmwareUrl.c_str(), haveSha ? expectedHash : nullptr)) {
+  if (downloadAndInstallFirmware(firmwareUrl.c_str(), expectedHash)) {
     SerialMon.println("OTA update successful. Saving state and rebooting...");
     markFirmwareUpdateAttempted();
     saveStateToNvs();
