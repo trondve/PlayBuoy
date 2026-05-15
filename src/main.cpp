@@ -368,6 +368,8 @@ void setup() {
   delay(500);  // 500ms is sufficient for USB-CDC enumeration; 3000ms wasted ~0.15mAh per boot
 
   SerialMon.println("\n========== BOOT CYCLE STARTED ==========");
+  SerialMon.printf("Firmware: %s (%s %s)\n", FIRMWARE_VERSION, __DATE__, __TIME__);
+  SerialMon.printf("Node:     %s (%s)\n", NODE_ID, NAME);
   SerialMon.println("Step 1: Disabling Bluetooth and releasing memory...");
 
   // Permanently release Bluetooth radio and memory (~30KB freed, BT never used)
@@ -486,7 +488,11 @@ void setup() {
       preparePinsAndSubsystemsForDeepSleep();
       esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
       SerialMon.println("  Entering deep sleep (brownout fast-path)...");
+#if DEBUG_NO_DEEP_SLEEP
+      SerialMon.println("⚠ DEBUG_NO_DEEP_SLEEP: skipping brownout fast-path sleep, continuing cycle.");
+#else
       esp_deep_sleep_start();
+#endif
     } else {
       SerialMon.printf("✓ Brownout recovery but battery adequate (%d%%) — proceeding with full cycle.\n", pct);
     }
@@ -620,11 +626,21 @@ void loop() {
     delay(500);   // brief settle after GNSS stop before re-establishing cellular
     SerialMon.println("  ✓ GNSS engine stopped");
 
+    // After GNSS, SIM7000G radio is in GNSS mode and needs an explicit reset to
+    // re-enter cellular mode. Without this, the first waitForNetwork() always
+    // times out (60s wasted) because the radio hasn't switched back to cellular.
+    SerialMon.println("  Resetting radio stack for cellular (CFUN=0 → CFUN=1)...");
+    SerialAT.println("AT+CFUN=0");
+    delay(2000);
+    SerialAT.println("AT+CFUN=1");
+    delay(5000);  // Allow radio to initialize and begin network search
+    SerialMon.println("  ✓ Radio stack reset");
+
     // Re-establish cellular data connection for firmware updates and JSON upload
     // Modem is already powered from GPS phase — skip pre-cycle to save ~14s
     SerialMon.println("  Re-establishing cellular data connection (modem already warm)...");
     ensureModemReady();
-    delay(1000);  // brief settle before connect (modem already warm from GPS)
+    delay(500);
     networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
 
     // If regular connection fails, try APN testing
@@ -887,19 +903,27 @@ void loop() {
   rtcState.lastNextWakeUtc = nextWakeUtc;
 
   SerialMon.println("Sleep and wake schedule:");
-  if (sleepMinutes >= 60) {
-    SerialMon.printf("  Duration: %dh %dm (%u total minutes)\n", sleepMinutes / 60, sleepMinutes % 60, sleepMinutes);
-  } else {
-    SerialMon.printf("  Duration: %d minute(s)\n", sleepMinutes);
+  {
+    uint32_t displayNow = (uint32_t)time(NULL);
+    uint32_t actualSleepSec = (nextWakeUtc > displayNow) ? (nextWakeUtc - displayNow) : 300;
+    uint32_t asDays  = actualSleepSec / 86400;
+    uint32_t asHours = (actualSleepSec % 86400) / 3600;
+    uint32_t asMins  = (actualSleepSec % 3600) / 60;
+    uint32_t asSecs  = actualSleepSec % 60;
+    if (asDays > 0)
+      SerialMon.printf("  Duration: %lu Days, %lu Hours, %lu Minutes and %lu Seconds\n", asDays, asHours, asMins, asSecs);
+    else if (asHours > 0)
+      SerialMon.printf("  Duration: %lu Hours, %lu Minutes and %lu Seconds\n", asHours, asMins, asSecs);
+    else
+      SerialMon.printf("  Duration: %lu Minutes and %lu Seconds\n", asMins, asSecs);
   }
   if (rtcState.lastNextWakeUtc >= SECONDS_PER_DAY) {
     struct tm tm_local;
     time_t t = (time_t)rtcState.lastNextWakeUtc;
     localtime_r(&t, &tm_local);
-    char whenBuf[32];
-    strftime(whenBuf, sizeof(whenBuf), "%d/%m/%y - %H:%M:%S", &tm_local);
+    char whenBuf[48];
+    strftime(whenBuf, sizeof(whenBuf), "%Y-%m-%d %H:%M:%S %Z", &tm_local);
     SerialMon.printf("  Next wake (local): %s\n", whenBuf);
-    SerialMon.printf("  Next wake (UTC): %lu\n", rtcState.lastNextWakeUtc);
   }
   delay(100);
 
@@ -952,12 +976,23 @@ void loop() {
   if (sleepSec < 300) sleepSec = 300; // enforce minimum sleep floor
 
   SerialMon.printf("\n========== ENTERING DEEP SLEEP ==========\n");
-  SerialMon.printf("  Sleep duration: %u seconds (from RTC epoch %lu)\n", sleepSec, nextWakeUtc);
-  SerialMon.printf("  Current UTC: %lu\n", nowUtc);
+  {
+    uint32_t asDays  = sleepSec / 86400;
+    uint32_t asHours = (sleepSec % 86400) / 3600;
+    uint32_t asMins  = (sleepSec % 3600) / 60;
+    uint32_t asSecs  = sleepSec % 60;
+    if (asDays > 0)
+      SerialMon.printf("  Sleeping for: %lu Days, %lu Hours, %lu Minutes and %lu Seconds\n", asDays, asHours, asMins, asSecs);
+    else if (asHours > 0)
+      SerialMon.printf("  Sleeping for: %lu Hours, %lu Minutes and %lu Seconds\n", asHours, asMins, asSecs);
+    else
+      SerialMon.printf("  Sleeping for: %lu Minutes and %lu Seconds\n", asMins, asSecs);
+  }
+  SerialMon.printf("  Wake at (UTC): %lu\n", nextWakeUtc);
+  SerialMon.printf("  Current UTC:   %lu\n", nowUtc);
   SerialMon.printf("  GPIO 25 (3V3 hold): Will be enabled in deep sleep\n");
   SerialMon.printf("  All peripheral power: OFF\n");
   SerialMon.printf("  Modem: OFF\n");
-  SerialMon.printf("  Next wake: RTC timer in %u seconds\n", sleepSec);
   SerialMon.flush();
 
   esp_sleep_enable_timer_wakeup((uint64_t)sleepSec * 1000000ULL);
