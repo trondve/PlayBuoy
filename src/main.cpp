@@ -548,6 +548,19 @@ void loop() {
     SerialMon.println("No previous GPS fix — cold-start required");
   }
 
+  // Battery guard: GPS phase (NTP + XTRA + GNSS warmup) costs 3-10 min at high current.
+  // Skip it when battery is low — NTP-only sync still runs via the else branch below.
+  // Anchor drift override skipped too: a drifting buoy at low battery still can't afford GPS.
+  if (shouldGetNewGpsFix) {
+    float gpsGuardV = getStableBatteryVoltage();
+    int gpsGuardPct = estimateBatteryPercent(gpsGuardV);
+    if (gpsGuardPct <= 40) {
+      SerialMon.printf("GPS fix skipped (battery %d%% / %.2fV <= 40%%) — NTP-only sync this cycle\n",
+                       gpsGuardPct, gpsGuardV);
+      shouldGetNewGpsFix = false;
+    }
+  }
+
   // 1) Collect wave data first (modem is still off for lower power)
   SerialMon.println("\n--- PHASE 2: WAVE DATA COLLECTION ---");
   SerialMon.println("Starting IMU sampling for wave spectral analysis...");
