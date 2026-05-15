@@ -1,5 +1,6 @@
 #include "config.h"
 #include "modem.h"
+#include "battery.h"
 #include <TinyGsmClient.h>
 #include <IPAddress.h>
 #include "esp_task_wdt.h"  // For watchdog timer
@@ -63,6 +64,12 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
       if (!modem.testAT()) {
         SerialMon.println(" AT communication failed");
         if (attempt < maxRetries - 1) {
+          float v = getStableBatteryVoltage();
+          int pct = estimateBatteryPercent(v);
+          if (pct <= BATTERY_CRITICAL_PERCENT || v <= BATTERY_CRITICAL_VOLTAGE) {
+            SerialMon.printf("Battery critical (%.2fV / %d%%) mid-retry — aborting to prevent brownout\n", v, pct);
+            return false;
+          }
           SerialMon.println("Power-cycling modem...");
           powerOffModem();
           delay(2000);
@@ -112,6 +119,12 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
       }
 
       if (attempt < maxRetries - 1) {
+        float v = getStableBatteryVoltage();
+        int pct = estimateBatteryPercent(v);
+        if (pct <= BATTERY_CRITICAL_PERCENT || v <= BATTERY_CRITICAL_VOLTAGE) {
+          SerialMon.printf("Battery critical (%.2fV / %d%%) mid-retry — aborting to prevent brownout\n", v, pct);
+          return false;
+        }
         SerialMon.println("Power-cycling modem...");
         powerOffModem();
         delay(2000);
@@ -123,9 +136,10 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
     }
 
     SerialMon.println(" Network registered.");
-    // Let CSQ stabilize briefly
-    delay(500);
-    SerialMon.println("Signal quality: " + String(modem.getSignalQuality()));
+    // CSQ returns 99 ("unknown") for 1-2s after registration; retry until real value
+    int csq = 99;
+    for (int i = 0; i < 8 && csq == 99; ++i) { delay(300); csq = modem.getSignalQuality(); }
+    SerialMon.println("Signal quality: " + String(csq));
     SerialMon.println("Operator: " + modem.getOperator());
 
     // RAT check: print AT+CPSI? so we can verify LTE-M vs NB-IoT in logs
