@@ -528,14 +528,16 @@ void loop() {
     if (age < interval) {
       shouldGetNewGpsFix = false;
       uint32_t remaining = interval - age;
-      uint32_t rh = remaining / 3600, rm = (remaining % 3600) / 60;
+      uint32_t rd = remaining / 86400;
+      uint32_t rh = (remaining % 86400) / 3600;
+      uint32_t rm = (remaining % 3600) / 60;
+      uint32_t rs = remaining % 60;
       if (rtcState.anchorDriftDetected) {
-        SerialMon.printf("Anchor drift active — daily GPS (last fix %uh ago, next in %uh %um)\n",
-                         age / 3600, rh, rm);
+        SerialMon.printf("Anchor drift active — daily GPS interval, last fix %uh ago\n", age / 3600);
       } else {
-        SerialMon.printf("GPS fresh — last fix %uh ago, next in %uh %um (weekly interval)\n",
-                         age / 3600, rh, rm);
+        SerialMon.printf("GPS fresh — last fix %uh ago (weekly interval)\n", age / 3600);
       }
+      SerialMon.printf("Time until next GPS fix: %ud %uh %um %us\n", rd, rh, rm, rs);
     } else {
       if (rtcState.anchorDriftDetected) {
         SerialMon.printf("Anchor drift active — daily GPS fix due (last fix %uh ago)\n", age / 3600);
