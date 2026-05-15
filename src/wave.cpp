@@ -20,7 +20,9 @@ static const float FS_HZ = 10.0f;           // IMU sample rate
 static const uint32_t DT_MS = (uint32_t)(1000.0f / FS_HZ);
 
 // Band limits for heave acceleration pre-filtering
-static const float HP_CUTOFF_HZ = 0.05f;    // Wider band for spectral analysis
+// HP cutoff set BELOW WAVE_FREQ_MIN (0.05Hz) so the lowest wave bins
+// see full power; a first-order HP at its own cutoff attenuates by -3dB.
+static const float HP_CUTOFF_HZ = 0.03f;    // -1.3dB at 0.05Hz (was 0.05Hz → -3dB)
 static const float LP_CUTOFF_HZ = 2.0f;     // Allow higher frequencies into FFT
 
 // Gravity tracker low-pass frequency
@@ -329,14 +331,21 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
   // Hs = 4 * sqrt(m0) — standard oceanographic definition
   result.Hs = 4.0f * sqrtf((float)m0);
 
-  // Parabolic (quadratic) interpolation around peak bin for sub-bin Tp accuracy
+  // Parabolic (quadratic) interpolation around peak bin for sub-bin Tp accuracy.
+  // Must use displacement PSD (accelPSD/ω⁴) at adjacent bins — not raw acceleration PSD.
+  // Using acceleration PSD biases the interpolation toward lower bins because 1/ω⁴
+  // grows rapidly toward lower frequencies, skewing the apparent peak shape.
   float peakFreq = (float)peakBin * df;
   if (peakBin > binMin && peakBin < binMax) {
-    float alpha_pk = re[peakBin - 1] * re[peakBin - 1] + fftIm[peakBin - 1] * fftIm[peakBin - 1];
-    float beta_pk  = re[peakBin]     * re[peakBin]     + fftIm[peakBin]     * fftIm[peakBin];
-    float gamma_pk = re[peakBin + 1] * re[peakBin + 1] + fftIm[peakBin + 1] * fftIm[peakBin + 1];
+    auto toDispPsd = [&](uint32_t b) -> float {
+      float f = (float)b * df; float w2 = 2.0f * PI * f; w2 *= w2; float w4 = w2 * w2;
+      return (w4 > 0.0f) ? (re[b] * re[b] + fftIm[b] * fftIm[b]) * psdScale / w4 : 0.0f;
+    };
+    float alpha_pk = toDispPsd(peakBin - 1);
+    float beta_pk  = toDispPsd(peakBin);
+    float gamma_pk = toDispPsd(peakBin + 1);
     float denom = alpha_pk - 2.0f * beta_pk + gamma_pk;
-    if (fabsf(denom) > 1e-12f) {
+    if (fabsf(denom) > 1e-30f) {
       float delta = 0.5f * (alpha_pk - gamma_pk) / denom;
       peakFreq = ((float)peakBin + delta) * df;
     }

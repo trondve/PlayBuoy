@@ -21,4 +21,4 @@ Generated from full codebase review before sealing. Each item is one commit.
 | 15 | Unused code | OTA_PATH — defined and printed in log but not used in URL construction | PASS |
 | 16 | Unused code | SIM_PIN — defined in config.h.example but never applied to modem | PASS |
 | 17 | Unused code | powerOnSensors()/powerOffSensors() — no-ops that only toggle a bool flag | PASS |
-| 18 | Wave method | Verify FFT methodology: gravity removal, IIR coefficients, 1/(2πf)⁴ PSD conversion, Hs=4√m₀, windowing | TODO |
+| 18 | Wave method | Verify FFT methodology: gravity removal, IIR coefficients, 1/(2πf)⁴ PSD conversion, Hs=4√m₀, windowing | PASS |
