@@ -13,7 +13,7 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .lastGpsFixTime = 0,
   .lastGpsHdop = 99.0f,
   .lastGpsTtf = 0,
-  .lastWaterTemp = 0.0f,
+  .lastWaterTemp = NAN,
   .tempHistory = {NAN, NAN, NAN, NAN, NAN},
   .tempHistoryCount = 0,
   .tempSpikeDetected = false,
@@ -315,7 +315,7 @@ bool restoreStateFromNvs() {
   rtcState.lastGpsFixTime        = prefs.getULong("gpsFix", 0);
   rtcState.lastGpsHdop           = prefs.getFloat("gpsHdop", 99.0f);
   rtcState.lastGpsTtf            = prefs.getUShort("gpsTtf", 0);
-  rtcState.lastWaterTemp         = prefs.getFloat("wTemp", 0.0f);
+  rtcState.lastWaterTemp         = prefs.getFloat("wTemp", NAN);
   rtcState.tempHistoryCount      = prefs.getUChar("thCnt", 0);
   prefs.getBytes("tHist", rtcState.tempHistory, sizeof(rtcState.tempHistory));
   rtcState.anchorDriftCounter      = prefs.getUChar("driftCnt", 0);
@@ -327,7 +327,7 @@ bool restoreStateFromNvs() {
   // Validate restored data; treat corrupted NVS as cold-boot fallback
   bool validRestore = true;
   if (rtcState.bootCounter > 1e6) validRestore = false;  // Unreasonable boot count
-  if (rtcState.lastWaterTemp < -50.0f || rtcState.lastWaterTemp > 100.0f) validRestore = false;  // Out-of-range temp
+  if (!isnan(rtcState.lastWaterTemp) && (rtcState.lastWaterTemp < -50.0f || rtcState.lastWaterTemp > 100.0f)) validRestore = false;  // Out-of-range temp (NAN = no reading yet, valid)
   if (rtcState.lastGpsLat < -90.0f || rtcState.lastGpsLat > 90.0f) validRestore = false;  // Invalid latitude
   if (rtcState.lastGpsLon < -180.0f || rtcState.lastGpsLon > 180.0f) validRestore = false;  // Invalid longitude
   if (rtcState.lastGpsFixTime > 0 && rtcState.lastGpsFixTime < 1000000000) validRestore = false;  // Before year 2001
