@@ -237,7 +237,7 @@ void powerOffModem() {
 #endif
   // Power off sequence (fallback) — datasheet requires PWRKEY LOW >= 1.2s
   digitalWrite(MODEM_PWRKEY, LOW);
-  delay(1300);  // 1.3s LOW pulse (spec minimum: 1.2s)
+  delay(1500);  // 1.5s LOW pulse (spec minimum: 1.2s; 1.5s gives 25% margin)
   digitalWrite(MODEM_PWRKEY, HIGH);
   delay(1500);
   
@@ -576,7 +576,7 @@ void loop() {
     }
   }
 
-  SerialMon.println("  Collecting wave data (10Hz IMU for 100s)...");
+  SerialMon.println("  Collecting wave data (10Hz IMU for 160s)...");
   esp_task_wdt_reset();
   recordWaveData();
   SerialMon.println("  ✓ Wave data collection complete");
@@ -854,7 +854,7 @@ void loop() {
       op = modem.getOperator();
       { IPAddress lip = modem.localIP(); ipStr = String((int)lip[0]) + "." + String((int)lip[1]) + "." + String((int)lip[2]) + "." + String((int)lip[3]); }
       rssi = modem.getSignalQuality();
-      SerialMon.printf("  Network: %s, IP: %s, Signal: %d%%\n", op.c_str(), ipStr.c_str(), rssi);
+      SerialMon.printf("  Network: %s, IP: %s, Signal: CSQ %d\n", op.c_str(), ipStr.c_str(), rssi);
     } else {
       SerialMon.println("  (No network - using cached values)");
     }

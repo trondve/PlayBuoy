@@ -309,9 +309,9 @@ static bool downloadAndApplyXTRA() {
   // CGNSCPY requires the GNSS engine to be powered on (per SIM7000G datasheet).
   // Power it on cleanly first; if it was already on, CGNSPWR=0 + CGNSPWR=1 restarts it.
   sendAT("AT+CGNSPWR=0");
-  delay(300);
+  delay(500);  // GNSS App Note: allow ≥500ms for engine shutdown before restart
   sendAT("AT+CGNSPWR=1");
-  delay(300);
+  delay(500);
   String cp;
   if (!sendAT("AT+CGNSCPY", &cp, 7000)) {
     sendAT("AT+CGNSPWR=0"); // ensure GNSS is off on failure
