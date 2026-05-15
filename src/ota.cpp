@@ -409,6 +409,17 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
     return false;
   }
 
+  // Signal quality gate: a firmware binary download mid-stall on a sealed buoy is unrecoverable.
+  // CSQ 10 = -93 dBm; LTE-M can sustain a session below this but 300KB downloads risk timeout.
+  // CSQ 99 = modem did not return a value (also treat as too weak).
+  const int MIN_OTA_CSQ = 10;
+  int csq = modem.getSignalQuality();
+  if (csq < MIN_OTA_CSQ || csq == 99) {
+    SerialMon.printf("OTA skipped: signal too weak (CSQ=%d, need >=%d / ~-93 dBm)\n", csq, MIN_OTA_CSQ);
+    return false;
+  }
+  SerialMon.printf("Signal OK for OTA (CSQ=%d)\n", csq);
+
   String versionUrl = String(baseUrl);
   if (versionUrl.endsWith(".bin")) versionUrl = versionUrl.substring(0, versionUrl.length() - 4) + ".version";
   else versionUrl += ".version";

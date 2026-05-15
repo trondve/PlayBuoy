@@ -867,23 +867,27 @@ void loop() {
     // Check for firmware updates if network is still connected
     // Re-validate network status — connection may have dropped since initial check
     SerialMon.println("Checking for firmware updates (OTA)...");
-    if (networkConnected && modem.isGprsConnected()) {
-       SerialMon.printf("  OTA server: %s\n", OTA_SERVER);
-       SerialMon.printf("  Node ID: %s\n", NODE_ID);
+    {
+      int otaBattPct = estimateBatteryPercent(getStableBatteryVoltage());
+      if (otaBattPct < 40) {
+        SerialMon.printf("  OTA skipped: battery %d%% below 40%% minimum\n", otaBattPct);
+      } else if (networkConnected && modem.isGprsConnected()) {
+        SerialMon.printf("  OTA server: %s\n", OTA_SERVER);
+        SerialMon.printf("  Node ID: %s\n", NODE_ID);
 
-       String baseUrl = "http://" + String(OTA_SERVER) + "/" + String(NODE_ID);
-       SerialMon.printf("  Checking for updates at: %s\n", baseUrl.c_str());
+        String baseUrl = "http://" + String(OTA_SERVER) + "/" + String(NODE_ID);
+        SerialMon.printf("  Checking for updates at: %s\n", baseUrl.c_str());
 
-       if (checkForFirmwareUpdate(baseUrl.c_str())) {
-         // OTA update in progress, will restart on completion
-         SerialMon.println("✓ OTA update in progress - will restart on completion");
-       } else {
-         SerialMon.println("  No firmware update needed (version current)");
-       }
-    } else if (networkConnected) {
-       SerialMon.println("⚠ OTA skipped: network connection lost since registration");
-    } else {
-       SerialMon.println("⊘ OTA skipped: no network connection");
+        if (checkForFirmwareUpdate(baseUrl.c_str())) {
+          SerialMon.println("✓ OTA update in progress - will restart on completion");
+        } else {
+          SerialMon.println("  No firmware update needed (version current)");
+        }
+      } else if (networkConnected) {
+        SerialMon.println("⚠ OTA skipped: network connection lost since registration");
+      } else {
+        SerialMon.println("⊘ OTA skipped: no network connection");
+      }
     }
     
     SerialMon.println("Building JSON payload with current measurements...");
