@@ -13,7 +13,7 @@ Generated from full codebase review before sealing. Each item is one commit.
 | 07 | Time | NTP→UTC→JSON→sleep-duration chain: nextWakeUtc and minutesToSleep agree ✓ | PASS |
 | 08 | Deep sleep | Pins high-Z ✓, GPIO25 held LOW ✓, BT released ✓, power domains set ✓, XTAL off ✓ | PASS |
 | 09 | Unsent JSON | Buffer is 1024 bytes, typical payload 756 bytes — fits ✓ | PASS |
-| 10 | Bugs | PDP teardown in Phase 7 (before sleep) has no fallback; gps.cpp tearDownPDP() does — unify | TODO |
+| 10 | Bugs | PDP teardown in Phase 7 (before sleep) has no fallback; gps.cpp tearDownPDP() does — unify | PASS |
 | 11 | Bugs | Wave period Tp has no sanity cap (16.16s seen on desk; impossible on small lake) | TODO |
 | 12 | Bugs | Modem baud rate: ensureModemReady() uses 57600; SIM7000G factory default is 115200 — verify | TODO |
 | 13 | Unused code | ENABLE_GENTLE_MODEM_TIMING — defined in config.h but never referenced in source | TODO |

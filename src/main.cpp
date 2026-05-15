@@ -956,13 +956,20 @@ void loop() {
   SerialMon.println("  ✓ 3.3V rail powered down");
 
   // Tear down PDP context before modem power-off to prevent registered-during-sleep leak.
-  // Order: CNACT → CGACT → CGATT → CIPSHUT (same as gps.cpp tearDownPDP)
+  // Order: CNACT → CGACT → CGATT → CIPSHUT (matches gps.cpp tearDownPDP exactly)
   if (g_modemReady) {
     SerialMon.println("  Tearing down PDP context (preventing radio registration leak)...");
-    modem.sendAT("+CNACT=0,0");    modem.waitResponse(5000);
+    modem.sendAT("+CNACT=0,0");
+    if (modem.waitResponse(5000) != 1) {
+      modem.sendAT("+CNACT=0");    modem.waitResponse(5000);  // fallback for older firmware
+    }
+    delay(400);
     modem.sendAT("+CGACT=0,1");    modem.waitResponse(5000);
+    delay(400);
     modem.sendAT("+CGATT=0");      modem.waitResponse(5000);
+    delay(400);
     modem.sendAT("+CIPSHUT");      modem.waitResponse(8000);
+    delay(400);
     SerialMon.println("  ✓ PDP context torn down");
   }
 
