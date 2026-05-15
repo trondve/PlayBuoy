@@ -693,6 +693,16 @@ void loop() {
     ensureModemReady();
     gpsNtpSync();
 
+    // gpsNtpSync() calls tearDownPDP() which includes CGATT=0 (full detach).
+    // Without a radio reset, the modem fails to re-register within the 60s timeout —
+    // same root cause as the GPS path, which already does CFUN=0→CFUN=1 here.
+    SerialMon.println("  Resetting radio stack for cellular (CFUN=0 → CFUN=1)...");
+    SerialAT.println("AT+CFUN=0");
+    delay(2000);
+    SerialAT.println("AT+CFUN=1");
+    delay(5000);
+    SerialMon.println("  ✓ Radio stack reset");
+
     // Establish cellular data connection for firmware updates and JSON upload
     SerialMon.println("Establishing cellular data connection for upload...");
     delay(500);
