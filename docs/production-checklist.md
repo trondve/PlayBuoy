@@ -4,9 +4,9 @@ Generated from full codebase review before sealing. Each item is one commit.
 
 | # | Category | Finding | Status |
 |---|----------|---------|--------|
-| 01 | AT timings | PWRKEY power-off pulse 1300ms vs 1200ms spec min — bump to 1500ms for margin | TODO |
-| 02 | AT timings | CGNSPWR=0→CGNSPWR=1 gap is 300ms in XTRA path; GNSS App Note recommends ≥500ms | TODO |
-| 03 | Brownout | No battery re-check between the 3 modem retry attempts; sag mid-retry can cause repeated brownouts | TODO |
+| 01 | AT timings | PWRKEY power-off pulse 1300ms vs 1200ms spec min — bump to 1500ms for margin | PASS |
+| 02 | AT timings | CGNSPWR=0→CGNSPWR=1 gap is 300ms in XTRA path; GNSS App Note recommends ≥500ms | PASS |
+| 03 | Brownout | No battery re-check between the 3 modem retry attempts; sag mid-retry can cause repeated brownouts | PASS |
 | 04 | OCV table | Key breakpoints plausible; verify upper range (70-100%) against Samsung INR18650-35E datasheet at 10°C | PASS |
 | 05 | Sleep schedule | Winter 70-79% and 60-69% both sleep 24h — no extra incentive to discharge when above optimal SoC | PASS |
 | 06 | Sleep schedule | Long sleep timer: 2-week/1-month/3-month — verify ESP32 RTC timer handles durations >12 days | PASS |
