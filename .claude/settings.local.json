@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pio run *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(cd \"C:\\\\Users\\\\trond\\\\OneDrive\\\\Documents\\\\GitHub\\\\PlayBuoy\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e playbuoy_grinde 2>&1 | Select-Object -Last 35)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git rm *)",
+      "Bash(Get-ChildItem -File)",
+      "Bash(Select-Object Name)"
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1184
+load:0x40078000,len:13232
+load:0x40080400,len:3028
+entry 0x400805e4
+
+========== BOOT CYCLE STARTED ==========
+Firmware: 1.2.4 (May 10 2026 19:28:17)
+Step 1: Disabling Bluetooth and releasing memory...
+✓ Bluetooth disabled, ~30KB memory freed
+Step 2: Logging wakeup reason...
+Wakeup reason: Undefined (Power On / Reset)
+Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+✓ GPIO 25 hold released successfully
+Step 4: Initializing power management pins...
+✓ Power management pins initialized (3.3V rail OFF)
+Step 5: Initializing RTC state management...
+[   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+✓ RTC state initialized
+Step 6: Checking OTA rollback state...
+Step 7: Initializing watchdog timer (45 minutes timeout)...
+✓ Watchdog initialized (45 min timeout)
+Step 8: Configuring RTC timezone (CET/CEST)...
+✓ RTC timezone configured (CET/CEST)
+Step 9: Measuring battery voltage (early, before any subsystems)...
+ADC calibration: Vref (eFuse)
+✓ Power monitor initialized
+
+Starting battery voltage measurement..
+Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+Median (3): 0.284 V  spread: 0 mV  INVALID
+✓ Battery voltage measured: 0.284V
+Battery voltage: 0.28 V, approx 0%
+Step 10: Evaluating brownout recovery path...
+Step 11: Checking for critical undervoltage protection cutoff...
+CRITICAL: Battery too low — entering deep sleep.
+Current: 0% / 0.284 V (<= 20% or <= 3.633 V)
+RTC time check: now=10, retry=10
+RTC not valid, using fallback month: 1 (January/winter-safe)
+Sleep calculation: month=1 (winter), battery=0%, timezone=CET
+Sleeping for 2160h 0m...
+Next wake (Europe/Oslo): 01/04/70 - 06:00
+3.3V rail already powered off.
+Powering off modem...
+Modem powered off.

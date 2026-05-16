@@ -1,0 +1,7 @@
+RTC time check: now=10, retry=10
+RTC not valid, using fallback month: 1 (January/winter-safe)
+Sleep calculation: month=1 (winter), battery=0%, timezone=CET
+Sleeping for 2160h 0m...
+Next wake (Europe/Oslo): 01/04/70 - 06:00
+3.3V rail already powered off.
+Powering off modem...

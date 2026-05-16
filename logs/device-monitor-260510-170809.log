@@ -1,0 +1,263 @@
+�ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1184
+load:0x40078000,len:13232
+load:0x40080400,len:3028
+entry 0x400805e4
+
+========== BOOT CYCLE STARTED ==========
+Firmware: 1.2.3 (May 10 2026 16:41:11)
+Step 1: Disabling Bluetooth and releasing memory...
+✓ Bluetooth disabled, ~30KB memory freed
+Step 2: Logging wakeup reason...
+Wakeup reason: Undefined (Power On / Reset)
+Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+✓ GPIO 25 hold released successfully
+Step 4: Initializing power management pins...
+✓ Power management pins initialized (3.3V rail OFF)
+Step 5: Initializing RTC state management...
+[   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+✓ RTC state initialized
+Step 6: Checking OTA rollback state...
+Step 7: Initializing watchdog timer (45 minutes timeout)...
+✓ Watchdog initialized (45 min timeout)
+Step 8: Configuring RTC timezone (CET/CEST)...
+✓ RTC timezone configured (CET/CEST)
+Step 9: Measuring battery voltage (early, before any subsystems)...
+ADC calibration: Vref (eFuse)
+✓ Power monitor initialized
+
+Starting battery voltage measurement..
+Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+Burst V[1]: 4.004 V (ADC: 2002 mV)  OK
+Burst V[2]: 4.002 V (ADC: 2001 mV)  OK
+Burst V[3]: 4.004 V (ADC: 2002 mV)  OK
+Median (3): 4.004 V  spread: 2 mV  OK
+✓ Battery voltage measured: 4.004V
+Battery voltage: 4.00 V, approx 78%
+Step 10: Evaluating brownout recovery path...
+Step 11: Checking for critical undervoltage protection cutoff...
+✓ Undervoltage check passed - proceeding to main loop
+========== SETUP COMPLETE, ENTERING MAIN LOOP ==========
+
+
+========== MAIN LOOP START ==========
+✓ Watchdog reset
+
+--- PHASE 1: GPS DECISION LOGIC ---
+No previous GPS fix found. Will attempt first fix (cold-start).
+
+--- PHASE 2: WAVE DATA COLLECTION ---
+Starting IMU sampling for wave spectral analysis...
+  Powering on 3.3V rail (sensors)...
+Powering on 3.3V rail...
+3.3V rail powered on.
+  ✓ 3.3V rail powered
+  Initializing IMU and temperature sensor...
+Powering on sensors...
+Sensors powered on.
+Initializing sensors...
+Sensors initialized
+  ✓ Sensors initialized
+  ✓ Initial water temperature: 27.25°C
+  Collecting wave data (10Hz IMU for 100s)...
+=== Starting wave data collection (160s) ===
+Attempting IMU initialization...
+Initializing MPU6500 directly...
+Failed to reset MPU6500
+ERROR: Failed to initialize IMU; wave data will be zeros
+  ✓ Wave data collection complete
+---- Wave Stats (FFT spectral) ----
+Samples: 0 @ 10.0 Hz, FFT bins: 0
+Hs (sig. height):    0.000 m
+Tp (period):         0.00 s
+Power proxy:         0.000 kW/m
+Sea state:           No waves (Perfect conditions)
+Accel RMS:           0.0000 m/s^2
+Mean tilt:           0.0 deg
+WARNING: MPU6500 data not available - wave readings may be zero
+----------------------------------
+  Powering down sensors and 3.3V rail...
+Powering off sensors...
+Sensors powered off.
+Powering off 3.3V rail...
+3.3V rail powered off.
+  ✓ Sensors and 3.3V rail powered down
+✓ PHASE 2 COMPLETE: Wave data collection finished
+
+
+--- PHASE 3: GNSS POSITIONING AND NTP/XTRA SYNC ---
+Attempting GPS fix (COLD-START)...
+  Powering on modem...
+Starting modem power sequence...
+Power sequence complete. Settling modem...
+  ✓ Modem ready
+  Running GNSS acquisition (NTP sync → XTRA download → 60s warmup → fix polling)...
+=== PDP with APN "telenor" ===
+AT+CGDCONT=1,"IP","telenor"
+OK
+AT+CNACT=1,"telenor"
+OK
+
++APP PDP: ACTIVE
+AT+CNACT?
++CNACT: 1,"109.179.164.119"
+
+OK
+PDP ACTIVE ✅  IP: 109.179.164.119
+=== NTP SYNC (no.pool.ntp.org) ===
+ATE0
+OK
+
+OK
+
+OK
+
++CCLK: "26/05/10,17:08:37+00"
+
+OK
+
+OK
+NTP failed with code 61: +CNTP: 61
+XTRA skipped: NTP sync failed (no valid CCLK within 90s)
+
+ERROR
+
+OK
+
++APP PDP: DEACTIVE
+
+ERROR
+
+OK
+
+SHUT OK
+=== GNSS POWER ON ===
+
+OK
+
+OK
+
+OK
+
+OK
+
+OK
+
+OK
+GNSS start mode: AT+CGNSCOLD
+
+OK
+
++CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+
+OK
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+OK
+
+OK
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+GNSS warmup: polling CGNSINF for up to 60s...
+GNSS warmup: no fix after 60s
+Starting GPS fix acquisition...
+
++CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,36,,
+
+OK
+=== GPS Status Monitoring ===
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,36,,
+
+OK
+
+
++CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,38,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,38,,
+
+OK
+
+Searched for GPS fix for 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,40,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,40,,
+
+OK
+
+Searched for GPS fix for 1 minute
+
++CGNSINF: 1,0,,,,,,,0,,,,,,5,,,,39,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,5,,,,39,,
+
+OK
+
+Searched for GPS fix for 1 minute and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,38,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,38,,
+
+OK
+
+Searched for GPS fix for 2 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,34,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,34,,
+
+OK
+
+Searched for GPS fix for 2 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,32,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,32,,
+
+OK
+
+Searched for GPS fix for 3 minutes and 1 second
+
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,23,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,23,,
+
+OK
+
+Searched for GPS fix for 3 minutes and 31 seconds
+Searched for GPS fix for 4 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,38,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,38,,
+
+OK
+

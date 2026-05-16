@@ -1,0 +1,81 @@
+20:44:05.248 > ets Jul 29 2019 12:21:46
+20:44:05.248 > 
+20:44:05.248 > rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+20:44:05.248 > configsip: 0, SPIWP:0xee
+20:44:05.248 > clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+20:44:05.248 > mode:DIO, clock div:2
+20:44:05.248 > load:0x3fff0030,len:1184
+20:44:05.248 > load:0x40078000,len:13232
+20:44:05.248 > load:0x40080400,len:3028
+20:44:05.248 > entry 0x400805e4
+20:44:06.182 > 
+20:44:06.182 > ========== BOOT CYCLE STARTED ==========
+20:44:06.281 > Firmware: 1.2.4 (May 15 2026 20:42:39)
+20:44:06.281 > Node:     playbuoy_grinde (Litla Grindevatnet)
+20:44:06.281 > Step 1: Disabling Bluetooth and releasing memory...
+20:44:06.281 > ✓ Bluetooth disabled, ~30KB memory freed
+20:44:06.281 > Step 2: Logging wakeup reason...
+20:44:06.281 > Wakeup reason: Undefined (Power On / Reset)
+20:44:06.281 > Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+20:44:06.281 > ✓ GPIO 25 hold released successfully
+20:44:06.281 > Step 4: Initializing power management pins...
+20:44:06.281 > ✓ Power management pins initialized (3.3V rail OFF)
+20:44:06.281 > Step 5: Initializing RTC state management...
+20:44:06.281 > ✓ RTC state initialized
+20:44:06.281 > Step 6: Checking OTA rollback state...
+20:44:06.281 > Step 7: Initializing watchdog timer (45 minutes timeout)...
+20:44:06.281 > ✓ Watchdog initialized (45 min timeout)
+20:44:06.281 > Step 8: Configuring RTC timezone (CET/CEST)...
+20:44:06.281 > ✓ RTC timezone configured (CET/CEST)
+20:44:06.281 > Step 9: Measuring battery voltage (early, before any subsystems)...
+20:44:06.281 > ADC calibration: Vref (eFuse)
+20:44:06.281 > ✓ Power monitor initialized
+20:44:06.281 > 
+20:44:06.281 > Starting battery voltage measurement..
+20:44:06.281 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+20:44:06.305 > Burst V[1]: 4.042 V (ADC: 2021 mV)  OK
+20:44:06.323 > Burst V[2]: 4.042 V (ADC: 2021 mV)  OK
+20:44:06.323 > Burst V[3]: 4.046 V (ADC: 2023 mV)  OK
+20:44:06.398 > Median (3): 4.084 V  spread: 4 mV  OK
+20:44:06.398 > ✓ Battery voltage measured: 4.084V
+20:44:06.398 > Battery voltage: 4.08 V, approx 85%
+20:44:06.398 > Step 10: Evaluating brownout recovery path...
+20:44:06.398 > Step 11: Checking for critical undervoltage protection cutoff...
+20:44:06.398 > ✓ Undervoltage check passed - proceeding to main loop
+20:44:06.398 > ========== SETUP COMPLETE, ENTERING MAIN LOOP ==========
+20:44:06.398 > 
+20:44:06.398 > 
+20:44:06.398 > ========== MAIN LOOP START ==========
+20:44:06.398 > ✓ Watchdog reset
+20:44:06.398 > 
+20:44:06.398 > --- PHASE 1: GPS DECISION LOGIC ---
+20:44:06.398 > No previous GPS fix — cold-start required
+20:44:06.398 > 
+20:44:06.398 > --- PHASE 2: WAVE DATA COLLECTION ---
+20:44:06.398 > Starting IMU sampling for wave spectral analysis...
+20:44:06.398 >   Powering on 3.3V rail (sensors)...
+20:44:06.398 > Powering on 3.3V rail...
+20:44:06.398 > 3.3V rail powered on.
+20:44:06.524 >   ✓ 3.3V rail powered
+20:44:06.552 >   Initializing IMU and temperature sensor...
+20:44:06.552 > Powering on sensors...
+20:44:06.552 > Sensors powered on.
+20:44:06.552 > Initializing sensors...
+20:44:06.651 > Sensors initialized
+20:44:06.664 >   ✓ Sensors initialized
+20:44:06.704 >   ✓ Initial water temperature: 20.25°C
+20:44:06.704 >   Collecting wave data (10Hz IMU for 100s)...
+20:44:06.704 > === Starting wave data collection (160s) ===
+20:44:06.704 > Attempting IMU initialization...
+20:44:06.704 > Initializing MPU6500 directly...
+20:44:06.915 > WHO_AM_I: 0x70
+20:44:06.915 > Detected: MPU6500 (No magnetometer)
+20:44:06.915 > MPU6500 initialized successfully!
+20:44:06.915 > IMU initialized successfully!
+20:44:06.915 > Wave collection: 0 samples, 0 s elapsed
+20:44:11.903 > Wave collection: 49 samples, 5 s elapsed
+20:44:16.888 > Wave collection: 99 samples, 10 s elapsed
+20:44:21.893 > Wave collection: 149 samples, 15 s elapsed
+20:44:26.893 > Wave collection: 199 samples, 20 s elapsed
+20:44:31.898 > Wave collection: 249 samples, 25 s elapsed
+20:44:36.896 > Wave collection: 299 samples, 30 s elapsed

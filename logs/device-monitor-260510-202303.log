@@ -1,0 +1,717 @@
+20:23:03.911 > ets Jul 29 2019 12:21:46
+20:23:03.912 > 
+20:23:03.912 > rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+20:23:03.917 > configsip: 0, SPIWP:0xee
+20:23:03.917 > clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+20:23:03.923 > mode:DIO, clock div:2
+20:23:03.928 > load:0x3fff0030,len:1184
+20:23:03.928 > load:0x40078000,len:13232
+20:23:03.933 > load:0x40080400,len:3028
+20:23:03.933 > entry 0x400805e4
+20:23:04.900 > 
+20:23:04.900 > ========== BOOT CYCLE STARTED ==========
+20:23:04.900 > Firmware: 1.2.4 (May 10 2026 20:21:55)
+20:23:04.907 > Step 1: Disabling Bluetooth and releasing memory...
+20:23:04.912 > ✓ Bluetooth disabled, ~30KB memory freed
+20:23:04.912 > Step 2: Logging wakeup reason...
+20:23:04.914 > Wakeup reason: Undefined (Power On / Reset)
+20:23:04.923 > Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+20:23:04.929 > ✓ GPIO 25 hold released successfully
+20:23:04.929 > Step 4: Initializing power management pins...
+20:23:04.934 > ✓ Power management pins initialized (3.3V rail OFF)
+20:23:04.939 > Step 5: Initializing RTC state management...
+20:23:04.945 > [   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+20:23:04.951 > ✓ RTC state initialized
+20:23:04.951 > Step 6: Checking OTA rollback state...
+20:23:04.956 > Step 7: Initializing watchdog timer (45 minutes timeout)...
+20:23:04.961 > ✓ Watchdog initialized (45 min timeout)
+20:23:04.961 > Step 8: Configuring RTC timezone (CET/CEST)...
+20:23:04.968 > ✓ RTC timezone configured (CET/CEST)
+20:23:04.973 > Step 9: Measuring battery voltage (early, before any subsystems)...
+20:23:04.979 > ADC calibration: Vref (eFuse)
+20:23:04.979 > ✓ Power monitor initialized
+20:23:04.984 > 
+20:23:04.984 > Starting battery voltage measurement..
+20:23:04.984 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+20:23:05.001 > Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+20:23:05.016 > Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+20:23:05.028 > Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+20:23:05.028 > Median (3): 0.284 V  spread: 0 mV  INVALID
+20:23:05.037 > ✓ Battery voltage measured: 0.284V
+20:23:05.037 > Battery voltage: 0.28 V, approx 0%
+20:23:05.043 > Step 10: Evaluating brownout recovery path...
+20:23:05.048 > Step 11: Checking for critical undervoltage protection cutoff...
+20:23:05.054 > CRITICAL: Battery too low — entering deep sleep.
+20:23:05.058 > Current: 0% / 0.284 V (<= 20% or <= 3.633 V)
+20:23:15.053 > RTC time check: now=10, retry=10
+20:23:15.053 > RTC not valid, using fallback month: 1 (January/winter-safe)
+20:23:15.058 > Sleep calculation: month=1 (winter), battery=0%, timezone=CET
+20:23:15.065 > Sleeping for 2160h 0m...
+20:23:15.065 > Next wake (Europe/Oslo): 01/04/70 - 06:00
+20:23:15.070 > 3.3V rail already powered off.
+20:23:15.072 > Powering off modem...
+20:23:27.371 > Modem powered off.
+20:23:27.371 > ⚠ DEBUG_NO_DEEP_SLEEP: skipping critical-guard sleep, continuing cycle.
+20:23:27.377 > ✓ Undervoltage check passed - proceeding to main loop
+20:23:27.387 > ========== SETUP COMPLETE, ENTERING MAIN LOOP ==========
+20:23:27.392 > 
+20:23:27.392 > 
+20:23:27.392 > ========== MAIN LOOP START ==========
+20:23:27.392 > ✓ Watchdog reset
+20:23:27.397 > 
+20:23:27.397 > --- PHASE 1: GPS DECISION LOGIC ---
+20:23:27.397 > No previous GPS fix found. Will attempt first fix (cold-start).
+20:23:27.403 > 
+20:23:27.403 > --- PHASE 2: WAVE DATA COLLECTION ---
+20:23:27.408 > Starting IMU sampling for wave spectral analysis...
+20:23:27.413 >   Powering on 3.3V rail (sensors)...
+20:23:27.413 > Powering on 3.3V rail...
+20:23:27.418 > 3.3V rail powered on.
+20:23:27.567 >   ✓ 3.3V rail powered
+20:23:27.567 >   Initializing IMU and temperature sensor...
+20:23:27.573 > Powering on sensors...
+20:23:27.573 > Sensors powered on.
+20:23:27.573 > Initializing sensors...
+20:23:27.690 > Sensors initialized
+20:23:27.690 >   ✓ Sensors initialized
+20:23:28.190 >   ✓ Initial water temperature: 19.19°C
+20:23:28.190 >   Collecting wave data (10Hz IMU for 100s)...
+20:23:28.196 > === Starting wave data collection (160s) ===
+20:23:28.202 > Attempting IMU initialization...
+20:23:28.202 > Initializing MPU6500 directly...
+20:23:28.404 > WHO_AM_I: 0x70
+20:23:28.404 > Detected: MPU6500 (No magnetometer)
+20:23:28.404 > MPU6500 initialized successfully!
+20:23:28.408 > IMU initialized successfully!
+20:23:28.408 > Wave collection: 0 samples, 0 s elapsed
+20:23:33.404 > Wave collection: 50 samples, 5 s elapsed
+20:23:38.403 > Wave collection: 100 samples, 10 s elapsed
+20:23:43.402 > Wave collection: 150 samples, 15 s elapsed
+20:23:48.404 > Wave collection: 200 samples, 20 s elapsed
+20:23:53.404 > Wave collection: 250 samples, 25 s elapsed
+20:23:58.404 > Wave collection: 300 samples, 30 s elapsed
+20:24:03.404 > Wave collection: 350 samples, 35 s elapsed
+20:24:08.405 > Wave collection: 400 samples, 40 s elapsed
+20:24:13.405 > Wave collection: 450 samples, 45 s elapsed
+20:24:18.404 > Wave collection: 500 samples, 50 s elapsed
+20:24:23.404 > Wave collection: 550 samples, 55 s elapsed
+20:24:28.404 > Wave collection: 600 samples, 60 s elapsed
+20:24:33.404 > Wave collection: 650 samples, 65 s elapsed
+20:24:38.405 > Wave collection: 700 samples, 70 s elapsed
+20:24:43.404 > Wave collection: 750 samples, 75 s elapsed
+20:24:48.404 > Wave collection: 800 samples, 80 s elapsed
+20:24:53.402 > Wave collection: 850 samples, 85 s elapsed
+20:24:58.404 > Wave collection: 900 samples, 90 s elapsed
+20:25:03.404 > Wave collection: 950 samples, 95 s elapsed
+20:25:08.404 > Wave collection: 1000 samples, 100 s elapsed
+20:25:13.404 > Wave collection: 1050 samples, 105 s elapsed
+20:25:18.392 > Wave collection: 1100 samples, 110 s elapsed
+20:25:23.403 > Wave collection: 1150 samples, 115 s elapsed
+20:25:28.404 > Wave collection: 1200 samples, 120 s elapsed
+20:25:33.404 > Wave collection: 1250 samples, 125 s elapsed
+20:25:38.398 > Wave collection: 1300 samples, 130 s elapsed
+20:25:43.404 > Wave collection: 1350 samples, 135 s elapsed
+20:25:48.404 > Wave collection: 1400 samples, 140 s elapsed
+20:25:53.404 > Wave collection: 1450 samples, 145 s elapsed
+20:25:58.404 > Wave collection: 1500 samples, 150 s elapsed
+20:26:03.404 > Wave collection: 1550 samples, 155 s elapsed
+20:26:08.305 > Wave collection complete: 1600 samples in 159 s
+20:26:08.305 > Running FFT spectral analysis...
+20:26:08.313 > Spectral result: Hs=0.027 m, Tp=13.39 s, bins=98
+20:26:08.313 >   ✓ Wave data collection complete
+20:26:08.319 > ---- Wave Stats (FFT spectral) ----
+20:26:08.319 > Samples: 1600 @ 10.0 Hz, FFT bins: 98
+20:26:08.324 > Hs (sig. height):    0.027 m
+20:26:08.324 > Tp (period):         13.39 s
+20:26:08.330 > Power proxy:         0.005 kW/m
+20:26:08.330 > Sea state:           Ripples (Very easy to swim)
+20:26:08.336 > Heave |a| mean:      0.0088 m/s^2
+20:26:08.341 > Accel RMS:           0.0114 m/s^2
+20:26:08.341 > Mean tilt:           3.4 deg
+20:26:08.347 > ----------------------------------
+20:26:08.347 >   Powering down sensors and 3.3V rail...
+20:26:08.352 > Powering off sensors...
+20:26:08.352 > Sensors powered off.
+20:26:08.456 > Powering off 3.3V rail...
+20:26:08.456 > 3.3V rail powered off.
+20:26:08.456 >   ✓ Sensors and 3.3V rail powered down
+20:26:08.462 > ✓ PHASE 2 COMPLETE: Wave data collection finished
+20:26:08.466 > 
+20:26:08.466 > 
+20:26:08.466 > --- PHASE 3: GNSS POSITIONING AND NTP/XTRA SYNC ---
+20:26:08.473 > Attempting GPS fix (COLD-START)...
+20:26:08.473 >   Powering on modem...
+20:26:08.476 > Starting modem power sequence...
+20:26:11.672 > Power sequence complete. Settling modem...
+20:26:19.678 >   ✓ Modem ready
+20:26:19.680 >   Running GNSS acquisition (NTP sync → XTRA download → 60s warmup → fix polling)...
+20:26:19.685 > === PDP with APN "telenor" ===
+20:26:19.796 > AT+CGDCONT=1,"IP","telenor"
+20:26:19.816 > OK
+20:26:19.924 > AT+CNACT=1,"telenor"
+20:26:19.946 > OK
+20:26:20.052 > 
+20:26:20.053 > +APP PDP: ACTIVE
+20:26:20.055 > AT+CNACT?
+20:26:20.067 > +CNACT: 1,"2.150.107.116"
+20:26:20.067 > 
+20:26:20.067 > OK
+20:26:20.067 > PDP ACTIVE ✅  IP: 2.150.107.116
+20:26:21.569 > === TIME SYNC (NTP with NITZ fallback) ===
+20:26:21.668 > ATE0
+20:26:21.669 > OK
+20:26:21.773 > 
+20:26:21.773 > OK
+20:26:23.884 > 
+20:26:23.884 > +CCLK: "26/05/10,20:26:23+08"
+20:26:23.884 > 
+20:26:23.884 > OK
+20:26:23.890 > CCLK (pre-NTP): 
+20:26:23.890 > +CCLK: "26/05/10,20:26:23+08"
+20:26:23.890 > 
+20:26:23.890 > OK
+20:26:23.890 >   TZ: +2.00h
+20:26:23.989 > 
+20:26:23.990 > OK
+20:26:24.100 > 
+20:26:24.100 > OK
+20:26:24.205 > 
+20:26:24.205 > OK
+20:26:24.410 > NTP failed (code 61)
+20:26:24.411 > NITZ time: 
+20:26:24.411 > +CCLK: "26/05/10,20:26:23+08"
+20:26:24.415 > 
+20:26:24.415 > OK
+20:26:24.415 >   TZ: +2.00h
+20:26:24.415 > RTC set from modem clock (NTP or NITZ): 1778437583 (UTC)
+20:26:24.421 > XTRA fresh: last=20583, today=20583, Δ=0 days
+20:26:24.527 > 
+20:26:24.528 > ERROR
+20:26:24.632 > 
+20:26:24.632 > OK
+20:26:25.136 > 
+20:26:25.136 > +APP PDP: DEACTIVE
+20:26:25.142 > 
+20:26:25.143 > ERROR
+20:26:26.090 > 
+20:26:26.090 > OK
+20:26:26.596 > 
+20:26:26.597 > SHUT OK
+20:26:34.990 > === GNSS POWER ON ===
+20:26:35.098 > 
+20:26:35.098 > OK
+20:26:35.215 > 
+20:26:35.215 > OK
+20:26:35.320 > 
+20:26:35.323 > OK
+20:26:35.429 > 
+20:26:35.430 > OK
+20:26:35.535 > 
+20:26:35.535 > OK
+20:26:35.643 > 
+20:26:35.643 > OK
+20:26:35.946 > GNSS start mode: AT+CGNSCOLD
+20:26:37.048 > 
+20:26:37.048 > OK
+20:26:37.157 > 
+20:26:37.157 > +CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+20:26:37.157 > 
+20:26:37.157 > OK
+20:26:37.571 > 
+20:26:37.571 > +CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+20:26:37.571 > 
+20:26:37.571 > OK
+20:26:37.982 > 
+20:26:37.983 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+20:26:37.983 > 
+20:26:37.983 > OK
+20:26:38.085 > 
+20:26:38.085 > OK
+20:26:38.194 > 
+20:26:38.194 > OK
+20:26:38.307 > 
+20:26:38.307 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+20:26:38.307 > 
+20:26:38.307 > OK
+20:26:38.307 > GNSS warmup: polling CGNSINF for up to 60s...
+20:27:39.415 > GNSS warmup: no fix after 60s
+20:27:39.415 > Starting GPS fix acquisition...
+20:27:39.633 > 
+20:27:39.633 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+20:27:39.633 > 
+20:27:39.633 > OK
+20:27:39.633 > === GPS Status Monitoring ===
+20:27:39.639 > CGNSINF: 
+20:27:39.639 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+20:27:39.639 > 
+20:27:39.639 > OK
+20:27:39.639 > 
+20:28:09.756 > 
+20:28:09.756 > +CGNSINF: 1,0,,,,,,,0,,,,,,2,,,,26,,
+20:28:09.756 > 
+20:28:09.756 > OK
+20:28:09.756 > CGNSINF: 
+20:28:09.756 > +CGNSINF: 1,0,,,,,,,0,,,,,,2,,,,26,,
+20:28:09.762 > 
+20:28:09.762 > OK
+20:28:09.762 > 
+20:28:09.762 > Searched for GPS fix for 30 seconds
+20:28:39.892 > 
+20:28:39.892 > +CGNSINF: 1,0,,,,,,,0,,,,,,2,,,,27,,
+20:28:39.892 > 
+20:28:39.892 > OK
+20:28:39.892 > CGNSINF: 
+20:28:39.892 > +CGNSINF: 1,0,,,,,,,0,,,,,,2,,,,27,,
+20:28:39.897 > 
+20:28:39.897 > OK
+20:28:39.897 > 
+20:28:39.897 > Searched for GPS fix for 1 minute
+20:29:10.028 > 
+20:29:10.028 > +CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,29,,
+20:29:10.028 > 
+20:29:10.028 > OK
+20:29:10.028 > CGNSINF: 
+20:29:10.028 > +CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,29,,
+20:29:10.028 > 
+20:29:10.028 > OK
+20:29:10.028 > 
+20:29:10.028 > Searched for GPS fix for 1 minute and 30 seconds
+20:29:40.162 > 
+20:29:40.162 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,32,,
+20:29:40.162 > 
+20:29:40.162 > OK
+20:29:40.162 > CGNSINF: 
+20:29:40.162 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,32,,
+20:29:40.167 > 
+20:29:40.167 > OK
+20:29:40.167 > 
+20:29:40.167 > Searched for GPS fix for 2 minutes
+20:30:10.299 > 
+20:30:10.300 > +CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,33,,
+20:30:10.300 > 
+20:30:10.300 > OK
+20:30:10.300 > CGNSINF: 
+20:30:10.300 > +CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,33,,
+20:30:10.305 > 
+20:30:10.305 > OK
+20:30:10.305 > 
+20:30:10.305 > Searched for GPS fix for 2 minutes and 30 seconds
+20:30:40.435 > 
+20:30:40.436 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,24,,
+20:30:40.436 > 
+20:30:40.436 > OK
+20:30:40.436 > CGNSINF: 
+20:30:40.436 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,24,,
+20:30:40.441 > 
+20:30:40.441 > OK
+20:30:40.441 > 
+20:30:40.441 > Searched for GPS fix for 3 minutes and 1 second
+20:31:10.571 > 
+20:31:10.571 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,26,,
+20:31:10.571 > 
+20:31:10.571 > OK
+20:31:10.571 > CGNSINF: 
+20:31:10.571 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,26,,
+20:31:10.577 > 
+20:31:10.577 > OK
+20:31:10.577 > 
+20:31:10.577 > Searched for GPS fix for 3 minutes and 31 seconds
+20:31:39.485 > Searched for GPS fix for 4 minutes
+20:31:40.707 > 
+20:31:40.708 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,24,,
+20:31:40.708 > 
+20:31:40.708 > OK
+20:31:40.708 > CGNSINF: 
+20:31:40.708 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,24,,
+20:31:40.711 > 
+20:31:40.711 > OK
+20:31:40.711 > 
+20:32:09.622 > Searched for GPS fix for 4 minutes and 30 seconds
+20:32:10.838 > 
+20:32:10.838 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,25,,
+20:32:10.838 > 
+20:32:10.838 > OK
+20:32:10.838 > CGNSINF: 
+20:32:10.838 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,25,,
+20:32:10.838 > 
+20:32:10.838 > OK
+20:32:10.838 > 
+20:32:39.757 > Searched for GPS fix for 5 minutes
+20:32:40.979 > 
+20:32:40.979 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,22,,
+20:32:40.979 > 
+20:32:40.979 > OK
+20:32:40.979 > CGNSINF: 
+20:32:40.979 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,22,,
+20:32:40.982 > 
+20:32:40.982 > OK
+20:32:40.982 > 
+20:33:09.894 > Searched for GPS fix for 5 minutes and 30 seconds
+20:33:11.115 > 
+20:33:11.115 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,31,,
+20:33:11.115 > 
+20:33:11.115 > OK
+20:33:11.115 > CGNSINF: 
+20:33:11.115 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,31,,
+20:33:11.119 > 
+20:33:11.119 > OK
+20:33:11.119 > 
+20:33:40.027 > Searched for GPS fix for 6 minutes
+20:33:41.251 > 
+20:33:41.251 > +CGNSINF: 1,0,,,,,,,0,,,,,,8,,,,29,,
+20:33:41.251 > 
+20:33:41.251 > OK
+20:33:41.251 > CGNSINF: 
+20:33:41.251 > +CGNSINF: 1,0,,,,,,,0,,,,,,8,,,,29,,
+20:33:41.255 > 
+20:33:41.255 > OK
+20:33:41.255 > 
+20:34:10.166 > Searched for GPS fix for 6 minutes and 30 seconds
+20:34:11.387 > 
+20:34:11.388 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,22,,
+20:34:11.388 > 
+20:34:11.388 > OK
+20:34:11.388 > CGNSINF: 
+20:34:11.388 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,22,,
+20:34:11.391 > 
+20:34:11.391 > OK
+20:34:11.391 > 
+20:34:40.300 > Searched for GPS fix for 7 minutes
+20:34:41.516 > 
+20:34:41.516 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,22,,
+20:34:41.516 > 
+20:34:41.516 > OK
+20:34:41.516 > CGNSINF: 
+20:34:41.516 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,22,,
+20:34:41.525 > 
+20:34:41.525 > OK
+20:34:41.525 > 
+20:35:10.438 > Searched for GPS fix for 7 minutes and 31 seconds
+20:35:11.655 > 
+20:35:11.655 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,28,,
+20:35:11.655 > 
+20:35:11.655 > OK
+20:35:11.655 > CGNSINF: 
+20:35:11.655 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,28,,
+20:35:11.655 > 
+20:35:11.655 > OK
+20:35:11.655 > 
+20:35:39.461 > Searched for GPS fix for 8 minutes
+20:35:41.789 > 
+20:35:41.789 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,27,,
+20:35:41.789 > 
+20:35:41.789 > OK
+20:35:41.789 > CGNSINF: 
+20:35:41.789 > +CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,27,,
+20:35:41.799 > 
+20:35:41.799 > OK
+20:35:41.799 > 
+20:36:09.595 > Searched for GPS fix for 8 minutes and 30 seconds
+20:36:11.930 > 
+20:36:11.931 > +CGNSINF: 1,0,,,,,,,0,,,,,,11,,,,25,,
+20:36:11.931 > 
+20:36:11.931 > OK
+20:36:11.931 > CGNSINF: 
+20:36:11.931 > +CGNSINF: 1,0,,,,,,,0,,,,,,11,,,,25,,
+20:36:11.935 > 
+20:36:11.935 > OK
+20:36:11.935 > 
+20:36:39.727 > Searched for GPS fix for 9 minutes
+20:36:42.062 > 
+20:36:42.062 > +CGNSINF: 1,0,,,,,,,0,,,,,,12,,,,29,,
+20:36:42.062 > 
+20:36:42.062 > OK
+20:36:42.062 > CGNSINF: 
+20:36:42.062 > +CGNSINF: 1,0,,,,,,,0,,,,,,12,,,,29,,
+20:36:42.062 > 
+20:36:42.062 > OK
+20:36:42.062 > 
+20:37:09.865 > Searched for GPS fix for 9 minutes and 30 seconds
+20:37:12.202 > 
+20:37:12.202 > +CGNSINF: 1,0,,,,,,,0,,,,,,13,,,,33,,
+20:37:12.202 > 
+20:37:12.202 > OK
+20:37:12.202 > CGNSINF: 
+20:37:12.202 > +CGNSINF: 1,0,,,,,,,0,,,,,,13,,,,33,,
+20:37:12.206 > 
+20:37:12.206 > OK
+20:37:12.206 > 
+20:37:39.999 > 
+20:37:40.000 > OK
+20:37:40.000 >   ✗ GPS fix failed
+20:37:40.000 >   Shutting down GNSS engine...
+20:37:40.099 > 
+20:37:40.099 > OK
+20:37:40.604 >   ✓ GNSS engine stopped
+20:37:40.605 >   Re-establishing cellular data connection (modem already warm)...
+20:37:41.610 > Modem already warm, skipping pre-cycle.
+20:37:41.610 > Connecting to cellular network (attempt 1/3)...
+20:37:41.610 > Modem warm, skipping init (ATZ).
+20:37:41.610 > Testing AT communication...
+20:37:41.625 >  AT communication successful
+20:37:42.977 > Waiting for network registration...
+20:38:43.211 >  Network registration failed.
+20:38:44.019 > Signal quality: 99
+20:38:47.028 > Operator: 
+20:38:47.029 > Trying NB-IoT fallback (AT+CNMP=51)...
+20:39:47.217 >  NB-IoT fallback failed.
+20:39:47.222 > Power-cycling modem...
+20:39:47.222 > Powering off modem...
+20:39:59.514 > Modem powered off.
+20:40:01.519 > Starting modem power sequence...
+20:40:04.722 > Power sequence complete. Settling modem...
+20:40:13.723 > Connecting to cellular network (attempt 2/3)...
+20:40:13.724 > Modem warm, skipping init (ATZ).
+20:40:14.722 > Testing AT communication...
+20:40:14.722 >  AT communication successful
+20:40:16.083 > Waiting for network registration...
+20:40:16.088 >  Network registered.
+20:40:16.595 > Signal quality: 99
+20:40:16.610 > Operator: Talkmore Talkmore
+20:40:16.610 > RAT check (AT+CPSI?):
+20:40:17.127 >  Network connected.
+20:40:17.128 > Connecting to APN: telenor
+20:40:19.869 >  Cellular network connected.
+20:40:19.878 > Local IP: 2.148.221.98
+20:40:19.878 > Applying custom DNS...
+20:40:19.984 >   ✓ Cellular connection established
+20:40:19.985 > 
+20:40:19.985 > --- PHASE 4: TEMPERATURE ANOMALY CHECK ---
+20:40:19.990 > Evaluating water temperature spike/trend detection...
+20:40:19.996 > Temp anomaly check: current=19.2°C, trend=0.00°C, spike=NO, overTemp=NO
+20:40:20.002 > ✓ Temperature anomaly check complete
+20:40:20.002 > RTC State:
+20:40:20.007 > - Boot count: 1
+20:40:20.007 > - Battery voltage: 0.28 V
+20:40:20.007 > - Last GPS fix: 0.000000, 0.000000
+20:40:20.013 > - Last GPS fix time: 0
+20:40:20.013 > - Last water temp: 19.19 C
+20:40:20.018 > - Anchor drift detected: NO
+20:40:20.018 > - Anchor drift counter: 0
+20:40:20.018 > - Charging problem: NO
+20:40:20.024 > - Temp spike detected: NO
+20:40:20.024 > - Over temp detected: NO
+20:40:20.030 > - Last upload failed: NO
+20:40:20.030 > - FW update attempted: NO
+20:40:20.030 > 
+20:40:20.030 > --- PHASE 5: TIMESTAMP AND BATTERY RE-CHECK ---
+20:40:20.035 > ✓ Using RTC timestamp (UTC epoch): 1778438418
+20:40:20.040 > Re-measuring battery voltage (after modem/GPS activities)...
+20:40:20.047 > 
+20:40:20.047 > Starting battery voltage measurement..
+20:40:20.050 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+20:40:20.063 > Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+20:40:20.078 > Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+20:40:20.093 > Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+20:40:20.093 > Median (3): 0.284 V  spread: 0 mV  INVALID
+20:40:20.099 >   Battery: 0.284V (initial boot: 0.284V, delta: +0.000V)
+20:40:20.104 > Computing sleep schedule based on SoC and season...
+20:40:20.111 > RTC time check: now=1778438418, retry=0
+20:40:20.111 > RTC month: 5, DST: YES (from epoch 1778438418)
+20:40:20.112 > Sleep calculation: month=5 (shoulder), battery=0%, timezone=CEST
+20:40:20.122 >   Battery SoC: 0%, Sleep duration: 20160 minutes
+20:40:20.127 > 
+20:40:20.127 > --- PHASE 6: JSON PAYLOAD CONSTRUCTION AND UPLOAD ---
+20:40:20.133 > Current local time: 2026-05-10 20:40:18 CEST
+20:40:20.133 > Checking for buffered data from previous failed uploads...
+20:40:20.138 > ✓ No buffered data waiting
+20:40:20.143 > Checking for firmware updates (OTA)...
+20:40:20.151 >   OTA server: trondve.ddns.net
+20:40:20.151 >   OTA path: 
+20:40:20.151 >   Node ID: playbuoy_grinde
+20:40:20.157 >   Checking for updates at: http://trondve.ddns.net/playbuoy_grinde
+20:40:20.163 > OTA skipped: insufficient battery (0.28V / 0%). Need >=3.85V AND >=50%.
+20:40:20.169 >   No firmware update needed (version current)
+20:40:20.174 > Building JSON payload with current measurements...
+20:40:20.174 >   Refreshed timestamp from network-synced RTC: 1778438418
+20:40:20.202 >   Network: Talkmore Talkmore, IP: 2.148.221.98, Signal: 31%
+20:40:20.202 >   JSON payload constructed:
+20:40:20.206 >   {"nodeId":"playbuoy_grinde","name":"Litla Grindevatnet","version":"1.2.4","timestamp":1778438418,"lat":0,"lon":0,"wave":{"height":0.026816828,"period":13.38893509,"direction":"N/A","power":0.004717989},"buoy":{"tilt":3.382467508,"accel_rms":0.011425117},"temp":19.1875,"temp_trend":0,"battery":0.284000009,"battery_percent":0,"temp_valid":true,"uptime":1035,"boot_count":1,"reset_reason":"PowerOn","minutes_to_sleep":180,"next_wake_utc":1778449218,"battery_change_since_last":0,"rtc":{"waterTemp":19.1875},"gps":{"hdop":99,"ttf":0},"net":{"operator":"Talkmore Talkmore","apn":"telenor","ip":"2.148.221.98","signal":31},"alerts":{"anchorDrift":false,"chargingIssue":false,"tempSpike":false,"overTemp":false,"uploadFailed":false}}
+20:40:20.269 >   Payload size: 728 bytes
+20:40:20.274 > ✓ Attempting JSON upload to API server...
+20:40:20.274 >   Target: playbuoyapi.no:80/upload
+20:40:21.086 > HTTP/1.1 200 OK
+20:40:21.086 > HTTP status code: 200
+20:40:21.086 > Date: Sun, 10 May 2026 18:40:20 GMT
+20:40:21.091 > Content-Type: application/json
+20:40:21.091 > Content-Length: 15
+20:40:21.097 > Connection: close
+20:40:21.097 > Cache-Control: no-store
+20:40:21.097 > referrer-policy: no-referrer
+20:40:21.102 > Server: cloudflare
+20:40:21.102 > strict-transport-security: max-age=15768000; includeSubDomains
+20:40:21.108 > x-content-type-options: nosniff
+20:40:21.114 > x-frame-options: DENY
+20:40:21.114 > cf-cache-status: DYNAMIC
+20:40:21.114 > Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+20:40:21.124 > Server-Timing: cfCacheStatus;desc="DYNAMIC"
+20:40:21.124 > Server-Timing: cfEdge;dur=23,cfOrigin;dur=84
+20:40:21.130 > Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=andYjVgtv%2FO8buRDaFByDsEA4n%2BsFpiO1O6c4U5ZH4lY%2FTrkrhgF6f0u149lmtBezIVlFoWOa0hDj9crP5%2BjGXx%2BaZxMqibeC%2F7T4WmTX77IyKL%2BUHp3j0uaQ8ty2KBv7g%3D%3D"}]}
+20:40:21.151 > CF-RAY: 9f9b12615eb98deb-OSL
+20:40:21.156 > alt-svc: h3=":443"; ma=86400
+20:40:21.156 > 
+20:40:22.151 > {"status":"ok"}
+20:40:22.162 > ✓✓✓ JSON UPLOAD SUCCESSFUL ✓✓✓
+20:40:22.163 > Upload marked as success.
+20:40:22.168 > 
+20:40:22.168 > --- PHASE 7: SLEEP PREPARATION AND POWER-DOWN ---
+20:40:22.168 > Sleep and wake schedule:
+20:40:22.174 >   Duration: 3h 0m (180 total minutes)
+20:40:22.174 >   Next wake (local): 10/05/26 - 23:40:18
+20:40:22.179 >   Next wake (UTC): 1778449218
+20:40:22.283 > Shutting down subsystems...
+20:40:22.283 >   Powering down 3.3V rail (sensors)...
+20:40:22.290 > 3.3V rail already powered off.
+20:40:22.290 >   ✓ 3.3V rail powered down
+20:40:22.294 >   Powering down modem...
+20:40:22.294 > Powering off modem...
+20:40:23.847 > Modem powered off (CPOWD).
+20:40:23.847 >   ✓ Modem powered down
+20:40:23.847 > 
+20:40:23.847 > ⚠ DEBUG_NO_DEEP_SLEEP ACTIVE: Staying awake and delaying instead of deep sleep
+20:40:23.859 > (This is for debugging only - in production, device enters deep sleep here)
+20:40:23.861 > 
+20:40:33.857 >   [DEBUG delay] 10790000 ms remaining...
+20:40:43.856 >   [DEBUG delay] 10780000 ms remaining...
+20:40:53.856 >   [DEBUG delay] 10770000 ms remaining...
+20:41:03.856 >   [DEBUG delay] 10760000 ms remaining...
+20:41:13.856 >   [DEBUG delay] 10750000 ms remaining...
+20:41:23.855 >   [DEBUG delay] 10740000 ms remaining...
+20:41:33.856 >   [DEBUG delay] 10730000 ms remaining...
+20:41:43.855 >   [DEBUG delay] 10720000 ms remaining...
+20:41:53.856 >   [DEBUG delay] 10710000 ms remaining...
+20:42:03.844 >   [DEBUG delay] 10700000 ms remaining...
+20:42:13.856 >   [DEBUG delay] 10690000 ms remaining...
+20:42:23.856 >   [DEBUG delay] 10680000 ms remaining...
+20:42:33.856 >   [DEBUG delay] 10670000 ms remaining...
+20:42:43.856 >   [DEBUG delay] 10660000 ms remaining...
+20:42:53.856 >   [DEBUG delay] 10650000 ms remaining...
+20:43:03.855 >   [DEBUG delay] 10640000 ms remaining...
+20:43:13.856 >   [DEBUG delay] 10630000 ms remaining...
+20:43:23.855 >   [DEBUG delay] 10620000 ms remaining...
+20:43:33.855 >   [DEBUG delay] 10610000 ms remaining...
+20:43:43.856 >   [DEBUG delay] 10600000 ms remaining...
+20:43:53.856 >   [DEBUG delay] 10590000 ms remaining...
+20:44:03.855 >   [DEBUG delay] 10580000 ms remaining...
+20:44:13.855 >   [DEBUG delay] 10570000 ms remaining...
+20:44:23.855 >   [DEBUG delay] 10560000 ms remaining...
+20:44:33.855 >   [DEBUG delay] 10550000 ms remaining...
+20:44:43.855 >   [DEBUG delay] 10540000 ms remaining...
+20:44:53.856 >   [DEBUG delay] 10530000 ms remaining...
+20:45:03.855 >   [DEBUG delay] 10520000 ms remaining...
+20:45:13.845 >   [DEBUG delay] 10510000 ms remaining...
+20:45:23.855 >   [DEBUG delay] 10500000 ms remaining...
+20:45:33.855 >   [DEBUG delay] 10490000 ms remaining...
+20:45:43.854 >   [DEBUG delay] 10480000 ms remaining...
+20:45:53.855 >   [DEBUG delay] 10470000 ms remaining...
+20:46:03.854 >   [DEBUG delay] 10460000 ms remaining...
+20:46:13.854 >   [DEBUG delay] 10450000 ms remaining...
+20:46:23.854 >   [DEBUG delay] 10440000 ms remaining...
+20:46:33.855 >   [DEBUG delay] 10430000 ms remaining...
+20:46:43.855 >   [DEBUG delay] 10420000 ms remaining...
+20:46:53.855 >   [DEBUG delay] 10410000 ms remaining...
+20:47:03.855 >   [DEBUG delay] 10400000 ms remaining...
+20:47:13.855 >   [DEBUG delay] 10390000 ms remaining...
+20:47:23.855 >   [DEBUG delay] 10380000 ms remaining...
+20:47:33.854 >   [DEBUG delay] 10370000 ms remaining...
+20:47:43.854 >   [DEBUG delay] 10360000 ms remaining...
+20:47:53.855 >   [DEBUG delay] 10350000 ms remaining...
+20:48:03.853 >   [DEBUG delay] 10340000 ms remaining...
+20:48:13.855 >   [DEBUG delay] 10330000 ms remaining...
+20:48:23.854 >   [DEBUG delay] 10320000 ms remaining...
+20:48:33.855 >   [DEBUG delay] 10310000 ms remaining...
+20:48:43.855 >   [DEBUG delay] 10300000 ms remaining...
+20:48:53.855 >   [DEBUG delay] 10290000 ms remaining...
+20:49:03.855 >   [DEBUG delay] 10280000 ms remaining...
+20:49:13.855 >   [DEBUG delay] 10270000 ms remaining...
+20:49:23.855 >   [DEBUG delay] 10260000 ms remaining...
+20:49:33.855 >   [DEBUG delay] 10250000 ms remaining...
+20:49:43.851 >   [DEBUG delay] 10240000 ms remaining...
+20:49:53.855 >   [DEBUG delay] 10230000 ms remaining...
+20:50:03.849 >   [DEBUG delay] 10220000 ms remaining...
+20:50:13.855 >   [DEBUG delay] 10210000 ms remaining...
+20:50:23.856 >   [DEBUG delay] 10200000 ms remaining...
+20:50:33.845 >   [DEBUG delay] 10190000 ms remaining...
+20:50:43.855 >   [DEBUG delay] 10180000 ms remaining...
+20:50:53.855 >   [DEBUG delay] 10170000 ms remaining...
+20:51:03.855 >   [DEBUG delay] 10160000 ms remaining...
+20:51:13.855 >   [DEBUG delay] 10150000 ms remaining...
+20:51:23.855 >   [DEBUG delay] 10140000 ms remaining...
+20:51:33.856 >   [DEBUG delay] 10130000 ms remaining...
+20:51:43.855 >   [DEBUG delay] 10120000 ms remaining...
+20:51:53.851 >   [DEBUG delay] 10110000 ms remaining...
+20:52:03.856 >   [DEBUG delay] 10100000 ms remaining...
+20:52:13.855 >   [DEBUG delay] 10090000 ms remaining...
+20:52:23.854 >   [DEBUG delay] 10080000 ms remaining...
+20:52:33.855 >   [DEBUG delay] 10070000 ms remaining...
+20:52:43.844 >   [DEBUG delay] 10060000 ms remaining...
+20:52:53.855 >   [DEBUG delay] 10050000 ms remaining...
+20:53:03.855 >   [DEBUG delay] 10040000 ms remaining...
+20:53:13.855 >   [DEBUG delay] 10030000 ms remaining...
+20:53:23.856 >   [DEBUG delay] 10020000 ms remaining...
+20:53:33.854 >   [DEBUG delay] 10010000 ms remaining...
+20:53:43.855 >   [DEBUG delay] 10000000 ms remaining...
+20:53:53.856 >   [DEBUG delay] 9990000 ms remaining...
+20:54:03.856 >   [DEBUG delay] 9980000 ms remaining...
+20:54:13.856 >   [DEBUG delay] 9970000 ms remaining...
+20:54:23.856 >   [DEBUG delay] 9960000 ms remaining...
+20:54:33.856 >   [DEBUG delay] 9950000 ms remaining...
+20:54:43.856 >   [DEBUG delay] 9940000 ms remaining...
+20:54:53.856 >   [DEBUG delay] 9930000 ms remaining...
+20:55:03.856 >   [DEBUG delay] 9920000 ms remaining...
+20:55:13.856 >   [DEBUG delay] 9910000 ms remaining...
+20:55:23.856 >   [DEBUG delay] 9900000 ms remaining...
+20:55:33.857 >   [DEBUG delay] 9890000 ms remaining...
+20:55:43.847 >   [DEBUG delay] 9880000 ms remaining...
+20:55:53.856 >   [DEBUG delay] 9870000 ms remaining...
+20:56:03.856 >   [DEBUG delay] 9860000 ms remaining...
+20:56:13.848 >   [DEBUG delay] 9850000 ms remaining...
+20:56:23.856 >   [DEBUG delay] 9840000 ms remaining...
+20:56:33.856 >   [DEBUG delay] 9830000 ms remaining...
+20:56:43.856 >   [DEBUG delay] 9820000 ms remaining...
+20:56:53.857 >   [DEBUG delay] 9810000 ms remaining...
+20:57:03.856 >   [DEBUG delay] 9800000 ms remaining...
+20:57:13.856 >   [DEBUG delay] 9790000 ms remaining...
+20:57:23.856 >   [DEBUG delay] 9780000 ms remaining...
+20:57:33.857 >   [DEBUG delay] 9770000 ms remaining...
+20:57:43.857 >   [DEBUG delay] 9760000 ms remaining...
+20:57:53.857 >   [DEBUG delay] 9750000 ms remaining...
+20:58:03.856 >   [DEBUG delay] 9740000 ms remaining...
+20:58:13.856 >   [DEBUG delay] 9730000 ms remaining...
+20:58:23.857 >   [DEBUG delay] 9720000 ms remaining...
+20:58:33.856 >   [DEBUG delay] 9710000 ms remaining...
+20:58:43.857 >   [DEBUG delay] 9700000 ms remaining...
+20:58:53.855 >   [DEBUG delay] 9690000 ms remaining...
+20:59:03.857 >   [DEBUG delay] 9680000 ms remaining...
+20:59:13.856 >   [DEBUG delay] 9670000 ms remaining...
+20:59:23.855 >   [DEBUG delay] 9660000 ms remaining...
+20:59:33.857 >   [DEBUG delay] 9650000 ms remaining...
+20:59:43.857 >   [DEBUG delay] 9640000 ms remaining...
+20:59:53.854 >   [DEBUG delay] 9630000 ms remaining...
+21:00:03.857 >   [DEBUG delay] 9620000 ms remaining...
+21:00:13.857 >   [DEBUG delay] 9610000 ms remaining...
+21:00:23.857 >   [DEBUG delay] 9600000 ms remaining...
+21:00:33.854 >   [DEBUG delay] 9590000 ms remaining...
+21:00:43.854 >   [DEBUG delay] 9580000 ms remaining...
+21:00:53.857 >   [DEBUG delay] 9570000 ms remaining...
+21:01:03.848 >   [DEBUG delay] 9560000 ms remaining...
+21:01:13.856 >   [DEBUG delay] 9550000 ms remaining...
+21:01:23.856 >   [DEBUG delay] 9540000 ms remaining...
+21:01:33.857 >   [DEBUG delay] 9530000 ms remaining...
+21:01:43.857 >   [DEBUG delay] 9520000 ms remaining...
+21:01:53.857 >   [DEBUG delay] 9510000 ms remaining...
+21:02:03.855 >   [DEBUG delay] 9500000 ms remaining...
+21:02:13.857 >   [DEBUG delay] 9490000 ms remaining...
+21:02:23.857 >   [DEBUG delay] 9480000 ms remaining...
+21:02:33.852 >   [DEBUG delay] 9470000 ms remaining...
+21:02:43.858 >   [DEBUG delay] 9460000 ms remaining...
+21:02:53.857 >   [DEBUG delay] 9450000 ms remaining...
+21:03:03.857 >   [DEBUG delay] 9440000 ms remaining...
+21:03:13.857 >   [DEBUG delay] 9430000 ms remaining...
+21:03:23.858 >   [DEBUG delay] 9420000 ms remaining...
+21:03:33.857 >   [DEBUG delay] 9410000 ms remaining...
+21:03:43.857 >   [DEBUG delay] 9400000 ms remaining...
+21:03:53.857 >   [DEBUG delay] 9390000 ms remaining...
+21:04:03.858 >   [DEBUG delay] 9380000 ms remaining...
+21:04:13.858 >   [DEBUG delay] 9370000 ms remaining...
+21:04:23.854 >   [DEBUG delay] 9360000 ms remaining...

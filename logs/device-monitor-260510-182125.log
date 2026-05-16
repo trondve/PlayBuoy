@@ -1,0 +1,365 @@
+18:21:39.082 > ets Jul 29 2019 12:21:46
+18:21:39.082 > 
+18:21:39.082 > rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+18:21:39.082 > configsip: 0, SPIWP:0xee
+18:21:39.082 > clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+18:21:39.082 > mode:DIO, clock div:2
+18:21:39.082 > load:0x3fff0030,len:1184
+18:21:39.082 > load:0x40078000,len:13232
+18:21:39.082 > load:0x40080400,len:3028
+18:21:39.082 > entry 0x400805e4
+18:21:40.041 > 
+18:21:40.041 > ========== BOOT CYCLE STARTED ==========
+18:21:40.159 > Firmware: 1.2.4 (May 10 2026 18:19:04)
+18:21:40.159 > Step 1: Disabling Bluetooth and releasing memory...
+18:21:40.159 > ✓ Bluetooth disabled, ~30KB memory freed
+18:21:40.159 > Step 2: Logging wakeup reason...
+18:21:40.159 > Wakeup reason: Undefined (Power On / Reset)
+18:21:40.159 > Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+18:21:40.159 > ✓ GPIO 25 hold released successfully
+18:21:40.159 > Step 4: Initializing power management pins...
+18:21:40.159 > ✓ Power management pins initialized (3.3V rail OFF)
+18:21:40.159 > Step 5: Initializing RTC state management...
+18:21:40.159 > [   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+18:21:40.159 > ✓ RTC state initialized
+18:21:40.159 > Step 6: Checking OTA rollback state...
+18:21:40.159 > Step 7: Initializing watchdog timer (45 minutes timeout)...
+18:21:40.159 > ✓ Watchdog initialized (45 min timeout)
+18:21:40.159 > Step 8: Configuring RTC timezone (CET/CEST)...
+18:21:40.159 > ✓ RTC timezone configured (CET/CEST)
+18:21:40.159 > Step 9: Measuring battery voltage (early, before any subsystems)...
+18:21:40.159 > ADC calibration: Vref (eFuse)
+18:21:40.159 > ✓ Power monitor initialized
+18:21:40.159 > 
+18:21:40.159 > Starting battery voltage measurement..
+18:21:40.159 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+18:21:40.159 > Burst V[1]: 4.022 V (ADC: 2011 mV)  OK
+18:21:40.159 > Burst V[2]: 4.016 V (ADC: 2008 mV)  OK
+18:21:40.174 > Burst V[3]: 4.020 V (ADC: 2010 mV)  OK
+18:21:40.175 > Median (3): 4.020 V  spread: 6 mV  OK
+18:21:40.243 > ✓ Battery voltage measured: 4.020V
+18:21:40.243 > Battery voltage: 4.02 V, approx 79%
+18:21:40.243 > Step 10: Evaluating brownout recovery path...
+18:21:40.243 > Step 11: Checking for critical undervoltage protection cutoff...
+18:21:40.243 > ✓ Undervoltage check passed - proceeding to main loop
+18:21:40.243 > ========== SETUP COMPLETE, ENTERING MAIN LOOP ==========
+18:21:40.243 > 
+18:21:40.243 > 
+18:21:40.243 > ========== MAIN LOOP START ==========
+18:21:40.243 > ✓ Watchdog reset
+18:21:40.243 > 
+18:21:40.243 > --- PHASE 1: GPS DECISION LOGIC ---
+18:21:40.243 > No previous GPS fix found. Will attempt first fix (cold-start).
+18:21:40.243 > 
+18:21:40.243 > --- PHASE 2: WAVE DATA COLLECTION ---
+18:21:40.243 > Starting IMU sampling for wave spectral analysis...
+18:21:40.243 >   Powering on 3.3V rail (sensors)...
+18:21:40.243 > Powering on 3.3V rail...
+18:21:40.243 > 3.3V rail powered on.
+18:21:40.399 >   ✓ 3.3V rail powered
+18:21:40.399 >   Initializing IMU and temperature sensor...
+18:21:40.399 > Powering on sensors...
+18:21:40.399 > Sensors powered on.
+18:21:40.399 > Initializing sensors...
+18:21:40.511 > Sensors initialized
+18:21:40.511 >   ✓ Sensors initialized
+18:21:41.072 >   ✓ Initial water temperature: 22.12°C
+18:21:41.072 >   Collecting wave data (10Hz IMU for 100s)...
+18:21:41.072 > === Starting wave data collection (160s) ===
+18:21:41.072 > Attempting IMU initialization...
+18:21:41.072 > Initializing MPU6500 directly...
+18:21:41.072 > Failed to reset MPU6500
+18:21:41.072 > ERROR: Failed to initialize IMU; wave data will be zeros
+18:21:41.072 >   ✓ Wave data collection complete
+18:21:41.072 > ---- Wave Stats (FFT spectral) ----
+18:21:41.072 > Samples: 0 @ 10.0 Hz, FFT bins: 0
+18:21:41.072 > Hs (sig. height):    0.000 m
+18:21:41.072 > Tp (period):         0.00 s
+18:21:41.072 > Power proxy:         0.000 kW/m
+18:21:41.072 > Sea state:           No waves (Perfect conditions)
+18:21:41.072 > Accel RMS:           0.0000 m/s^2
+18:21:41.072 > Mean tilt:           0.0 deg
+18:21:41.072 > WARNING: MPU6500 data not available - wave readings may be zero
+18:21:41.072 > ----------------------------------
+18:21:41.072 >   Powering down sensors and 3.3V rail...
+18:21:41.072 > Powering off sensors...
+18:21:41.072 > Sensors powered off.
+18:21:41.196 > Powering off 3.3V rail...
+18:21:41.197 > 3.3V rail powered off.
+18:21:41.197 >   ✓ Sensors and 3.3V rail powered down
+18:21:41.197 > ✓ PHASE 2 COMPLETE: Wave data collection finished
+18:21:41.197 > 
+18:21:41.197 > 
+18:21:41.197 > --- PHASE 3: GNSS POSITIONING AND NTP/XTRA SYNC ---
+18:21:41.197 > Attempting GPS fix (COLD-START)...
+18:21:41.197 >   Powering on modem...
+18:21:41.197 > Starting modem power sequence...
+18:21:44.394 > Power sequence complete. Settling modem...
+18:21:52.388 >   ✓ Modem ready
+18:21:52.388 >   Running GNSS acquisition (NTP sync → XTRA download → 60s warmup → fix polling)...
+18:21:52.409 > === PDP with APN "telenor" ===
+18:21:52.505 > AT+CGDCONT=1,"IP","telenor"
+18:21:52.537 > OK
+18:21:52.633 > AT+CNACT=1,"telenor"
+18:21:52.665 > OK
+18:21:52.777 > 
+18:21:52.777 > +APP PDP: ACTIVE
+18:21:52.777 > AT+CNACT?
+18:21:52.777 > +CNACT: 1,"109.179.2.250"
+18:21:52.800 > 
+18:21:52.800 > OK
+18:21:52.800 > PDP ACTIVE ✅  IP: 109.179.2.250
+18:21:54.287 > === TIME SYNC (NTP with NITZ fallback) ===
+18:21:54.399 > ATE0
+18:21:54.399 > OK
+18:21:54.494 > 
+18:21:54.495 > OK
+18:21:56.619 > 
+18:21:56.619 > +CCLK: "26/05/10,18:21:55+08"
+18:21:56.619 > 
+18:21:56.619 > OK
+18:21:56.619 > CCLK (pre-NTP): 
+18:21:56.619 > +CCLK: "26/05/10,18:21:55+08"
+18:21:56.619 > 
+18:21:56.619 > OK
+18:21:56.619 >   TZ: +2.00h
+18:21:56.714 > 
+18:21:56.714 > OK
+18:21:56.827 > 
+18:21:56.827 > OK
+18:21:56.923 > 
+18:21:56.923 > OK
+18:21:57.323 > NTP failed (code 61)
+18:21:57.766 > 
+18:21:57.766 > +CCLK: "26/05/10,18:21:57+00"
+18:21:57.766 > 
+18:21:57.766 > OK
+18:21:57.766 > NITZ time: 
+18:21:57.766 > +CCLK: "26/05/10,18:21:57+00"
+18:21:57.766 > 
+18:21:57.766 > OK
+18:21:57.766 >   TZ: +0.00h
+18:21:57.766 > WARNING: NITZ TZ offset is +0 — may be local time without offset. GPS will correct.
+18:21:57.766 > RTC set from modem clock (NTP or NITZ): 1778437317 (UTC)
+18:21:57.766 > XTRA is fresh enough; skipping download.
+18:21:57.862 > 
+18:21:57.862 > ERROR
+18:21:57.971 > 
+18:21:57.971 > OK
+18:21:58.466 > 
+18:21:58.466 > +APP PDP: DEACTIVE
+18:21:58.466 > 
+18:21:58.466 > ERROR
+18:21:59.413 > 
+18:21:59.414 > OK
+18:21:59.909 > 
+18:21:59.909 > SHUT OK
+18:22:08.301 > === GNSS POWER ON ===
+18:22:08.414 > 
+18:22:08.414 > OK
+18:22:08.525 > 
+18:22:08.526 > OK
+18:22:08.637 > 
+18:22:08.637 > OK
+18:22:08.731 > 
+18:22:08.731 > OK
+18:22:08.841 > 
+18:22:08.841 > OK
+18:22:08.956 > 
+18:22:08.956 > OK
+18:22:09.262 > GNSS start mode: AT+CGNSCOLD
+18:22:10.365 > 
+18:22:10.365 > OK
+18:22:10.460 > 
+18:22:10.461 > +CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+18:22:10.476 > 
+18:22:10.476 > OK
+18:22:10.875 > 
+18:22:10.875 > +CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+18:22:10.875 > 
+18:22:10.875 > OK
+18:22:11.292 > 
+18:22:11.292 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+18:22:11.292 > 
+18:22:11.292 > OK
+18:22:11.404 > 
+18:22:11.404 > OK
+18:22:11.499 > 
+18:22:11.499 > OK
+18:22:11.626 > 
+18:22:11.626 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+18:22:11.626 > 
+18:22:11.626 > OK
+18:22:11.626 > GNSS warmup: polling CGNSINF for up to 60s...
+18:23:11.654 > GNSS warmup: no fix after 60s
+18:23:11.654 > Starting GPS fix acquisition...
+18:23:11.879 > 
+18:23:11.879 > +CGNSINF: 1,0,,,,,,,0,,,,,,1,,,,22,,
+18:23:11.879 > 
+18:23:11.879 > OK
+18:23:11.879 > === GPS Status Monitoring ===
+18:23:11.879 > CGNSINF: 
+18:23:11.879 > +CGNSINF: 1,0,,,,,,,0,,,,,,1,,,,22,,
+18:23:11.879 > 
+18:23:11.879 > OK
+18:23:11.879 > 
+18:23:42.015 > 
+18:23:42.015 > +CGNSINF: 1,0,,,,,,,0,,,,,,1,,,,19,,
+18:23:42.015 > 
+18:23:42.015 > OK
+18:23:42.015 > CGNSINF: 
+18:23:42.015 > +CGNSINF: 1,0,,,,,,,0,,,,,,1,,,,19,,
+18:23:42.015 > 
+18:23:42.015 > OK
+18:23:42.015 > 
+18:23:42.015 > Searched for GPS fix for 30 seconds
+18:24:12.151 > 
+18:24:12.151 > +CGNSINF: 1,0,,,,,,,0,,,,,,1,,,,16,,
+18:24:12.151 > 
+18:24:12.151 > OK
+18:24:12.151 > CGNSINF: 
+18:24:12.151 > +CGNSINF: 1,0,,,,,,,0,,,,,,1,,,,16,,
+18:24:12.151 > 
+18:24:12.151 > OK
+18:24:12.151 > 
+18:24:12.151 > Searched for GPS fix for 1 minute
+18:24:42.289 > 
+18:24:42.289 > +CGNSINF: 1,0,,,,,,,0,,,,,,2,,,,24,,
+18:24:42.289 > 
+18:24:42.289 > OK
+18:24:42.289 > CGNSINF: 
+18:24:42.289 > +CGNSINF: 1,0,,,,,,,0,,,,,,2,,,,24,,
+18:24:42.289 > 
+18:24:42.289 > OK
+18:24:42.289 > 
+18:24:42.289 > Searched for GPS fix for 1 minute and 30 seconds
+18:25:12.425 > 
+18:25:12.426 > +CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,26,,
+18:25:12.426 > 
+18:25:12.426 > OK
+18:25:12.426 > CGNSINF: 
+18:25:12.426 > +CGNSINF: 1,0,,,,,,,0,,,,,,3,,,,26,,
+18:25:12.426 > 
+18:25:12.426 > OK
+18:25:12.426 > 
+18:25:12.426 > Searched for GPS fix for 2 minutes
+18:25:42.561 > 
+18:25:42.561 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,31,,
+18:25:42.561 > 
+18:25:42.561 > OK
+18:25:42.561 > CGNSINF: 
+18:25:42.561 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,31,,
+18:25:42.561 > 
+18:25:42.561 > OK
+18:25:42.561 > 
+18:25:42.561 > Searched for GPS fix for 2 minutes and 30 seconds
+18:26:12.698 > 
+18:26:12.699 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,31,,
+18:26:12.699 > 
+18:26:12.699 > OK
+18:26:12.699 > CGNSINF: 
+18:26:12.699 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,31,,
+18:26:12.699 > 
+18:26:12.699 > OK
+18:26:12.699 > 
+18:26:12.699 > Searched for GPS fix for 3 minutes and 1 second
+18:26:42.835 > 
+18:26:42.835 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,29,,
+18:26:42.835 > 
+18:26:42.835 > OK
+18:26:42.835 > CGNSINF: 
+18:26:42.835 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,29,,
+18:26:42.835 > 
+18:26:42.835 > OK
+18:26:42.835 > 
+18:26:42.835 > Searched for GPS fix for 3 minutes and 31 seconds
+18:27:11.739 > Searched for GPS fix for 4 minutes
+18:27:12.966 > 
+18:27:12.966 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,29,,
+18:27:12.966 > 
+18:27:12.966 > OK
+18:27:12.966 > CGNSINF: 
+18:27:12.966 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,29,,
+18:27:12.966 > 
+18:27:12.966 > OK
+18:27:12.966 > 
+18:27:41.869 > Searched for GPS fix for 4 minutes and 30 seconds
+18:27:43.087 > 
+18:27:43.088 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,28,,
+18:27:43.088 > 
+18:27:43.088 > OK
+18:27:43.088 > CGNSINF: 
+18:27:43.088 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,28,,
+18:27:43.101 > 
+18:27:43.101 > OK
+18:27:43.101 > 
+18:28:12.007 > Searched for GPS fix for 5 minutes
+18:28:13.221 > 
+18:28:13.222 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,28,,
+18:28:13.222 > 
+18:28:13.222 > OK
+18:28:13.222 > CGNSINF: 
+18:28:13.238 > +CGNSINF: 1,0,,,,,,,0,,,,,,4,,,,28,,
+18:28:13.238 > 
+18:28:13.238 > OK
+18:28:13.238 > 
+18:28:42.144 > Searched for GPS fix for 5 minutes and 30 seconds
+18:28:43.358 > 
+18:28:43.359 > +CGNSINF: 1,0,,,,,,,0,,,,,,5,,,,29,,
+18:28:43.359 > 
+18:28:43.359 > OK
+18:28:43.359 > CGNSINF: 
+18:28:43.373 > +CGNSINF: 1,0,,,,,,,0,,,,,,5,,,,29,,
+18:28:43.373 > 
+18:28:43.373 > OK
+18:28:43.373 > 
+18:29:12.276 > Searched for GPS fix for 6 minutes
+18:29:13.491 > 
+18:29:13.491 > +CGNSINF: 1,0,,,,,,,0,,,,,,5,,,,32,,
+18:29:13.513 > 
+18:29:13.513 > OK
+18:29:13.513 > CGNSINF: 
+18:29:13.513 > +CGNSINF: 1,0,,,,,,,0,,,,,,5,,,,32,,
+18:29:13.513 > 
+18:29:13.513 > OK
+18:29:13.513 > 
+18:29:42.407 > Searched for GPS fix for 6 minutes and 30 seconds
+18:29:43.623 > 
+18:29:43.623 > +CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,31,,
+18:29:43.647 > 
+18:29:43.647 > OK
+18:29:43.647 > CGNSINF: 
+18:29:43.647 > +CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,31,,
+18:29:43.647 > 
+18:29:43.647 > OK
+18:29:43.647 > 
+18:30:12.552 > Searched for GPS fix for 7 minutes
+18:30:13.767 > 
+18:30:13.767 > +CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,33,,
+18:30:13.767 > 
+18:30:13.767 > OK
+18:30:13.767 > CGNSINF: 
+18:30:13.783 > +CGNSINF: 1,0,,,,,,,0,,,,,,6,,,,33,,
+18:30:13.783 > 
+18:30:13.783 > OK
+18:30:13.783 > 
+18:30:42.680 > Searched for GPS fix for 7 minutes and 31 seconds
+18:30:43.903 > 
+18:30:43.904 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,29,,
+18:30:43.904 > 
+18:30:43.904 > OK
+18:30:43.904 > CGNSINF: 
+18:30:43.915 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,29,,
+18:30:43.915 > 
+18:30:43.915 > OK
+18:30:43.915 > 
+18:31:11.697 > Searched for GPS fix for 8 minutes
+18:31:14.039 > 
+18:31:14.040 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,35,,
+18:31:14.040 > 
+18:31:14.040 > OK
+18:31:14.040 > CGNSINF: 
+18:31:14.056 > +CGNSINF: 1,0,,,,,,,0,,,,,,7,,,,35,,
+18:31:14.056 > 
+18:31:14.056 > OK
+18:31:14.056 > 

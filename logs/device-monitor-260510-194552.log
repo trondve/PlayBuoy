@@ -1,0 +1,927 @@
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1184
+load:0x40078000,len:13232
+load:0x40080400,len:3028
+entry 0x400805e4
+
+========== BOOT CYCLE STARTED ==========
+Firmware: 1.2.4 (May 10 2026 19:44:43)
+Step 1: Disabling Bluetooth and releasing memory...
+✓ Bluetooth disabled, ~30KB memory freed
+Step 2: Logging wakeup reason...
+Wakeup reason: Undefined (Power On / Reset)
+Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+✓ GPIO 25 hold released successfully
+Step 4: Initializing power management pins...
+✓ Power management pins initialized (3.3V rail OFF)
+Step 5: Initializing RTC state management...
+[   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+✓ RTC state initialized
+Step 6: Checking OTA rollback state...
+Step 7: Initializing watchdog timer (45 minutes timeout)...
+✓ Watchdog initialized (45 min timeout)
+Step 8: Configuring RTC timezone (CET/CEST)...
+✓ RTC timezone configured (CET/CEST)
+Step 9: Measuring battery voltage (early, before any subsystems)...
+ADC calibration: Vref (eFuse)
+✓ Power monitor initialized
+
+Starting battery voltage measurement..
+Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+Median (3): 0.284 V  spread: 0 mV  INVALID
+✓ Battery voltage measured: 0.284V
+Battery voltage: 0.28 V, approx 0%
+Step 10: Evaluating brownout recovery path...
+Step 11: Checking for critical undervoltage protection cutoff...
+CRITICAL: Battery too low — entering deep sleep.
+Current: 0% / 0.284 V (<= 20% or <= 3.633 V)
+RTC time check: now=10, retry=10
+RTC not valid, using fallback month: 1 (January/winter-safe)
+Sleep calculation: month=1 (winter), battery=0%, timezone=CET
+Sleeping for 2160h 0m...
+Next wake (Europe/Oslo): 01/04/70 - 06:00
+3.3V rail already powered off.
+Powering off modem...
+Modem powered off.
+⚠ DEBUG_NO_DEEP_SLEEP: skipping critical-guard sleep, continuing cycle.
+✓ Undervoltage check passed - proceeding to main loop
+========== SETUP COMPLETE, ENTERING MAIN LOOP ==========
+
+
+========== MAIN LOOP START ==========
+✓ Watchdog reset
+
+--- PHASE 1: GPS DECISION LOGIC ---
+No previous GPS fix found. Will attempt first fix (cold-start).
+
+--- PHASE 2: WAVE DATA COLLECTION ---
+Starting IMU sampling for wave spectral analysis...
+  Powering on 3.3V rail (sensors)...
+Powering on 3.3V rail...
+3.3V rail powered on.
+  ✓ 3.3V rail powered
+  Initializing IMU and temperature sensor...
+Powering on sensors...
+Sensors powered on.
+Initializing sensors...
+Sensors initialized
+  ✓ Sensors initialized
+  ✓ Initial water temperature: 25.19°C
+  Collecting wave data (10Hz IMU for 100s)...
+=== Starting wave data collection (160s) ===
+Attempting IMU initialization...
+Initializing MPU6500 directly...
+WHO_AM_I: 0x70
+Detected: MPU6500 (No magnetometer)
+MPU6500 initialized successfully!
+IMU initialized successfully!
+Wave collection: 0 samples, 0 s elapsed
+Wave collection: 50 samples, 5 s elapsed
+Wave collection: 100 samples, 10 s elapsed
+Wave collection: 150 samples, 15 s elapsed
+Wave collection: 200 samples, 20 s elapsed
+Wave collection: 250 samples, 25 s elapsed
+Wave collection: 300 samples, 30 s elapsed
+Wave collection: 350 samples, 35 s elapsed
+Wave collection: 400 samples, 40 s elapsed
+Wave collection: 450 samples, 45 s elapsed
+Wave collection: 500 samples, 50 s elapsed
+Wave collection: 550 samples, 55 s elapsed
+Wave collection: 600 samples, 60 s elapsed
+Wave collection: 650 samples, 65 s elapsed
+Wave collection: 700 samples, 70 s elapsed
+Wave collection: 750 samples, 75 s elapsed
+Wave collection: 800 samples, 80 s elapsed
+Wave collection: 850 samples, 85 s elapsed
+Wave collection: 900 samples, 90 s elapsed
+Wave collection: 950 samples, 95 s elapsed
+Wave collection: 1000 samples, 100 s elapsed
+Wave collection: 1050 samples, 105 s elapsed
+Wave collection: 1100 samples, 110 s elapsed
+Wave collection: 1150 samples, 115 s elapsed
+Wave collection: 1200 samples, 120 s elapsed
+Wave collection: 1250 samples, 125 s elapsed
+Wave collection: 1300 samples, 130 s elapsed
+Wave collection: 1350 samples, 135 s elapsed
+Wave collection: 1400 samples, 140 s elapsed
+Wave collection: 1450 samples, 145 s elapsed
+Wave collection: 1500 samples, 150 s elapsed
+Wave collection: 1550 samples, 155 s elapsed
+Wave collection complete: 1600 samples in 159 s
+Running FFT spectral analysis...
+Spectral result: Hs=0.110 m, Tp=0.00 s, bins=98
+  ✓ Wave data collection complete
+---- Wave Stats (FFT spectral) ----
+Samples: 1600 @ 10.0 Hz, FFT bins: 98
+Hs (sig. height):    0.110 m
+Tp (period):         0.00 s
+Power proxy:         0.000 kW/m
+Sea state:           Light waves (OK waves)
+Heave |a| mean:      0.3897 m/s^2
+Accel RMS:           1.0170 m/s^2
+Mean tilt:           170.2 deg
+----------------------------------
+  Powering down sensors and 3.3V rail...
+Powering off sensors...
+Sensors powered off.
+Powering off 3.3V rail...
+3.3V rail powered off.
+  ✓ Sensors and 3.3V rail powered down
+✓ PHASE 2 COMPLETE: Wave data collection finished
+
+
+--- PHASE 3: GNSS POSITIONING AND NTP/XTRA SYNC ---
+Attempting GPS fix (COLD-START)...
+  Powering on modem...
+Starting modem power sequence...
+Power sequence complete. Settling modem...
+  ✓ Modem ready
+  Running GNSS acquisition (NTP sync → XTRA download → 60s warmup → fix polling)...
+=== PDP with APN "telenor" ===
+AT+CGDCONT=1,"IP","telenor"
+OK
+AT+CNACT=1,"telenor"
+OK
+
++APP PDP: ACTIVE
+AT+CNACT?
++CNACT: 1,"2.148.234.200"
+
+OK
+PDP ACTIVE ✅  IP: 2.148.234.200
+=== TIME SYNC (NTP with NITZ fallback) ===
+ATE0
+OK
+
+OK
+
++CCLK: "26/05/10,19:49:11+08"
+
+OK
+CCLK (pre-NTP): 
++CCLK: "26/05/10,19:49:11+08"
+
+OK
+  TZ: +2.00h
+
+OK
+
+OK
+
+OK
+NTP failed (code 61)
+NITZ time: 
++CCLK: "26/05/10,19:49:11+08"
+
+OK
+  TZ: +2.00h
+RTC set from modem clock (NTP or NITZ): 1778435351 (UTC)
+XTRA due (stored day invalid, epoch migration): last=728868 today=20583
+=== XTRA DOWNLOAD to /customer/ via HTTPTOFS ===
+
+OK
+XTRA downloaded: 25771 bytes
+=== APPLY XTRA (CGNSPWR=1 → CGNSCPY → CGNSXTRA=1 → CGNSCOLD) ===
+
+OK
+
+OK
+
++CGNSCPY: 0
+
+OK
+
+OK
+
+OK
+
+OK
+
+OK
+XTRA applied ✅ (GNSS engine started via CGNSCOLD)
+
+ERROR
+
+OK
+
++APP PDP: DEACTIVE
+
+ERROR
+
+OK
+
+SHUT OK
+
++CGNSXTRA: 0 
+=== GNSS POWER ON ===
+GNSS already started by XTRA CGNSCOLD — skipping power cycle
+
+OK
+
+OK
+
++CGNSINF: 1,0,,,,,,,0,,,,,,14,,,,,,
+
+OK
+GNSS warmup: polling CGNSINF for up to 60s...
+GNSS warmup: no fix after 60s
+Starting GPS fix acquisition...
+
++CGNSINF: 1,0,,,,,,,0,,,,,,8,,,,,,
+
+OK
+=== GPS Status Monitoring ===
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,8,,,,,,
+
+OK
+
+Searched for GPS fix for 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,8,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,8,,,,,,
+
+OK
+
+Searched for GPS fix for 1 minute
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 1 minute and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 2 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 2 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 3 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 3 minutes and 31 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 4 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 4 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 5 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 5 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 6 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 6 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 7 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 7 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 8 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 8 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 9 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+Searched for GPS fix for 9 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,10,,,,,,
+
+OK
+
+
+OK
+  ✗ GPS fix failed
+  Shutting down GNSS engine...
+
+OK
+  ✓ GNSS engine stopped
+  Re-establishing cellular data connection (modem already warm)...
+Modem already warm, skipping pre-cycle.
+Connecting to cellular network (attempt 1/3)...
+Modem warm, skipping init (ATZ).
+Testing AT communication...
+ AT communication successful
+Waiting for network registration...
+ Network registration failed.
+Signal quality: 99
+Operator: 
+Trying NB-IoT fallback (AT+CNMP=51)...
+ NB-IoT fallback failed.
+Power-cycling modem...
+Powering off modem...
+Modem powered off (CPOWD).
+Starting modem power sequence...
+Power sequence complete. Settling modem...
+Connecting to cellular network (attempt 2/3)...
+Modem warm, skipping init (ATZ).
+Testing AT communication...
+ AT communication successful
+Waiting for network registration...
+ Network registered.
+Signal quality: 99
+Operator: Talkmore Talkmore
+RAT check (AT+CPSI?):
+ Network connected.
+Connecting to APN: telenor
+ Cellular network connected.
+Local IP: 2.148.183.146
+Applying custom DNS...
+  ✓ Cellular connection established
+
+--- PHASE 4: TEMPERATURE ANOMALY CHECK ---
+Evaluating water temperature spike/trend detection...
+Temp anomaly check: current=25.2°C, trend=0.00°C, spike=NO, overTemp=NO
+✓ Temperature anomaly check complete
+RTC State:
+- Boot count: 1
+- Battery voltage: 0.28 V
+- Last GPS fix: 0.000000, 0.000000
+- Last GPS fix time: 0
+- Last water temp: 25.19 C
+- Anchor drift detected: NO
+- Anchor drift counter: 0
+- Charging problem: NO
+- Temp spike detected: NO
+- Over temp detected: NO
+- Last upload failed: NO
+- FW update attempted: NO
+
+--- PHASE 5: TIMESTAMP AND BATTERY RE-CHECK ---
+✓ Using RTC timestamp (UTC epoch): 1778436176
+Re-measuring battery voltage (after modem/GPS activities)...
+
+Starting battery voltage measurement..
+Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+Median (3): 0.284 V  spread: 0 mV  INVALID
+  Battery: 0.284V (initial boot: 0.284V, delta: +0.000V)
+Computing sleep schedule based on SoC and season...
+RTC time check: now=1778436176, retry=0
+RTC month: 5, DST: YES (from epoch 1778436176)
+Sleep calculation: month=5 (shoulder), battery=0%, timezone=CEST
+  Battery SoC: 0%, Sleep duration: 20160 minutes
+
+--- PHASE 6: JSON PAYLOAD CONSTRUCTION AND UPLOAD ---
+Current local time: 2026-05-10 20:02:56 CEST
+Checking for buffered data from previous failed uploads...
+✓ No buffered data waiting
+Checking for firmware updates (OTA)...
+  OTA server: trondve.ddns.net
+  OTA path: 
+  Node ID: playbuoy_grinde
+  Checking for updates at: http://trondve.ddns.net/playbuoy_grinde
+OTA skipped: insufficient battery (0.28V / 0%). Need >=3.85V AND >=50%.
+  No firmware update needed (version current)
+Building JSON payload with current measurements...
+  Refreshed timestamp from network-synced RTC: 1778436176
+  Network: Talkmore Talkmore, IP: 2.148.183.146, Signal: 29%
+  JSON payload constructed:
+  {"nodeId":"playbuoy_grinde","name":"Litla Grindevatnet","version":"1.2.4","timestamp":1778436176,"lat":0,"lon":0,"wave":{"height":0.110288672,"period":0,"direction":"N/A","power":0},"buoy":{"tilt":170.1954041,"accel_rms":1.017045021},"temp":25.1875,"temp_trend":0,"battery":0.284000009,"battery_percent":0,"temp_valid":true,"uptime":1025,"boot_count":1,"reset_reason":"PowerOn","minutes_to_sleep":180,"next_wake_utc":1778446976,"battery_change_since_last":0,"rtc":{"waterTemp":25.1875},"gps":{"hdop":99,"ttf":0},"net":{"operator":"Talkmore Talkmore","apn":"telenor","ip":"2.148.183.146","signal":29},"alerts":{"anchorDrift":false,"chargingIssue":false,"tempSpike":false,"overTemp":false,"uploadFailed":false}}
+  Payload size: 709 bytes
+✓ Attempting JSON upload to API server...
+  Target: playbuoyapi.no:80/upload
+HTTP/1.1 200 OK
+HTTP status code: 200
+Date: Sun, 10 May 2026 18:02:59 GMT
+Content-Type: application/json
+Content-Length: 15
+Connection: close
+Cache-Control: no-store
+referrer-policy: no-referrer
+Server: cloudflare
+strict-transport-security: max-age=15768000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+cf-cache-status: DYNAMIC
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server-Timing: cfCacheStatus;desc="DYNAMIC"
+Server-Timing: cfEdge;dur=36,cfOrigin;dur=150
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=ogCaY5WN6brNH0omOy6rpUNVUeWZQO1K5icXkO%2FwEavtgsP9E8dSiozQu69JeLroMquYIjHQzP8oyNAYV2xYcP0DwyOSGhLHryGGoVAm7UkMKYftYUN7iZH84Fq9%2FNiajQ%3D%3D"}]}
+CF-RAY: 9f9adba65eb40b61-OSL
+alt-svc: h3=":443"; ma=86400
+
+{"status":"ok"}
+✓✓✓ JSON UPLOAD SUCCESSFUL ✓✓✓
+Upload marked as success.
+
+--- PHASE 7: SLEEP PREPARATION AND POWER-DOWN ---
+Sleep and wake schedule:
+  Duration: 3h 0m (180 total minutes)
+  Next wake (local): 10/05/26 - 23:02:56
+  Next wake (UTC): 1778446976
+Shutting down subsystems...
+  Powering down 3.3V rail (sensors)...
+3.3V rail already powered off.
+  ✓ 3.3V rail powered down
+  Powering down modem...
+Powering off modem...
+Modem powered off.
+  ✓ Modem powered down
+
+⚠ DEBUG_NO_DEEP_SLEEP ACTIVE: Staying awake and delaying instead of deep sleep
+(This is for debugging only - in production, device enters deep sleep here)
+
+  [DEBUG delay] 10790000 ms remaining...
+  [DEBUG delay] 10780000 ms remaining...
+  [DEBUG delay] 10770000 ms remaining...
+  [DEBUG delay] 10760000 ms remaining...
+  [DEBUG delay] 10750000 ms remaining...
+  [DEBUG delay] 10740000 ms remaining...
+  [DEBUG delay] 10730000 ms remaining...
+  [DEBUG delay] 10720000 ms remaining...
+  [DEBUG delay] 10710000 ms remaining...
+  [DEBUG delay] 10700000 ms remaining...
+  [DEBUG delay] 10690000 ms remaining...
+  [DEBUG delay] 10680000 ms remaining...
+  [DEBUG delay] 10670000 ms remaining...
+  [DEBUG delay] 10660000 ms remaining...
+  [DEBUG delay] 10650000 ms remaining...
+  [DEBUG delay] 10640000 ms remaining...
+  [DEBUG delay] 10630000 ms remaining...
+  [DEBUG delay] 10620000 ms remaining...
+  [DEBUG delay] 10610000 ms remaining...
+  [DEBUG delay] 10600000 ms remaining...
+  [DEBUG delay] 10590000 ms remaining...
+  [DEBUG delay] 10580000 ms remaining...
+  [DEBUG delay] 10570000 ms remaining...
+  [DEBUG delay] 10560000 ms remaining...
+  [DEBUG delay] 10550000 ms remaining...
+  [DEBUG delay] 10540000 ms remaining...
+  [DEBUG delay] 10530000 ms remaining...
+  [DEBUG delay] 10520000 ms remaining...
+  [DEBUG delay] 10510000 ms remaining...
+  [DEBUG delay] 10500000 ms remaining...
+  [DEBUG delay] 10490000 ms remaining...
+  [DEBUG delay] 10480000 ms remaining...
+  [DEBUG delay] 10470000 ms remaining...
+  [DEBUG delay] 10460000 ms remaining...
+  [DEBUG delay] 10450000 ms remaining...
+  [DEBUG delay] 10440000 ms remaining...
+  [DEBUG delay] 10430000 ms remaining...
+  [DEBUG delay] 10420000 ms remaining...
+  [DEBUG delay] 10410000 ms remaining...
+  [DEBUG delay] 10400000 ms remaining...
+  [DEBUG delay] 10390000 ms remaining...
+  [DEBUG delay] 10380000 ms remaining...
+  [DEBUG delay] 10370000 ms remaining...
+  [DEBUG delay] 10360000 ms remaining...
+  [DEBUG delay] 10350000 ms remaining...
+  [DEBUG delay] 10340000 ms remaining...
+  [DEBUG delay] 10330000 ms remaining...
+  [DEBUG delay] 10320000 ms remaining...
+  [DEBUG delay] 10310000 ms remaining...
+  [DEBUG delay] 10300000 ms remaining...
+  [DEBUG delay] 10290000 ms remaining...
+  [DEBUG delay] 10280000 ms remaining...
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1184
+load:0x40078000,len:13232
+load:0x40080400,len:3028
+entry 0x400805e4
+
+========== BOOT CYCLE STARTED ==========
+Firmware: 1.2.4 (May 10 2026 19:44:43)
+Step 1: Disabling Bluetooth and releasing memory...
+✓ Bluetooth disabled, ~30KB memory freed
+Step 2: Logging wakeup reason...
+Wakeup reason: Undefined (Power On / Reset)
+Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+✓ GPIO 25 hold released successfully
+Step 4: Initializing power management pins...
+✓ Power management pins initialized (3.3V rail OFF)
+Step 5: Initializing RTC state management...
+[   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+✓ RTC state initialized
+Step 6: Checking OTA rollback state...
+Step 7: Initializing watchdog timer (45 minutes timeout)...
+✓ Watchdog initialized (45 min timeout)
+Step 8: Configuring RTC timezone (CET/CEST)...
+✓ RTC timezone configured (CET/CEST)
+Step 9: Measuring battery voltage (early, before any subsystems)...
+ADC calibration: Vref (eFuse)
+✓ Power monitor initialized
+
+Starting battery voltage measurement..
+Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+Median (3): 0.284 V  spread: 0 mV  INVALID
+✓ Battery voltage measured: 0.284V
+Battery voltage: 0.28 V, approx 0%
+Step 10: Evaluating brownout recovery path...
+Step 11: Checking for critical undervoltage protection cutoff...
+CRITICAL: Battery too low — entering deep sleep.
+Current: 0% / 0.284 V (<= 20% or <= 3.633 V)
+RTC time check: now=10, retry=10
+RTC not valid, using fallback month: 1 (January/winter-safe)
+Sleep calculation: month=1 (winter), battery=0%, timezone=CET
+Sleeping for 2160h 0m...
+Next wake (Europe/Oslo): 01/04/70 - 06:00
+3.3V rail already powered off.
+Powering off modem...
+Modem powered off.
+⚠ DEBUG_NO_DEEP_SLEEP: skipping critical-guard sleep, continuing cycle.
+✓ Undervoltage check passed - proceeding to main loop
+========== SETUP COMPLETE, ENTERING MAIN LOOP ==========
+
+
+========== MAIN LOOP START ==========
+✓ Watchdog reset
+
+--- PHASE 1: GPS DECISION LOGIC ---
+No previous GPS fix found. Will attempt first fix (cold-start).
+
+--- PHASE 2: WAVE DATA COLLECTION ---
+Starting IMU sampling for wave spectral analysis...
+  Powering on 3.3V rail (sensors)...
+Powering on 3.3V rail...
+3.3V rail powered on.
+  ✓ 3.3V rail powered
+  Initializing IMU and temperature sensor...
+Powering on sensors...
+Sensors powered on.
+Initializing sensors...
+Sensors initialized
+  ✓ Sensors initialized
+  ✓ Initial water temperature: 25.62°C
+  Collecting wave data (10Hz IMU for 100s)...
+=== Starting wave data collection (160s) ===
+Attempting IMU initialization...
+Initializing MPU6500 directly...
+WHO_AM_I: 0x70
+Detected: MPU6500 (No magnetometer)
+MPU6500 initialized successfully!
+IMU initialized successfully!
+Wave collection: 0 samples, 0 s elapsed
+Wave collection: 50 samples, 5 s elapsed
+Wave collection: 100 samples, 10 s elapsed
+Wave collection: 150 samples, 15 s elapsed
+Wave collection: 200 samples, 20 s elapsed
+Wave collection: 250 samples, 25 s elapsed
+Wave collection: 300 samples, 30 s elapsed
+Wave collection: 350 samples, 35 s elapsed
+Wave collection: 400 samples, 40 s elapsed
+Wave collection: 450 samples, 45 s elapsed
+Wave collection: 500 samples, 50 s elapsed
+Wave collection: 550 samples, 55 s elapsed
+Wave collection: 600 samples, 60 s elapsed
+Wave collection: 650 samples, 65 s elapsed
+Wave collection: 700 samples, 70 s elapsed
+Wave collection: 750 samples, 75 s elapsed
+Wave collection: 800 samples, 80 s elapsed
+Wave collection: 850 samples, 85 s elapsed
+Wave collection: 900 samples, 90 s elapsed
+Wave collection: 950 samples, 95 s elapsed
+Wave collection: 1000 samples, 100 s elapsed
+Wave collection: 1050 samples, 105 s elapsed
+Wave collection: 1100 samples, 110 s elapsed
+Wave collection: 1150 samples, 115 s elapsed
+Wave collection: 1200 samples, 120 s elapsed
+Wave collection: 1250 samples, 125 s elapsed
+Wave collection: 1300 samples, 130 s elapsed
+Wave collection: 1350 samples, 135 s elapsed
+Wave collection: 1400 samples, 140 s elapsed
+Wave collection: 1450 samples, 145 s elapsed
+Wave collection: 1500 samples, 150 s elapsed
+Wave collection: 1550 samples, 155 s elapsed
+Wave collection complete: 1600 samples in 159 s
+Running FFT spectral analysis...
+Spectral result: Hs=0.017 m, Tp=14.03 s, bins=98
+  ✓ Wave data collection complete
+---- Wave Stats (FFT spectral) ----
+Samples: 1600 @ 10.0 Hz, FFT bins: 98
+Hs (sig. height):    0.017 m
+Tp (period):         14.03 s
+Power proxy:         0.002 kW/m
+Sea state:           No waves (Perfect conditions)
+Heave |a| mean:      0.0091 m/s^2
+Accel RMS:           0.0147 m/s^2
+Mean tilt:           2.5 deg
+----------------------------------
+  Powering down sensors and 3.3V rail...
+Powering off sensors...
+Sensors powered off.
+Powering off 3.3V rail...
+3.3V rail powered off.
+  ✓ Sensors and 3.3V rail powered down
+✓ PHASE 2 COMPLETE: Wave data collection finished
+
+
+--- PHASE 3: GNSS POSITIONING AND NTP/XTRA SYNC ---
+Attempting GPS fix (COLD-START)...
+  Powering on modem...
+Starting modem power sequence...
+Power sequence complete. Settling modem...
+  ✓ Modem ready
+  Running GNSS acquisition (NTP sync → XTRA download → 60s warmup → fix polling)...
+=== PDP with APN "telenor" ===
+AT+CGDCONT=1,"IP","telenor"
+OK
+AT+CNACT=1,"telenor"
+OK
+
++APP PDP: ACTIVE
+AT+CNACT?
++CNACT: 1,"2.148.217.149"
+
+OK
+PDP ACTIVE ✅  IP: 2.148.217.149
+=== TIME SYNC (NTP with NITZ fallback) ===
+ATE0
+OK
+
+OK
+
++CCLK: "26/05/10,20:15:17+08"
+
+OK
+CCLK (pre-NTP): 
++CCLK: "26/05/10,20:15:17+08"
+
+OK
+  TZ: +2.00h
+
+OK
+
+OK
+
+OK
+NTP failed (code 61)
+NITZ time: 
++CCLK: "26/05/10,20:15:17+08"
+
+OK
+  TZ: +2.00h
+RTC set from modem clock (NTP or NITZ): 1778436917 (UTC)
+XTRA fresh: last=20583, today=20583, Δ=0 days
+
+ERROR
+
+OK
+
++APP PDP: DEACTIVE
+
+ERROR
+
+OK
+
+SHUT OK
+=== GNSS POWER ON ===
+
+OK
+
+OK
+
+OK
+
+OK
+
+OK
+
+OK
+GNSS start mode: AT+CGNSCOLD
+
+OK
+
++CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+
+OK
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+OK
+
+OK
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+GNSS warmup: polling CGNSINF for up to 60s...
+GNSS warmup: no fix after 60s
+Starting GPS fix acquisition...
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+=== GPS Status Monitoring ===
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+Searched for GPS fix for 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+Searched for GPS fix for 1 minute
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+Searched for GPS fix for 1 minute and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+Searched for GPS fix for 2 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+Searched for GPS fix for 2 minutes and 30 seconds
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+
+Searched for GPS fix for 3 minutes
+
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+CGNSINF: 
++CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+
+OK
+

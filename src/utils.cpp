@@ -19,7 +19,7 @@ void logWakeupReason() {
     case ESP_SLEEP_WAKEUP_WIFI: SerialMon.println("WiFi"); break;
     case ESP_SLEEP_WAKEUP_COCPU: SerialMon.println("Co-Processor"); break;
     case ESP_SLEEP_WAKEUP_ALL: SerialMon.println("All Wakeup Sources"); break;
-    case ESP_SLEEP_WAKEUP_UNDEFINED: SerialMon.println("Undefined (Power On / Reset)"); break;
+    case ESP_SLEEP_WAKEUP_UNDEFINED: SerialMon.println("Power On / Reset"); break;
     default: SerialMon.println("Unknown"); break;
   }
 }

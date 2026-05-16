@@ -1,0 +1,302 @@
+20:45:21.890 > Wave collection: 749 samples, 75 s elapsed
+20:45:26.907 > Wave collection: 799 samples, 80 s elapsed
+20:45:31.895 > Wave collection: 849 samples, 85 s elapsed
+20:45:36.897 > Wave collection: 899 samples, 90 s elapsed
+20:45:41.903 > Wave collection: 949 samples, 95 s elapsed
+20:45:46.902 > Wave collection: 999 samples, 100 s elapsed
+20:45:51.892 > Wave collection: 1049 samples, 105 s elapsed
+20:45:56.899 > Wave collection: 1099 samples, 110 s elapsed
+20:46:01.906 > Wave collection: 1149 samples, 115 s elapsed
+20:46:06.912 > Wave collection: 1199 samples, 120 s elapsed
+20:46:11.903 > Wave collection: 1249 samples, 125 s elapsed
+20:46:16.909 > Wave collection: 1299 samples, 130 s elapsed
+20:46:21.900 > Wave collection: 1349 samples, 135 s elapsed
+20:46:26.905 > Wave collection: 1399 samples, 140 s elapsed
+20:46:31.913 > Wave collection: 1449 samples, 145 s elapsed
+20:46:36.897 > Wave collection: 1499 samples, 150 s elapsed
+20:46:41.908 > Wave collection: 1549 samples, 155 s elapsed
+20:46:46.895 > Wave collection complete: 1599 samples in 160 s
+20:46:46.954 > Running FFT spectral analysis...
+20:46:46.954 > Spectral result: Hs=0.039 m, Tp=7.51 s, bins=98
+20:46:46.954 >   ✓ Wave data collection complete
+20:46:46.954 > ---- Wave Stats (FFT spectral) ----
+20:46:46.954 > Samples: 1599 @ 10.0 Hz, FFT bins: 98
+20:46:46.954 > Hs (sig. height):    0.039 m
+20:46:46.954 > Tp (period):         7.51 s
+20:46:46.954 > Power proxy:         0.005 kW/m
+20:46:46.954 > Sea state:           Ripples (Very easy to swim)
+20:46:46.954 > Heave |a| mean:      0.1204 m/s^2
+20:46:46.954 > Accel RMS:           0.4296 m/s^2
+20:46:46.954 > Mean tilt:           58.2 deg
+20:46:46.954 > ----------------------------------
+20:46:46.954 >   Powering down sensors and 3.3V rail...
+20:46:46.954 > Powering off sensors...
+20:46:46.954 > Sensors powered off.
+20:46:47.074 > Powering off 3.3V rail...
+20:46:47.085 > 3.3V rail powered off.
+20:46:47.085 >   ✓ Sensors and 3.3V rail powered down
+20:46:47.085 > ✓ PHASE 2 COMPLETE: Wave data collection finished
+20:46:47.085 > 
+20:46:47.085 > 
+20:46:47.085 > --- PHASE 3: GNSS POSITIONING AND NTP/XTRA SYNC ---
+20:46:47.085 > Attempting GPS fix (COLD-START)...
+20:46:47.085 >   Powering on modem...
+20:46:47.085 > Starting modem power sequence...
+20:46:50.273 > Power sequence complete. Settling modem...
+20:46:58.294 >   ✓ Modem ready
+20:46:58.294 >   Running GNSS acquisition (NTP sync → XTRA download → 60s warmup → fix polling)...
+20:46:58.294 > === PDP with APN "telenor" ===
+20:46:58.392 > AT+CGDCONT=1,"IP","telenor"
+20:46:58.409 > OK
+20:46:58.521 > AT+CNACT=1,"telenor"
+20:46:58.549 > OK
+20:46:58.649 > 
+20:46:58.649 > +APP PDP: ACTIVE
+20:46:58.679 > AT+CNACT?
+20:46:58.679 > +CNACT: 1,"176.75.250.42"
+20:46:58.679 > 
+20:46:58.679 > OK
+20:46:58.679 > PDP ACTIVE ✅  IP: 176.75.250.42
+20:47:00.159 > === TIME SYNC (NTP with NITZ fallback) ===
+20:47:00.278 > ATE0
+20:47:00.278 > OK
+20:47:00.362 > 
+20:47:00.362 > OK
+20:47:02.498 > 
+20:47:02.498 > +CCLK: "26/05/15,20:47:01+08"
+20:47:02.498 > 
+20:47:02.498 > OK
+20:47:02.498 > CCLK (pre-NTP): 
+20:47:02.498 > +CCLK: "26/05/15,20:47:01+08"
+20:47:02.498 > 
+20:47:02.498 > OK
+20:47:02.498 >   TZ: +2.00h
+20:47:02.595 > 
+20:47:02.595 > OK
+20:47:02.700 > 
+20:47:02.700 > OK
+20:47:02.799 > 
+20:47:02.799 > OK
+20:47:03.201 > NTP failed (code 61)
+20:47:03.227 > NITZ time: 
+20:47:03.227 > +CCLK: "26/05/15,20:47:01+08"
+20:47:03.227 > 
+20:47:03.227 > OK
+20:47:03.227 >   TZ: +2.00h
+20:47:03.227 > RTC set from modem clock (NTP or NITZ): 1778870821 (UTC)
+20:47:03.227 > XTRA fresh: last=20588, today=20588, Δ=0 days
+20:47:03.319 > 
+20:47:03.319 > ERROR
+20:47:03.434 > 
+20:47:03.434 > OK
+20:47:03.949 > 
+20:47:03.949 > +APP PDP: DEACTIVE
+20:47:03.949 > 
+20:47:03.949 > ERROR
+20:47:04.844 > 
+20:47:04.845 > OK
+20:47:05.356 > 
+20:47:05.357 > SHUT OK
+20:47:13.736 > === GNSS POWER ON ===
+20:47:13.849 > 
+20:47:13.849 > OK
+20:47:13.970 > 
+20:47:13.970 > OK
+20:47:14.066 > 
+20:47:14.066 > OK
+20:47:14.185 > 
+20:47:14.186 > OK
+20:47:14.294 > 
+20:47:14.294 > OK
+20:47:14.392 > 
+20:47:14.409 > OK
+20:47:14.690 > Injecting XTRA ephemeris into GNSS engine RAM...
+20:47:15.767 > 
+20:47:15.767 > +CGNSCPY: 0
+20:47:15.767 > 
+20:47:15.767 > OK
+20:47:15.881 > 
+20:47:15.881 > OK
+20:47:15.881 > GNSS start mode: AT+CGNSCOLD
+20:47:16.984 > 
+20:47:16.984 > OK
+20:47:17.096 > 
+20:47:17.096 > +CGNSINF: 0,,,,,,,,,,,,,,,,,,,,
+20:47:17.096 > 
+20:47:17.096 > OK
+20:47:17.494 > 
+20:47:17.494 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+20:47:17.512 > 
+20:47:17.512 > OK
+20:47:17.608 > 
+20:47:17.608 > OK
+20:47:17.718 > 
+20:47:17.720 > OK
+20:47:17.841 > 
+20:47:17.841 > +CGNSINF: 1,0,,,,,,,0,,,,,,,,,,,,
+20:47:17.841 > 
+20:47:17.841 > OK
+20:47:17.841 > GNSS warmup: polling CGNSINF for up to 60s...
+20:48:17.862 > GNSS warmup: no fix after 60s
+20:48:17.874 > Starting GPS fix acquisition...
+20:48:18.084 > 
+20:48:18.084 > +CGNSINF: 1,0,,,,,,,0,,,,,,15,,,,40,,
+20:48:18.084 > 
+20:48:18.084 > OK
+20:48:18.084 > === GPS Status Monitoring ===
+20:48:18.107 > CGNSINF: 
+20:48:18.107 > +CGNSINF: 1,0,,,,,,,0,,,,,,15,,,,40,,
+20:48:18.107 > 
+20:48:18.107 > OK
+20:48:18.107 > 
+20:48:48.238 > 
+20:48:48.238 > +CGNSINF: 1,0,,,,,,,0,,,,,,17,,,,44,,
+20:48:48.238 > 
+20:48:48.238 > OK
+20:48:48.238 > CGNSINF: 
+20:48:48.238 > +CGNSINF: 1,0,,,,,,,0,,,,,,17,,,,44,,
+20:48:48.238 > 
+20:48:48.238 > OK
+20:48:48.238 > 
+20:48:48.238 > Searched for GPS fix for 30 seconds
+20:48:52.686 > GPS fix acquired! HDOP=2.2 TTF=114s
+20:48:52.769 > 
+20:48:52.808 > OK
+20:48:52.808 >   ✓ GPS FIX ACQUIRED: lat=59.402588, lon=5.296540, HDOP=2.2, TTF=114 seconds
+20:48:52.808 > Anchor drift check: No previous anchor
+20:48:52.808 > RTC synced to GPS time: 1778870932
+20:48:52.808 >   ✓ RTC synchronized with GPS time
+20:48:52.808 >   Shutting down GNSS engine...
+20:48:52.903 > 
+20:48:52.903 > OK
+20:48:53.421 >   ✓ GNSS engine stopped
+20:48:53.421 >   Resetting radio stack for cellular (CFUN=0 → CFUN=1)...
+20:49:00.409 >   ✓ Radio stack reset
+20:49:00.409 >   Re-establishing cellular data connection (modem already warm)...
+20:49:00.910 > Modem already warm, skipping pre-cycle.
+20:49:00.910 > Connecting to cellular network (attempt 1/3)...
+20:49:00.943 > Modem warm, skipping init (ATZ).
+20:49:00.943 > Testing AT communication...
+20:49:00.943 >  AT communication successful
+20:49:02.275 > Waiting for network registration...
+20:49:02.275 >  Network registered.
+20:49:02.592 > Signal quality: 27
+20:49:02.592 > Operator: Talkmore Talkmore
+20:49:02.608 > RAT check (AT+CPSI?):
+20:49:03.114 >  Network connected.
+20:49:03.114 > Connecting to APN: telenor
+20:49:05.297 >  Cellular network connected.
+20:49:05.313 > Local IP: 46.156.185.61
+20:49:05.313 > Applying custom DNS...
+20:49:05.493 >   ✓ Cellular connection established
+20:49:05.493 > 
+20:49:05.493 > --- PHASE 4: TEMPERATURE ANOMALY CHECK ---
+20:49:05.493 > Evaluating water temperature spike/trend detection...
+20:49:05.493 > Temp anomaly check: current=20.2°C, trend=0.00°C, spike=NO, overTemp=NO
+20:49:05.493 > ✓ Temperature anomaly check complete
+20:49:05.493 > RTC State:
+20:49:05.493 > - Boot count: 1
+20:49:05.493 > - Battery voltage: 0.00 V
+20:49:05.493 > - Last GPS fix: 59.402588, 5.296540
+20:49:05.493 > - Last GPS fix time: 1778870932
+20:49:05.493 > - Last water temp: 20.25 C
+20:49:05.493 > - Anchor drift detected: NO
+20:49:05.493 > - Anchor drift counter: 0
+20:49:05.493 > - Charging problem: NO
+20:49:05.493 > - Temp spike detected: NO
+20:49:05.493 > - Over temp detected: NO
+20:49:05.493 > - Last upload failed: NO
+20:49:05.493 > - FW update attempted: NO
+20:49:05.493 > 
+20:49:05.493 > --- PHASE 5: TIMESTAMP AND BATTERY RE-CHECK ---
+20:49:05.493 > ✓ Using RTC timestamp (UTC epoch): 1778870944
+20:49:05.493 > Re-measuring battery voltage (after modem/GPS activities)...
+20:49:05.493 > 
+20:49:05.493 > Starting battery voltage measurement..
+20:49:05.493 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+20:49:05.493 > Burst V[1]: 3.998 V (ADC: 1999 mV)  OK
+20:49:05.514 > Burst V[2]: 3.996 V (ADC: 1998 mV)  OK
+20:49:05.627 > Burst V[3]: 3.996 V (ADC: 1998 mV)  OK
+20:49:05.627 > Median (3): 4.037 V  spread: 2 mV  OK
+20:49:05.627 >   Battery: 4.037V (initial boot: 4.084V, delta: -0.046V)
+20:49:05.627 > Computing sleep schedule based on SoC and season...
+20:49:05.627 > RTC time check: now=1778870944, retry=0
+20:49:05.627 > RTC month: 5, DST: YES (from epoch 1778870944)
+20:49:05.627 > Sleep calculation: month=5 (shoulder), battery=78%, timezone=CEST
+20:49:05.627 >   Battery SoC: 78%, Sleep duration: 540 minutes
+20:49:05.627 > 
+20:49:05.627 > --- PHASE 6: JSON PAYLOAD CONSTRUCTION AND UPLOAD ---
+20:49:05.627 > Current local time: 2026-05-15 20:49:04 CEST
+20:49:05.627 > Checking for buffered data from previous failed uploads...
+20:49:05.627 > ✓ No buffered data waiting
+20:49:05.627 > Checking for firmware updates (OTA)...
+20:49:05.627 >   OTA server: trondve.ddns.net
+20:49:05.627 >   OTA path: 
+20:49:05.627 >   Node ID: playbuoy_grinde
+20:49:05.627 >   Checking for updates at: http://trondve.ddns.net/playbuoy_grinde
+20:49:05.627 > CHECKING FOR FIRMWARE UPDATES
+20:49:05.627 > Version URL: http://trondve.ddns.net/playbuoy_grinde.version
+20:49:05.627 > Current firmware version: 1.2.4
+20:49:05.627 > ----------------------------------------
+20:49:05.627 > HTTP GET Host=trondve.ddns.net Port=80 Path=/playbuoy_grinde.version
+20:49:06.448 > HTTP body: '1.2.4'
+20:49:06.448 > Server version retrieved: 1.2.4
+20:49:06.448 > Version comparison: 1.2.4 vs 1.2.4 = 0
+20:49:06.448 > Firmware is up to date
+20:49:06.448 >   No firmware update needed (version current)
+20:49:06.448 > Building JSON payload with current measurements...
+20:49:06.448 >   Refreshed timestamp from network-synced RTC: 1778870945
+20:49:06.470 >   Network: Talkmore Talkmore, IP: 46.156.185.61, Signal: 27%
+20:49:06.561 >   JSON payload constructed:
+20:49:06.561 >   {"nodeId":"playbuoy_grinde","name":"Litla Grindevatnet","version":"1.2.4","timestamp":1778870945,"lat":59.40258789,"lon":5.296539783,"wave":{"height":0.038546119,"period":7.513029099,"direction":"N/A","power":0.005469813},"buoy":{"tilt":58.19440842,"accel_rms":0.429557204},"temp":20.25,"temp_trend":0,"battery":4.037158966,"battery_percent":78,"temp_valid":true,"uptime":299,"boot_count":1,"reset_reason":"PowerOn","minutes_to_sleep":540,"next_wake_utc":1778904000,"battery_change_since_last":0,"rtc":{"waterTemp":20.25},"gps":{"hdop":2.200000048,"ttf":114},"net":{"operator":"Talkmore Talkmore","apn":"telenor","ip":"46.156.185.61","signal":27},"alerts":{"anchorDrift":false,"chargingIssue":false,"tempSpike":false,"overTemp":false,"uploadFailed":false}}
+20:49:06.561 >   Payload size: 756 bytes
+20:49:06.561 > ✓ Attempting JSON upload to API server...
+20:49:06.561 >   Target: playbuoyapi.no:80/upload
+20:49:07.463 > HTTP/1.1 200 OK
+20:49:07.463 > HTTP status code: 200
+20:49:07.463 > Date: Fri, 15 May 2026 18:49:07 GMT
+20:49:07.463 > Content-Type: application/json
+20:49:07.463 > Content-Length: 15
+20:49:07.463 > Connection: close
+20:49:07.463 > Cache-Control: no-store
+20:49:07.463 > referrer-policy: no-referrer
+20:49:07.463 > Server: cloudflare
+20:49:07.463 > strict-transport-security: max-age=15768000; includeSubDomains
+20:49:07.463 > x-content-type-options: nosniff
+20:49:07.463 > x-frame-options: DENY
+20:49:07.463 > cf-cache-status: DYNAMIC
+20:49:07.463 > Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+20:49:07.463 > Server-Timing: cfCacheStatus;desc="DYNAMIC"
+20:49:07.463 > Server-Timing: cfEdge;dur=28,cfOrigin;dur=141
+20:49:07.463 > Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=AV%2BLW%2BUBRHA%2BGrHRZjHHewhoEfNuHUGl%2FkevGhoS3xLBa4S8wfOiRIkqbGnUNIer%2FMtEpfGa4XdEKUdH64oXUvnDG%2FZGJTGKE5nurXMLIF81kfgeQKfRNm0z95tPqQ1m%2Fg%3D%3D"}]}
+20:49:07.463 > CF-RAY: 9fc45219da72712b-OSL
+20:49:07.463 > alt-svc: h3=":443"; ma=86400
+20:49:07.463 > 
+20:49:08.484 > {"status":"ok"}
+20:49:08.484 > ✓✓✓ JSON UPLOAD SUCCESSFUL ✓✓✓
+20:49:08.484 > Upload marked as success.
+20:49:08.484 > 
+20:49:08.484 > --- PHASE 7: SLEEP PREPARATION AND POWER-DOWN ---
+20:49:08.484 > Sleep and wake schedule:
+20:49:08.484 >   Duration: 9 Hours, 10 Minutes and 53 Seconds
+20:49:08.484 >   Next wake (local): 2026-05-16 06:00:00 CEST
+20:49:08.564 > Shutting down subsystems...
+20:49:08.564 >   Powering down 3.3V rail (sensors)...
+20:49:08.584 > 3.3V rail already powered off.
+20:49:08.584 >   ✓ 3.3V rail powered down
+20:49:08.584 >   Tearing down PDP context (preventing radio registration leak)...
+20:49:09.011 >   ✓ PDP context torn down
+20:49:09.012 >   Powering down modem...
+20:49:09.012 > Powering off modem...
+20:49:10.546 > Modem powered off (CPOWD).
+20:49:10.546 >   ✓ Modem powered down
+20:49:10.589 >   Preparing pins and peripherals for minimum power leakage...
+20:49:10.589 >   ✓ System in minimum-leakage state
+20:49:10.589 > 
+20:49:10.589 > ========== ENTERING DEEP SLEEP ==========
+20:49:10.589 >   Sleeping for: 9 Hours, 10 Minutes and 51 Seconds
+20:49:10.589 >   Wake at (UTC): 1778904000
+20:49:10.589 >   Current UTC:   1778870949
+20:49:10.589 >   GPIO 25 (3V3 hold): Will be enabled in deep sleep
+20:49:10.589 >   All peripheral power: OFF
+20:49:10.589 >   Modem: OFF

@@ -5,7 +5,7 @@
 #define TINY_GSM_RX_BUFFER 1024
 #define NODE_ID "playbuoy_grinde"
 #define NAME "Litla Grindevatnet"
-#define FIRMWARE_VERSION "1.2.4"
+#define FIRMWARE_VERSION "1.3.2"
 #define GPS_SYNC_INTERVAL_SECONDS       (7 * 24 * 3600)  // normal: fix every 7 days
 #define GPS_ANCHOR_DRIFT_INTERVAL_SECONDS (24 * 3600)    // daily fix while anchor drift is active
 

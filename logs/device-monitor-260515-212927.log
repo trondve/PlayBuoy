@@ -1,0 +1,45 @@
+21:29:27.181 > ets Jul 29 2019 12:21:46
+21:29:27.182 > 
+21:29:27.182 > rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+21:29:27.187 > configsip: 0, SPIWP:0xee
+21:29:27.187 > clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+21:29:27.192 > mode:DIO, clock div:2
+21:29:27.198 > load:0x3fff0030,len:1184
+21:29:27.198 > load:0x40078000,len:13232
+21:29:27.203 > load:0x40080400,len:3028
+21:29:27.203 > entry 0x400805e4
+21:29:28.134 > 
+21:29:28.134 > ========== BOOT CYCLE STARTED ==========
+21:29:28.134 > Firmware: 1.2.4 (May 15 2026 21:28:19)
+21:29:28.148 > Node:     playbuoy_grinde (Litla Grindevatnet)
+21:29:28.157 > Step 1: Disabling Bluetooth and releasing memory...
+21:29:28.157 > ✓ Bluetooth disabled, ~30KB memory freed
+21:29:28.158 > Step 2: Logging wakeup reason...
+21:29:28.167 > Wakeup reason: Power On / Reset
+21:29:28.167 > Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+21:29:28.172 > ✓ GPIO 25 hold released successfully
+21:29:28.177 > Step 4: Initializing power management pins...
+21:29:28.183 > ✓ Power management pins initialized (3.3V rail OFF)
+21:29:28.183 > Step 5: Initializing RTC state management...
+21:29:28.190 > ✓ RTC state initialized
+21:29:28.196 > Step 6: Checking OTA rollback state...
+21:29:28.196 > Step 7: Initializing watchdog timer (45 minutes timeout)...
+21:29:28.201 > ✓ Watchdog initialized (45 min timeout)
+21:29:28.206 > Step 8: Configuring RTC timezone (CET/CEST)...
+21:29:28.212 > ✓ RTC timezone configured (CET/CEST)
+21:29:28.212 > Step 9: Measuring battery voltage (early, before any subsystems)...
+21:29:28.217 > ADC calibration: Vref (eFuse)
+21:29:28.221 > ✓ Power monitor initialized
+21:29:28.221 > 
+21:29:28.221 > Starting battery voltage measurement..
+21:29:28.228 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+21:29:28.238 > Burst V[1]: 0.287 V (ADC: 142 mV)  INVALID
+21:29:28.252 > Burst V[2]: 0.287 V (ADC: 142 mV)  INVALID
+21:29:28.269 > Burst V[3]: 0.287 V (ADC: 142 mV)  INVALID
+21:29:28.269 > Median (3): 0.287 V  spread: 0 mV  INVALID
+21:29:28.269 > ✓ Battery voltage measured: 0.287V
+21:29:28.269 > Battery voltage: 0.29 V, approx 0%
+21:29:28.280 > Step 10: Evaluating brownout recovery path...
+21:29:28.285 > Step 11: Checking for critical undervoltage protection cutoff...
+21:29:28.290 > CRITICAL: Battery too low — entering deep sleep.
+21:29:28.295 > Current: 0% / 0.287 V (<= 20% or <= 3.633 V)

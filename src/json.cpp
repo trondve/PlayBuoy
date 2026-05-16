@@ -35,19 +35,22 @@ String buildJsonPayload(
 
   // Sanitize float fields: replace NaN/Inf with 0 to prevent invalid JSON
   auto sanitize = [](float x) -> float { return isfinite(x) ? x : 0.0f; };
+  // Round to 6 decimal places — float32 only has ~7 significant digits total,
+  // so digits beyond 6 decimal places are float noise from serialization.
+  auto round6 = [](float x) -> double { return round((double)x * 1e6) / 1e6; };
 
   doc["nodeId"] = nodeId;
   doc["name"] = name;
   doc["version"] = firmwareVersion;
   // Send timestamp as Unix epoch integer (UTC)
   doc["timestamp"] = timestamp;
-  doc["lat"] = sanitize(lat);
-  doc["lon"] = sanitize(lon);
+  doc["lat"] = round6(sanitize(lat));
+  doc["lon"] = round6(sanitize(lon));
 
   JsonObject wave = doc.createNestedObject("wave");
   wave["height"] = sanitize(waveHeight);
   wave["period"] = sanitize(wavePeriod);
-  wave["direction"] = sanitize(waveDirection);
+  wave["direction"] = waveDirection;
   wave["power"] = sanitize(wavePower);
 
   // Buoy diagnostics from IMU

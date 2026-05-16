@@ -87,12 +87,12 @@ float readBatteryVoltage() {
   float v[NUM_BURSTS];
   for (int i = 0; i < NUM_BURSTS; i++) {
     uint32_t adcMv = readAdcBurstMv(ADC_SAMPLES_PER_BURST);
-    v[i] = (float)adcMv / 1000.0f * DIVIDER_RATIO;
+    v[i] = (float)adcMv / 1000.0f * DIVIDER_RATIO * BATTERY_CALIBRATION_FACTOR;
     SerialMon.printf("Burst V[%d]: %.3f V (ADC: %lu mV)  %s\n",
                      i + 1, v[i], adcMv, isValidVoltage(v[i]) ? "OK" : "INVALID");
   }
 
-  float vmed = medianOfThree(v[0], v[1], v[2]) * BATTERY_CALIBRATION_FACTOR;
+  float vmed = medianOfThree(v[0], v[1], v[2]);
 
   // Log spread for remote diagnostics — if bursts differ by >20mV something is off
   float vmin = v[0], vmax = v[0];

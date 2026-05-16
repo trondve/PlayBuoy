@@ -1,0 +1,53 @@
+19:39:44.170 > ets Jul 29 2019 12:21:46
+19:39:44.171 > 
+19:39:44.171 > rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+19:39:44.176 > configsip: 0, SPIWP:0xee
+19:39:44.176 > clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+19:39:44.181 > mode:DIO, clock div:2
+19:39:44.187 > load:0x3fff0030,len:1184
+19:39:44.187 > load:0x40078000,len:13232
+19:39:44.191 > load:0x40080400,len:3028
+19:39:44.191 > entry 0x400805e4
+19:39:45.163 > 
+19:39:45.164 > ========== BOOT CYCLE STARTED ==========
+19:39:45.164 > Firmware: 1.2.4 (May 10 2026 19:38:35)
+19:39:45.168 > Step 1: Disabling Bluetooth and releasing memory...
+19:39:45.173 > ✓ Bluetooth disabled, ~30KB memory freed
+19:39:45.173 > Step 2: Logging wakeup reason...
+19:39:45.179 > Wakeup reason: Undefined (Power On / Reset)
+19:39:45.185 > Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...
+19:39:45.191 > ✓ GPIO 25 hold released successfully
+19:39:45.191 > Step 4: Initializing power management pins...
+19:39:45.196 > ✓ Power management pins initialized (3.3V rail OFF)
+19:39:45.202 > Step 5: Initializing RTC state management...
+19:39:45.207 > [   595][E][Preferences.cpp:50] begin(): nvs_open failed: NOT_FOUND
+19:39:45.213 > ✓ RTC state initialized
+19:39:45.213 > Step 6: Checking OTA rollback state...
+19:39:45.219 > Step 7: Initializing watchdog timer (45 minutes timeout)...
+19:39:45.225 > ✓ Watchdog initialized (45 min timeout)
+19:39:45.225 > Step 8: Configuring RTC timezone (CET/CEST)...
+19:39:45.228 > ✓ RTC timezone configured (CET/CEST)
+19:39:45.235 > Step 9: Measuring battery voltage (early, before any subsystems)...
+19:39:45.241 > ADC calibration: Vref (eFuse)
+19:39:45.241 > ✓ Power monitor initialized
+19:39:45.247 > 
+19:39:45.247 > Starting battery voltage measurement..
+19:39:45.247 > Pin: GPIO35, ADC: 12-bit, Atten: 11 dB
+19:39:45.264 > Burst V[1]: 0.284 V (ADC: 142 mV)  INVALID
+19:39:45.278 > Burst V[2]: 0.284 V (ADC: 142 mV)  INVALID
+19:39:45.294 > Burst V[3]: 0.284 V (ADC: 142 mV)  INVALID
+19:39:45.294 > Median (3): 0.284 V  spread: 0 mV  INVALID
+19:39:45.300 > ✓ Battery voltage measured: 0.284V
+19:39:45.300 > Battery voltage: 0.28 V, approx 0%
+19:39:45.305 > Step 10: Evaluating brownout recovery path...
+19:39:45.310 > Step 11: Checking for critical undervoltage protection cutoff...
+19:39:45.315 > CRITICAL: Battery too low — entering deep sleep.
+19:39:45.321 > Current: 0% / 0.284 V (<= 20% or <= 3.633 V)
+19:39:55.316 > RTC time check: now=10, retry=10
+19:39:55.316 > RTC not valid, using fallback month: 1 (January/winter-safe)
+19:39:55.321 > Sleep calculation: month=1 (winter), battery=0%, timezone=CET
+19:39:55.327 > Sleeping for 2160h 0m...
+19:39:55.327 > Next wake (Europe/Oslo): 01/04/70 - 06:00
+19:39:55.332 > 3.3V rail already powered off.
+19:39:55.335 > Powering off modem...
+19:40:07.634 > Modem powered off.

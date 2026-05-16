@@ -217,6 +217,59 @@ static const char* seasonName(Season s) {
   return "unknown";
 }
 
+struct SleepAnchor { int soc; int minutes; };
+
+static const SleepAnchor SUMMER_ANCHORS[] = {
+  {100,    120},  // 2h  — actively discharge; frequent reports while solar abundant
+  { 80,    180},  // 3h
+  { 70,    240},  // 4h
+  { 60,    360},  // 6h
+  { 50,    720},  // 12h — entering optimal storage range
+  { 40,   4320},  // 3d  — more conservative below 50%
+  { 30,  10080},  // 1w
+  { 25,  20160},  // 2w  — near critical; hibernate and let solar recover
+  {  0,  40320},  // 4w
+};
+
+static const SleepAnchor SHOULDER_ANCHORS[] = {
+  {100,   2880},  // 2d
+  { 80,   2880},  // 2d  — flat plateau; solar inconsistent at 59°N
+  { 60,   5040},  // 3.5d
+  { 50,  10080},  // 1w
+  { 40,  20160},  // 2w
+  { 35,  30240},  // 3w
+  { 30,  43200},  // 1mo
+  { 25,  86400},  // 2mo
+  {  0, 129600},  // 3mo
+};
+
+static const SleepAnchor WINTER_ANCHORS[] = {
+  {100,   2880},  // 2d
+  { 90,   2880},  // 2d  — flat plateau; minimal solar at 59°N Nov-Mar
+  { 80,   5760},  // 4d
+  { 70,   7200},  // 5d
+  { 60,  10080},  // 1w
+  { 50,  15120},  // 1.5w
+  { 40,  20160},  // 2w
+  { 35,  30240},  // 3w
+  { 30,  43200},  // 1mo
+  { 25,  86400},  // 2mo
+  {  0, 129600},  // 3mo — hibernate; critical guard at 25% handles true emergency
+};
+
+static int interpolateSleep(int soc, const SleepAnchor* a, size_t n) {
+  if (soc >= a[0].soc) return a[0].minutes;
+  if (soc <= a[n - 1].soc) return a[n - 1].minutes;
+  for (size_t i = 0; i < n - 1; i++) {
+    int socHi = a[i].soc,     socLo = a[i + 1].soc;
+    int minHi = a[i].minutes, minLo = a[i + 1].minutes;
+    if (soc <= socHi && soc >= socLo) {
+      return minHi + (minLo - minHi) * (socHi - soc) / (socHi - socLo);
+    }
+  }
+  return 1440;
+}
+
 int determineSleepDuration(int batteryPercent, bool fastPath) {
   int month = getCurrentMonth(fastPath); // 1=Jan, ..., 12=Dec
   Season season = getSeason(month);
@@ -258,46 +311,14 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
   // Returns minutes for finer-grained control.
   // Portable: works in sunny southern Europe AND far-north long winters.
 
-  if (season == SEASON_WINTER) {
-    // Winter: minimal solar harvest, conserve battery.
-    if (batteryPercent > 80) return 720;          // 12 hours — discharge toward healthy range
-    if (batteryPercent > 70) return 1080;         // 18 hours — gradient between 80% (12h) and 60% (24h)
-    if (batteryPercent > 60) return 1440;         // 24 hours
-    if (batteryPercent > 50) return 2880;         // 2 days
-    if (batteryPercent > 40) return 4320;         // 3 days — entering optimal storage range
-    if (batteryPercent > 35) return 10080;        // 1 week
-    if (batteryPercent > 30) return 20160;        // 2 weeks
-    if (batteryPercent > 25) return 43200;        // 1 month
-    return 129600;                                 // 3 months — near critical, hibernate
+  const SleepAnchor* anchors;
+  size_t n;
+  switch (season) {
+    case SEASON_WINTER:   anchors = WINTER_ANCHORS;   n = sizeof(WINTER_ANCHORS)   / sizeof(WINTER_ANCHORS[0]);   break;
+    case SEASON_SHOULDER: anchors = SHOULDER_ANCHORS; n = sizeof(SHOULDER_ANCHORS) / sizeof(SHOULDER_ANCHORS[0]); break;
+    default:              anchors = SUMMER_ANCHORS;   n = sizeof(SUMMER_ANCHORS)   / sizeof(SUMMER_ANCHORS[0]);   break;
   }
-
-  if (season == SEASON_SHOULDER) {
-    // Shoulder: intermediate schedule between winter and summer.
-    // Solar is available but weak/inconsistent (Apr-May, Sep-Oct at 59°N).
-    if (batteryPercent > 80) return 360;          // 6 hours — some discharge, moderate reporting
-    if (batteryPercent > 70) return 540;          // 9 hours
-    if (batteryPercent > 60) return 720;          // 12 hours
-    if (batteryPercent > 50) return 1080;         // 18 hours
-    if (batteryPercent > 40) return 2880;         // 2 days — more conservative below 50%
-    if (batteryPercent > 35) return 5760;         // 4 days
-    if (batteryPercent > 30) return 10080;        // 1 week — significant escalation near 30%
-    if (batteryPercent > 25) return 20160;        // 2 weeks — near critical, hibernate
-    return 20160;                                  // 2 weeks — critical guard handles true emergency
-  }
-
-  // Summer: solar harvest available, more frequent reporting.
-  if (batteryPercent > 80) {
-    SerialMon.printf("Summer mode: battery >80%%, sleeping 2 hours (discharge toward healthy range)\n");
-    return 120;                                    // 2 hours — actively discharge + frequent temp updates
-  }
-  if (batteryPercent > 70) return 180;           // 3 hours — good solar, capture temp changes
-  if (batteryPercent > 60) return 360;           // 6 hours — sustainable equilibrium
-  if (batteryPercent > 50) return 540;           // 9 hours — in optimal storage range
-  if (batteryPercent > 40) return 1440;          // 24 hours — more conservative below 50%
-  if (batteryPercent > 35) return 2880;          // 2 days
-  if (batteryPercent > 30) return 5760;          // 4 days — escalation near 30%
-  if (batteryPercent > 25) return 10080;         // 1 week — near critical, let solar recover
-  return 10080;                                    // 1 week — critical guard handles true emergency
+  return interpolateSleep(batteryPercent, anchors, n);
 }
 
 // Function to log battery voltage and estimated percentage

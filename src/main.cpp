@@ -94,7 +94,13 @@ void preparePinsAndSubsystemsForDeepSleep() {
   pinMode(MODEM_RX, INPUT);
   pinMode(MODEM_PWRKEY, INPUT);
   pinMode(MODEM_RST, INPUT);
-  pinMode(MODEM_POWER_ON, INPUT);
+  // Hold MODEM_POWER_ON LOW during deep sleep to prevent 3V3 rail leak.
+  // Setting to INPUT (high-Z) lets the pin float HIGH if the circuit has a pull-up,
+  // which keeps modem VBAT enabled and the LED on throughout deep sleep.
+  pinMode(MODEM_POWER_ON, OUTPUT);
+  digitalWrite(MODEM_POWER_ON, LOW);
+  gpio_hold_dis(GPIO_NUM_23);
+  gpio_hold_en(GPIO_NUM_23);
   pinMode(MODEM_DTR, INPUT);
   pinMode(MODEM_RI, INPUT);
 
@@ -394,8 +400,9 @@ void setup() {
   }
 
   // Release any deep-sleep holds from previous cycle before driving pins
-  SerialMon.println("Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail control)...");
+  SerialMon.println("Step 3: Releasing GPIO deep-sleep hold (GPIO 25 3.3V rail, GPIO 23 modem power)...");
   gpio_deep_sleep_hold_dis();
+  gpio_hold_dis(GPIO_NUM_23);  // release modem POWER_ON hold before driving pins
   esp_err_t holdErr = gpio_hold_dis(GPIO_NUM_25);
   if (holdErr != ESP_OK) {
     SerialMon.printf("⚠ WARNING: GPIO 25 hold release failed (err=%d). Retrying once...\n", holdErr);

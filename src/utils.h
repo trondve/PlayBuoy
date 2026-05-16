@@ -1,4 +1,5 @@
 #pragma once
+#include <Arduino.h>
 
 // Common time constants
 static constexpr uint32_t SECONDS_PER_DAY = 24UL * 3600UL;
