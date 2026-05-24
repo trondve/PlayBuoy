@@ -63,13 +63,12 @@ String buildJsonPayload(
   doc["battery"] = sanitize(batteryVoltage);
   doc["battery_percent"] = estimateBatteryPercent(batteryVoltage);
 
-  doc["temp_valid"] = !isnan(waterTemp);
+  doc["temp_valid"] = isfinite(waterTemp);  // false for NaN and Inf (sanitize() converts both to 0)
 
   doc["uptime"] = uptime;
   doc["boot_count"] = rtcState.bootCounter;
   doc["reset_reason"] = resetReason;
 
-  // New fields
   doc["minutes_to_sleep"] = minutesToSleep;
   doc["next_wake_utc"] = nextWakeUtc;
   doc["battery_change_since_last"] = batteryChangeSinceLast;

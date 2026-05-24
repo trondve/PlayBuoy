@@ -15,9 +15,9 @@
 //
 
 //
-// Initializes ADC for battery voltage measurement (ESP32 ADC1, GPIO 36).
-// Reads pin 36 (3.3V reference attenuated 1/3.6) connected to battery via divider.
-// Calibration: reference voltage = 1.1V, full-scale (4095 ADC counts) = 3.96V.
+// Initializes ADC for battery voltage measurement (ESP32 ADC1, GPIO 35).
+// Battery voltage divider (100K/100K, ratio 2.0) feeds GPIO 35 at half battery voltage.
+// ADC: 12-bit, 11dB attenuation (~0–3.9V input range). Calibrated via eFuse.
 // Returns: true if ADC initialized, false on error (shouldn't happen).
 //
 bool beginPowerMonitor();
