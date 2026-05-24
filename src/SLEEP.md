@@ -42,3 +42,27 @@ Configure ESP32 for minimum leakage during deep sleep (target: 10-15µA). The bu
 - Never add RTC_DATA_ATTR variables to fast memory (it's disabled)
 - Never skip the pin INPUT sweep before sleep
 - If adding new GPIO usage, add the corresponding INPUT cleanup before sleep
+
+## Measured Deep Sleep Power (observed 2026-05-16 – 2026-05-18)
+
+Conditions: 53.4h experiment. Solar panels blacked out. All three LEDs physically desoldered (GY-91, LilyGo status, LilyGo solar charging). GPIO 23 held LOW (modem VBAT off). GPIO 25 held LOW (3V3 sensor rail off).
+
+| Window | Drain rate |
+|--------|-----------|
+| Overall 53.4h (includes OCV relaxation) | ~0.65 mAh/h |
+| Steady-state h32–h44 | **~0.43 mAh/h** |
+| Equivalent current | **~40–75 µA** |
+
+Estimated contributors to the steady-state floor:
+- ESP32 RTC domain: ~10–15 µA
+- Solar charger IC (CN3791 quiescent): ~12 µA
+- LDO leakage + PCB passive leakage: ~10–40 µA
+
+**Before the GPIO 23 fix**, modem VBAT stayed live during sleep → modem LED on → ~5–20 mA additional draw. Fixed by holding GPIO 23 LOW via `gpio_hold_en(GPIO_NUM_23)`. See `preparePinsAndSubsystemsForDeepSleep()`.
+
+**Projection — 100% → 20% SoC on deep sleep only (7000mAh 1S2P pack):**
+- Available capacity: 80% × 7000mAh = 5600 mAh
+- At 0.43 mAh/h: ~13,000 h ≈ **18 months**
+- This is comparable to the cell's own self-discharge rate at cold temperatures, so deep sleep is essentially free in winter
+
+*Use these numbers as inputs for the annual power-budget simulation. Solar charge rates and wake cycle costs are documented in `BATTERY.md`.*

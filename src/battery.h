@@ -14,6 +14,20 @@
 // - Season-aware: winter 90-day sleep, summer 30-min wake cycle
 //
 
+// High-battery charge dump tiers — override seasonal sleep schedule to prevent overcharge brownouts.
+// Triggered when SoC ≥ 80%. All tiers apply across all seasons; TIER1 sleep interval is
+// season-aware (60 min summer, 6 h shoulder/winter). Night quiet-hour bypass starts at TIER2.
+enum DumpMode {
+  DUMP_NONE  = 0,
+  DUMP_TIER1 = 1,  // 75–85%: 60 min (summer) / 6 h (shoulder+winter), normal cycle, no night override
+  DUMP_TIER2 = 2,  // 85–90%: 60 min, full cycle + GPS forced, night override
+  DUMP_TIER3 = 3,  // 90–95%: 30 min, two back-to-back cycles, night override
+  DUMP_TIER4 = 4,  // ≥95%:   15 min, two back-to-back cycles, night override
+};
+
+// Returns dump tier for a given raw SoC (before hysteresis). Returns DUMP_NONE when SoC < 80%.
+DumpMode getDumpMode(int rawSoc);
+
 //
 // Detects charge state changes via hysteresis (±30mV around 3.7V threshold).
 // Sets isCharging flag, used to detect "charging lost" condition.

@@ -145,6 +145,28 @@ uint32_t adjustNextWakeUtcForQuietHours(uint32_t candidateUtc) {
 }
 
 void ensureModemReady() {
+  // Drain UART and check for OVER-VOLTAGE URC before any AT exchange or re-power.
+  // If the modem self-powered-down due to overvoltage, powering it back on into the
+  // same condition makes things worse. Dump mode should prevent this, but if it slips
+  // through (e.g. fast solar charge on first boot), we must not re-trigger the fault.
+  // 200ms drain window: URCs arrive in <1ms on UART; 200ms is generous but non-blocking.
+  {
+    String pending;
+    uint32_t drainEnd = millis() + 200;
+    while (millis() < drainEnd) {
+      while (SerialAT.available()) pending += (char)SerialAT.read();
+      delay(5);
+    }
+    if (pending.indexOf("OVER-VOLTAGE") >= 0) {
+      SerialMon.println("⚠ OVER-VOLTAGE URC from modem — modem self-powered-down due to overvoltage");
+      SerialMon.println("  Dump mode should prevent recurrence. Skipping re-power this cycle.");
+      SerialMon.print("  URC content: "); SerialMon.println(pending);
+      rtcState.modemOvervoltageDetected = true;
+      g_modemReady = false;
+      return;  // do NOT re-power — battery is too full
+    }
+  }
+
   if (g_modemReady) {
     // Probe modem liveness with a raw AT; if unresponsive, force re-power
     while (SerialAT.available()) SerialAT.read(); // flush
@@ -246,9 +268,19 @@ void wakeModemForNetwork() {
 void powerOffModem() {
   SerialMon.println("Powering off modem...");
 
-  // Disable radio before power-off to cleanly deregister from network
+  // Disable radio before power-off to cleanly deregister from network.
+  // Spec: CFUN=0 OK arrives within 1–2s. Poll within the existing 1500ms window — no
+  // timing reduction, just adds diagnostic visibility if the modem is unresponsive.
   SerialAT.println("AT+CFUN=0");
-  delay(1500);  // Wait for radio shutdown
+  {
+    uint32_t t0 = millis(); String r; bool gotOk = false;
+    while (millis() - t0 < 1500) {
+      while (SerialAT.available()) r += (char)SerialAT.read();
+      if (!gotOk && r.indexOf("OK") >= 0) gotOk = true;
+      delay(10);
+    }
+    if (!gotOk) SerialMon.println("  ⚠ CFUN=0 (powerOff): no OK — modem may already be off");
+  }
 
   // Try graceful shutdown first (optional)
 #if ENABLE_CPOWD_SHUTDOWN
@@ -570,6 +602,17 @@ void loop() {
     }
   }
 
+  // Dump mode TIER2+ forces a GPS fix every cycle regardless of the normal interval,
+  // because the full modem+GNSS sequence is the most effective energy dump available.
+  if (!shouldGetNewGpsFix) {
+    int earlyPct = estimateBatteryPercent(getStableBatteryVoltage());
+    if (getDumpMode(earlyPct) >= DUMP_TIER2 && earlyPct > 40) {
+      SerialMon.printf("Dump mode TIER%d: forcing GPS fix this cycle (SoC=%d%%)\n",
+                       (int)getDumpMode(earlyPct), earlyPct);
+      shouldGetNewGpsFix = true;
+    }
+  }
+
   // 1) Collect wave data first (modem is still off for lower power)
   SerialMon.println("\n--- PHASE 2: WAVE DATA COLLECTION ---");
   SerialMon.println("Starting IMU sampling for wave spectral analysis...");
@@ -667,10 +710,30 @@ void loop() {
     // re-enter cellular mode. Without this, the first waitForNetwork() always
     // times out (60s wasted) because the radio hasn't switched back to cellular.
     SerialMon.println("  Resetting radio stack for cellular (CFUN=0 → CFUN=1)...");
+    // Spec: CFUN=0 OK within 1–2s, CFUN=1 OK within 3–5s. Poll within the existing
+    // delay windows for diagnostic visibility — delays are NOT reduced on early OK.
     SerialAT.println("AT+CFUN=0");
-    delay(2000);
+    {
+      uint32_t t0 = millis(); String r; bool gotOk = false;
+      while (millis() - t0 < 2000) {
+        while (SerialAT.available()) r += (char)SerialAT.read();
+        if (!gotOk && r.indexOf("OK") >= 0) gotOk = true;
+        delay(10);
+      }
+      if (!gotOk) SerialMon.println("  ⚠ CFUN=0: no OK within 2s — radio may be stuck");
+      else SerialMon.println("  ✓ CFUN=0: OK");
+    }
     SerialAT.println("AT+CFUN=1");
-    delay(5000);  // Allow radio to initialize and begin network search
+    {
+      uint32_t t0 = millis(); String r; bool gotOk = false;
+      while (millis() - t0 < 5000) {
+        while (SerialAT.available()) r += (char)SerialAT.read();
+        if (!gotOk && r.indexOf("OK") >= 0) gotOk = true;
+        delay(10);
+      }
+      if (!gotOk) SerialMon.println("  ⚠ CFUN=1: no OK within 5s — radio stack may be unstable");
+      else SerialMon.println("  ✓ CFUN=1: OK");
+    }
     SerialMon.println("  ✓ Radio stack reset");
 
     // Re-establish cellular data connection for firmware updates and JSON upload
@@ -707,9 +770,27 @@ void loop() {
     // same root cause as the GPS path, which already does CFUN=0→CFUN=1 here.
     SerialMon.println("  Resetting radio stack for cellular (CFUN=0 → CFUN=1)...");
     SerialAT.println("AT+CFUN=0");
-    delay(2000);
+    {
+      uint32_t t0 = millis(); String r; bool gotOk = false;
+      while (millis() - t0 < 2000) {
+        while (SerialAT.available()) r += (char)SerialAT.read();
+        if (!gotOk && r.indexOf("OK") >= 0) gotOk = true;
+        delay(10);
+      }
+      if (!gotOk) SerialMon.println("  ⚠ CFUN=0: no OK within 2s — radio may be stuck");
+      else SerialMon.println("  ✓ CFUN=0: OK");
+    }
     SerialAT.println("AT+CFUN=1");
-    delay(5000);
+    {
+      uint32_t t0 = millis(); String r; bool gotOk = false;
+      while (millis() - t0 < 5000) {
+        while (SerialAT.available()) r += (char)SerialAT.read();
+        if (!gotOk && r.indexOf("OK") >= 0) gotOk = true;
+        delay(10);
+      }
+      if (!gotOk) SerialMon.println("  ⚠ CFUN=1: no OK within 5s — radio stack may be unstable");
+      else SerialMon.println("  ✓ CFUN=1: OK");
+    }
     SerialMon.println("  ✓ Radio stack reset");
 
     // Establish cellular data connection for firmware updates and JSON upload
@@ -798,6 +879,7 @@ void loop() {
   SerialMon.println("Computing sleep schedule based on SoC and season...");
   int batteryPercent = estimateBatteryPercent(getStableBatteryVoltage());
   int sleepMinutes = determineSleepDuration(batteryPercent);
+  DumpMode dumpMode = getDumpMode(batteryPercent);
   SerialMon.printf("  Battery SoC: %d%%, Sleep duration: %d minutes\n", batteryPercent, sleepMinutes);
   // Now that hysteresis has used the previous cycle's voltage, persist the fresh one
   rtcState.lastBatteryVoltage = getStableBatteryVoltage();
@@ -806,7 +888,10 @@ void loop() {
 #endif
   uint32_t nowUtc = (uint32_t)time(NULL);
   uint32_t candidateWakeUtc = (currentTimestamp >= SECONDS_PER_DAY ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
-  uint32_t nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
+  // Dump mode TIER2+: bypass quiet-hour deferral — draining at 3am matters more than the schedule
+  uint32_t nextWakeUtc = (dumpMode >= DUMP_TIER2)
+    ? candidateWakeUtc
+    : adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
 
   SerialMon.println("\n--- PHASE 6: JSON PAYLOAD CONSTRUCTION AND UPLOAD ---");
@@ -927,10 +1012,12 @@ void loop() {
     } else {
       SerialMon.println("  (No network - using cached values)");
     }
-    // Refresh next wake after potential time update and apply quiet-hours adjustment
+    // Refresh next wake after potential time update
     nowUtc = (uint32_t)time(NULL);
     candidateWakeUtc = (currentTimestamp >= SECONDS_PER_DAY ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
-    nextWakeUtc = adjustNextWakeUtcForQuietHours(candidateWakeUtc);
+    nextWakeUtc = (dumpMode >= DUMP_TIER2)
+      ? candidateWakeUtc
+      : adjustNextWakeUtcForQuietHours(candidateWakeUtc);
     json = buildJsonPayload(
       fix.latitude,
       fix.longitude,
@@ -987,6 +1074,105 @@ void loop() {
   } else {
     SerialMon.println("Skipping new data upload (buffered data upload failed or in progress)");
   }
+
+  // Dump mode TIER3+: run a second full cycle back-to-back before sleeping.
+  // Modem is still on from Phase 6 — no re-power needed. Wave sampling runs fresh.
+  if (dumpMode >= DUMP_TIER3) {
+    SerialMon.println("\n--- DUMP MODE TIER3+: SECOND UPLOAD CYCLE ---");
+    esp_task_wdt_reset();
+
+    // Fresh wave + temperature sample
+    powerOn3V3Rail();
+    delay(150);
+    if (!g_sensorsInitialized) {
+      beginSensors();
+      g_sensorsInitialized = true;
+    }
+    recordWaveData();
+    float bonusTemp = getWaterTemperature();
+    if (!isnan(bonusTemp)) {
+      rtcState.lastWaterTemp = bonusTemp;
+      pushTemperatureHistory(bonusTemp);
+    }
+    powerOff3V3Rail();
+    esp_task_wdt_reset();
+
+    // Fresh battery reading
+    float bonusVoltage = readBatteryVoltage();
+    float bonusDelta = bonusVoltage - rtcState.lastBatteryVoltage;
+    setStableBatteryVoltage(bonusVoltage);
+    SerialMon.printf("  Battery (second cycle): %.3fV (%d%%)\n",
+                     bonusVoltage, estimateBatteryPercent(bonusVoltage));
+
+    // Re-validate and refresh network info
+    if (!networkConnected || !modem.isGprsConnected()) {
+      SerialMon.println("  Reconnecting for second cycle upload...");
+      networkConnected = connectToNetwork(NETWORK_PROVIDER, true);
+    }
+    String bonusOp = "", bonusIp = "";
+    int bonusRssi = 0;
+    if (networkConnected) {
+      bonusOp   = modem.getOperator();
+      bonusRssi = modem.getSignalQuality();
+      IPAddress lip = modem.localIP();
+      bonusIp = String((int)lip[0]) + "." + String((int)lip[1]) + "." +
+                String((int)lip[2]) + "." + String((int)lip[3]);
+    }
+
+    uint32_t bonusNow = (uint32_t)time(NULL);
+    uint32_t bonusTs  = (bonusNow >= SECONDS_PER_DAY) ? bonusNow : currentTimestamp;
+    uint32_t bonusCand = bonusNow + (uint32_t)sleepMinutes * 60UL;
+    uint32_t bonusNextWake = (dumpMode >= DUMP_TIER2)
+      ? bonusCand
+      : adjustNextWakeUtcForQuietHours(bonusCand);
+
+    String bonusJson = buildJsonPayload(
+      fix.latitude, fix.longitude,
+      computeWaveHeight(), computeWavePeriod(),
+      computeWaveDirection(),
+      computeWavePower(computeWaveHeight(), computeWavePeriod()),
+      rtcState.lastWaterTemp, bonusVoltage, bonusTs,
+      NODE_ID, NAME, FIRMWARE_VERSION,
+      millis() / 1000, resetReason,
+      bonusOp, networkConnected ? String(NETWORK_PROVIDER) : String(""),
+      bonusIp, bonusRssi,
+      rtcState.lastWaterTemp, sleepMinutes, bonusNextWake, bonusDelta
+    );
+
+    if (networkConnected) {
+      SerialMon.println("  Uploading second cycle data...");
+      if (sendJsonToServer(API_SERVER, API_PORT, API_ENDPOINT, bonusJson)) {
+        SerialMon.println("  ✓ Second cycle upload successful");
+        markUploadSuccess();
+      } else {
+        SerialMon.println("  ✗ Second cycle upload failed — buffering");
+        markUploadFailed();
+        storeUnsentJson(bonusJson);
+      }
+    } else {
+      SerialMon.println("  ✗ No network for second cycle upload — buffering");
+      storeUnsentJson(bonusJson);
+    }
+    rtcState.lastBatteryVoltage = bonusVoltage;
+    SerialMon.println("✓ DUMP MODE SECOND CYCLE COMPLETE");
+  }
+
+  // Track consecutive modem failures. Reset on any successful upload; increment otherwise.
+  // Logged as a field-diagnostic — does not alter sleep schedule, just makes the problem visible.
+  if (networkConnected) {
+    rtcState.modemFailCount = 0;
+    rtcState.modemOvervoltageDetected = false;  // clear once a full cycle succeeds
+  } else {
+    if (rtcState.modemFailCount < 255) rtcState.modemFailCount++;
+    if (rtcState.modemFailCount >= 5) {
+      SerialMon.printf("⚠ MODEM: %d consecutive cycles with no network — check signal, SIM, and voltage\n",
+                       rtcState.modemFailCount);
+    }
+  }
+  if (rtcState.modemOvervoltageDetected) {
+    SerialMon.println("⚠ MODEM: over-voltage condition was detected this session — dump mode active");
+  }
+
   SerialMon.println("\n--- PHASE 7: SLEEP PREPARATION AND POWER-DOWN ---");
   // Store planned sleep/wake info in RTC for next boot's wake reason context
   rtcState.lastSleepMinutes = (uint32_t)sleepMinutes;

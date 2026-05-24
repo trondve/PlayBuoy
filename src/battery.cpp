@@ -52,7 +52,8 @@ bool handleUndervoltageProtection() {
     SerialMon.printf("Current: %d%% / %.3f V (<= %d%% or <= %.3f V)\n",
                      pct, voltage, BATTERY_CRITICAL_PERCENT, BATTERY_CRITICAL_VOLTAGE);
     // Decide a conservative sleep window using existing policy
-    int sleepMinutes = determineSleepDuration(pct);
+    // fastPath=true: NTP hasn't run yet — skip 10s RTC retry loop, fall back to January (winter-safe)
+    int sleepMinutes = determineSleepDuration(pct, true);
     rtcState.lastBatteryVoltage = voltage; // persist for next boot's hysteresis
     // Compute next wake epoch from current RTC time
     uint32_t now = (uint32_t)time(NULL);
@@ -99,10 +100,11 @@ bool handleUndervoltageProtection() {
 int estimateBatteryPercent(float voltage) {
   // Samsung INR18650-35E (3500mAh energy cell) OCV table, 101 points (0-100%).
   // Target cell: LiitoKala Lii-35S which uses the 35E core.
-  // Table is adjusted for ~10°C Norwegian lake water operating temperature.
+  // Table is at 25°C reference (standard Samsung 35E datasheet values).
+  // Runtime temperature correction below handles cold-temperature OCV depression.
   // The 35E has a higher and flatter plateau than the 25R/30Q power cells previously used.
   //
-  // Key reference points (at ~10°C):
+  // Key reference points (at 25°C):
   //   0% = 2.950V (conservative floor, real cutoff is 2.50V)
   //   10% = 3.350V    25% = 3.555V
   //   50% = 3.720V    75% = 4.002V
@@ -130,15 +132,15 @@ int estimateBatteryPercent(float voltage) {
     4.200f                                                                               // 100%
   };
 
-  // Temperature compensation: OCV shifts ~1.5mV per °C between -20°C and +25°C
-  // Use water temperature as proxy for cell temperature. At cold temps (<10°C),
-  // apply upward correction to prevent over-reporting SoC.
+  // Temperature compensation: OCV shifts ~1.5mV per °C between -20°C and +25°C.
+  // OCV is depressed at cold temps relative to the 25°C table; correct upward so
+  // the lookup returns accurate SoC. Correction fades to zero at 25°C (reference).
+  // Threshold < 25°C avoids a discontinuity: at exactly 10°C the old threshold
+  // caused a 22.5mV step that could cross dump-mode boundaries spuriously.
   float voltageTempCorrected = voltage;
   if (!isnan(rtcState.lastWaterTemp)) {
     float tempC = rtcState.lastWaterTemp;
-    if (tempC < 10.0f) {
-      // OCV drops at cold temps; correct upward (add voltage) to account for it
-      // Formula: vCorrected = vRaw + 0.0015V/°C * (25°C - tempC)
+    if (tempC < 25.0f) {
       voltageTempCorrected = voltage + 0.0015f * (25.0f - tempC);
     }
   }
@@ -270,9 +272,33 @@ static int interpolateSleep(int soc, const SleepAnchor* a, size_t n) {
   return 1440;
 }
 
+DumpMode getDumpMode(int rawSoc) {
+  if (rawSoc >= 95) return DUMP_TIER4;
+  if (rawSoc >= 90) return DUMP_TIER3;
+  if (rawSoc >= 85) return DUMP_TIER2;
+  if (rawSoc >= 75) return DUMP_TIER1;
+  return DUMP_NONE;
+}
+
 int determineSleepDuration(int batteryPercent, bool fastPath) {
   int month = getCurrentMonth(fastPath); // 1=Jan, ..., 12=Dec
   Season season = getSeason(month);
+
+  // Dump mode check — must run on raw SoC before hysteresis skews the value.
+  // Returns immediately with the dump interval, bypassing the seasonal schedule.
+  DumpMode dump = getDumpMode(batteryPercent);
+  if (dump != DUMP_NONE) {
+    int sleepMin;
+    switch (dump) {
+      case DUMP_TIER1: sleepMin = (season == SEASON_SUMMER) ? 60 : 360; break;
+      case DUMP_TIER2: sleepMin = 60;  break;
+      case DUMP_TIER3: sleepMin = 30;  break;
+      default:         sleepMin = 15;  break;  // DUMP_TIER4 (≥95%)
+    }
+    SerialMon.printf("HIGH BATTERY DUMP MODE TIER%d: SoC=%d%%, sleep=%d min (%s season)\n",
+                     (int)dump, batteryPercent, sleepMin, seasonName(season));
+    return sleepMin;
+  }
 
   // SoC hysteresis: offset batteryPercent by ±2% based on voltage trend
   // to prevent schedule oscillation when sitting near a threshold boundary.
@@ -323,9 +349,14 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
 
 // Function to log battery voltage and estimated percentage
 void logBatteryStatus() {
-  float voltage = getStableBatteryVoltage(); 
+  float voltage = getStableBatteryVoltage();
   int percent = estimateBatteryPercent(voltage);
-  SerialMon.printf("Battery voltage: %.2f V, approx %d%%\n", voltage, percent);
+  SerialMon.printf("Battery voltage: %.3f V, approx %d%%\n", voltage, percent);
+  // 3.70–3.85V is the at-risk zone: OCV looks safe but under 2A modem load the voltage
+  // can sag 150–300mV, pushing VBAT below the SIM7000G minimum (3.55V) and causing
+  // registration failure. 3.70V is the critical cutoff; warn above it up to 3.85V.
+  if (voltage > BATTERY_CRITICAL_VOLTAGE && voltage <= 3.85f) {
+    SerialMon.printf("⚠ MARGINAL VOLTAGE: %.3fV — SIM7000G may fail to register under 2A modem load\n",
+                     voltage);
+  }
 }
-// This function logs the current battery voltage and estimated percentage
-// It can be called periodically to monitor battery health

@@ -49,6 +49,10 @@ typedef struct {
   uint32_t lastSleepMinutes;        // Planned sleep minutes before last deep sleep (uint32 — max winter value 129600 exceeds uint16 max)
   uint32_t lastNextWakeUtc;         // Planned next wake epoch
 
+  // Modem health tracking (survives deep sleep)
+  uint8_t modemFailCount;           // Consecutive wake cycles that failed to establish network
+  bool modemOvervoltageDetected;    // Set when OVER-VOLTAGE URC received; cleared on successful cycle
+
 } rtc_state_t;
 
 //

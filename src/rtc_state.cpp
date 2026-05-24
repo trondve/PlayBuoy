@@ -28,6 +28,8 @@ RTC_DATA_ATTR rtc_state_t rtcState = {
   .hasUnsentData = false,
   .lastSleepMinutes = 0,
   .lastNextWakeUtc = 0,
+  .modemFailCount = 0,
+  .modemOvervoltageDetected = false,
 
 };
 
