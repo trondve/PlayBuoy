@@ -23,7 +23,7 @@ Replace time-domain double integration with FFT spectral analysis:
 - FFT is drift-free — no accumulated error from double integration
 - No fudge factor needed — Hs = 4·√m₀ is the accepted oceanographic standard
 - Frequency-domain filtering cleanly separates wave energy from noise
-- Same 3-minute sampling window, no additional power cost
+- ~160s (2:40) sampling window, no additional power cost vs prior implementation
 
 ## Trade-offs
 - 1024-point FFT requires ~8KB RAM (acceptable on ESP32 with 520KB)

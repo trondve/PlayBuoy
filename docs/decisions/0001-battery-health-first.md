@@ -28,14 +28,20 @@ Adopt a **battery health-first** strategy:
 5. **Conservative sleep schedule** prioritizes survival over data frequency
 
 ### Sleep Schedule Implementation
-- **Summer (May-Sep)**: Aggressive data collection (2-24h cycles) when solar is abundant
-- **Winter (Oct-Apr)**: Deep hibernation (12h-3month cycles) when solar is minimal
+Three-season model (see `src/battery.cpp`):
+- **Summer (Jun–Aug)**: Aggressive data collection (2–9h cycles) when solar is abundant
+- **Shoulder (Apr–May, Sep–Oct)**: Moderate cycles (6–18h) during transition seasons
+- **Winter (Nov–Mar)**: Deep hibernation (12h–3 month cycles) when solar is minimal
 - **Fallback to winter** if RTC time is invalid (safer than guessing summer)
 
 ### Charging Philosophy
-- **>80% SoC**: 2h intervals (discharge toward healthy range)
-- **40-60% SoC**: 6-24h intervals (maintain optimal range)
-- **<40% SoC**: 24h+ intervals (allow recharge)
+- **≥75% SoC**: Charge dump (DumpMode) — intentionally short cycles to burn excess energy:
+  - TIER1 (75–85%): 60 min summer / 6h shoulder+winter, normal full cycle
+  - TIER2 (85–90%): 60 min, full cycle including GPS, overrides quiet hours
+  - TIER3 (90–95%): 30 min, two back-to-back cycles, overrides quiet hours
+  - TIER4 (≥95%): 15 min, two back-to-back cycles, overrides quiet hours
+- **40–60% SoC**: Sustainable (6–24h cycles depending on season)
+- **<40% SoC**: Conservation mode (24h+ to allow recharge)
 
 ### Brownout Protection
 If battery sagged under modem load → brownout reset:
@@ -51,8 +57,9 @@ If battery sagged under modem load → brownout reset:
 - **Recovery**: Brownout fast-track prevents reset loops
 
 ## Trade-offs
-✗ Lower data frequency in winter (4-6 readings/day vs. 24+)
+✗ Lower data frequency in winter (1–4 readings/day vs. 24+ in summer)
 ✗ Delayed response to critical changes (temperature, wave height)
+✗ DumpMode adds complexity (4 tiers, quiet-hour overrides, back-to-back cycles)
 ✓ Guaranteed survival through months of darkness
 ✓ Preserved cell health for multi-year operation
 

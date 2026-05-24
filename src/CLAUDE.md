@@ -16,7 +16,7 @@ ESP32 firmware for the PlayBuoy IoT buoy. Each boot cycle: measure battery → r
 | `gps.cpp` | GPS pipeline | NTP sync → XTRA ephemeris → 60s smoke test → fix polling |
 | `modem.cpp` | Cellular + upload | LTE-M preferred, NB-IoT fallback, HTTP POST with retry |
 | `ota.cpp` | Firmware updates | Version comparison, HTTP download, ESP.restart() |
-| `json.cpp` | Payload builder | ~30 fields, 512-byte RTC buffer for failed uploads |
+| `json.cpp` | Payload builder | ~30 fields, 1024-byte RTC buffer for failed uploads |
 | `rtc_state.cpp` | Persistent state | Boot counter, GPS anchor, temp history (survives deep sleep) |
 | `config.h` | Per-buoy config | Node ID, API key, server URLs — GITIGNORED |
 

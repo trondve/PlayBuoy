@@ -35,7 +35,7 @@
 - [ ] **Serial monitor**: Verify startup messages, boot reason
 - [ ] **Battery voltage**: ADC reading matches calibrated meter
 - [ ] **Temperature**: DS18B20 reading in known condition
-- [ ] **Wave sampling**: IMU responds, FFT runs without crash
+- [ ] **Wave sampling**: IMU responds, FFT runs without crash (~160s collection)
 - [ ] **Modem power-on**: AT commands respond, can query signal
 - [ ] **Network registration**: LTE-M connects to Telenor
 - [ ] **NTP sync**: RTC time syncs via modem
@@ -131,7 +131,7 @@ pio run --target upload -e lilygo-t-sim7000g
 First fix (cold start): 20+ minutes normal
 Subsequent fixes: Should be 10min or less
 If stuck >20min:
-  - Wait 7 days for fresh XTRA data
+  - Wait 3 days for fresh XTRA data (XTRA_STALE_DAYS = 3)
   - Try relocating to higher elevation
   - Or reflash CGNSCOLD after XTRA download
 ```
@@ -177,8 +177,9 @@ If stuck >20min:
    ```bash
    scp firmware/playbuoy_*.bin user@trondve.ddns.net:/www/firmware/
    scp firmware/playbuoy_*.version user@trondve.ddns.net:/www/firmware/
+   scp firmware/playbuoy_*.sha256 user@trondve.ddns.net:/www/firmware/
    ```
-4. Verify server has both `.bin` and `.version` files
+4. Verify server has `.bin`, `.version`, and `.sha256` files for each buoy
 
 ### Rollback (If OTA Fails)
 If a buoy gets stuck in `OTA_IMG_PENDING_VERIFY`:
@@ -208,13 +209,13 @@ If a buoy gets stuck in `OTA_IMG_PENDING_VERIFY`:
 | Boot + BT init | 3s | CPU + serial |
 | Battery measurement | 30ms | 30mA ADC |
 | Brownout check | <100ms | minimal |
-| Wave collection | 3m | sensors active (~40mA) |
+| Wave collection | 160s (~2:40) | sensors active (~40mA) |
 | Modem power-on | 9.2s | 50mA (powering up) |
 | NTP sync + XTRA | 5-90s | modem active (~200-500mA) |
 | GPS fix (warm) | 5-20m | modem + GPS (~500mA) |
 | Cellular + upload | 10-30s | modem + network (~500-1000mA) |
 | **Total wake** | 8-30 minutes | varies |
-| Deep sleep | 2h-3mo | ~15µA |
+| Deep sleep | 2h-3mo | ~40–75µA measured |
 
 ## Contact & Support
 - Hardware: LilyGo T-SIM7000G documentation in `docs/components/`

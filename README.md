@@ -18,9 +18,11 @@ ESP32-based wave monitoring buoy firmware for the LilyGo T-SIM7000G board.
    #define FIRMWARE_VERSION "1.0.0"         // Current firmware version
    #define API_SERVER "your-api-server.com" // Your API server
    #define API_KEY "your-api-key"           // Your API key
-  #define OTA_SERVER "trondve.ddns.net" // Your OTA server
+   #define OTA_SERVER "trondve.ddns.net"    // Your OTA server
    #define NETWORK_PROVIDER "your-provider" // Your network provider
-   #define NTP_SERVER "pool.ntp.org"        // Your NTP server
+   #define NTP_SERVER "no.pool.ntp.org"     // NTP server (Norway pool)
+   #define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3" // POSIX TZ (Europe/Oslo)
+   #define BATTERY_CALIBRATION_FACTOR 1.0f  // Adjust to match DMM reading
    ```
 
 3. **Build and upload:**
@@ -33,35 +35,37 @@ ESP32-based wave monitoring buoy firmware for the LilyGo T-SIM7000G board.
 To build firmware for multiple buoys:
 
 ```bash
-python build_all_buoys.py
+python tools/scripts/build_all_buoys.py
 ```
 
 This will create firmware files and version files for each buoy in the `firmware/` directory.
 
 ## OTA Updates
 
-The firmware uses a version-aware OTA system to prevent unnecessary downloads:
+The firmware uses a version-aware OTA system with mandatory SHA-256 integrity verification.
 
 ### How it works:
-1. **Version Check**: Before downloading firmware, the buoy checks a version file
-2. **Version Comparison**: Compares server version with current firmware version
-3. **Smart Download**: Only downloads if server version is newer
-4. **Cycle Protection**: Prevents repeated update attempts in the same cycle
+1. **Battery gate**: OTA requires ≥50% SoC — skipped below this threshold to prevent mid-flash brownout (sealed device = permanent brick if interrupted)
+2. **Version check**: Fetches `{NODE_ID}.version` from the OTA server and compares with current firmware version
+3. **Smart download**: Only downloads if server version is newer
+4. **SHA-256 verification**: Fetches `{NODE_ID}.sha256` and verifies the download before flashing
+5. **Rollback safety**: New partition is marked `OTA_IMG_PENDING_VERIFY`; rolls back automatically if the new firmware crashes before completing a successful cycle
 
-### Version Files:
-The build process creates two types of version files for each buoy:
-- **JSON format**: `playbuoy-{id}.version.json` (preferred)
-- **Text format**: `playbuoy-{id}.version` (fallback)
-
-### Example URLs:
-- Version check: `http://trondve.ddns.net/your-buoy-id.version.json`
-- Firmware download: `http://trondve.ddns.net/your-buoy-id.bin`
+### Server files required per buoy:
+- `{NODE_ID}.bin` — firmware binary
+- `{NODE_ID}.version` — plain text semver string (e.g. `1.2.0`)
+- `{NODE_ID}.sha256` — 64 hex chars (output of `sha256sum {NODE_ID}.bin`)
 
 ### Updating Firmware:
-1. Update `CURRENT_VERSION` in `build_all_buoys.py`
-2. Run `python build_all_buoys.py`
-3. Upload both `.bin` and `.version` files to your server
-4. Buoys will automatically detect and install the new version
+1. Increment `FIRMWARE_VERSION` in `src/config.h` (or `config.h.example`)
+2. Run `python tools/scripts/build_all_buoys.py`
+3. Upload `.bin`, `.version`, and `.sha256` files to your OTA server:
+   ```bash
+   scp firmware/playbuoy_*.bin user@trondve.ddns.net:/www/firmware/
+   scp firmware/playbuoy_*.version user@trondve.ddns.net:/www/firmware/
+   scp firmware/playbuoy_*.sha256 user@trondve.ddns.net:/www/firmware/
+   ```
+4. Buoys will automatically detect and install the new version on the next wake cycle
 
 ## Security
 

@@ -9,7 +9,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 - **LilyGo T-SIM7000G**: ESP32-D0WD-V3 @ 240MHz + SIM7000G modem
 - **Sensors**: DS18B20 (water temp), GY-91 (IMU/accelerometer)
 - **Power**: 2× 18650 Li-ion, 4× 0.3W 5V solar panels
-- **Connectivity**: LTE-M/NB-IoT (Telenor Norway), GPS/GLONASS/BeiDou
+- **Connectivity**: LTE-M/NB-IoT (Telenor Norway), GPS/GLONASS/Galileo
 
 ### Pin Assignments
 | Pin | Function | Notes |
@@ -32,7 +32,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 4. Brownout fast-track (skip full cycle if battery <40%)
 5. Critical guard check (sleep if ≤3.70V/25%)
 6. Power 3V3 rail → init sensors → read temperature
-7. Collect wave data (3 min, 10Hz accelerometer, FFT)
+7. Collect wave data (160s, 10Hz accelerometer, FFT)
 8. Power off sensors/rail
 9. Modem: NTP sync → XTRA download → GNSS fix
 10. Cellular: re-establish (skip pre-cycle if modem warm)
@@ -47,7 +47,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
   - XTAL OFF (~250µA)
   - GPIO 25 held LOW via `gpio_hold_en`
   - All I/O pins high-Z (INPUT)
-  - Estimated: ~10-15µA total
+  - Measured: ~40–75µA steady-state (after LED desoldering; see `src/SLEEP.md`)
 
 - **Sleep schedule**: Battery-aware, season-aware
   - Summer (Jun–Aug): 2–9 hour cycles (>50% SoC)
@@ -56,6 +56,11 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
   - Below 50% in any season: sleep doubles at each SoC band; steepest near 25–30%
   - GPS skipped when battery ≤ 40% (NTP-only sync to save power)
   - Optimal range: 40–60% SoC; never above 80%, never below 20%
+  - **DumpMode** (high-SoC charge dump): short wake cycles to burn excess energy
+    - TIER1 ≥75%: 60 min (summer) / 6h (shoulder+winter), normal cycle
+    - TIER2 ≥85%: 60 min, full cycle + GPS forced, overrides quiet hours
+    - TIER3 ≥90%: 30 min, two back-to-back cycles, overrides quiet hours
+    - TIER4 ≥95%: 15 min, two back-to-back cycles, overrides quiet hours
 
 ### Critical Components
 
@@ -94,7 +99,7 @@ Solar-powered, permanently sealed, waterproof IoT buoy for lakes and ocean beach
 - Skip pre-cycle if modem already warm (saves 14s, 0.4mAh)
 - Conservative timing per SIM7000G datasheet
 - 3× HTTP POST retry with backoff
-- JSON buffering on upload failure (512-byte RTC buffer)
+- JSON buffering on upload failure (1024-byte RTC buffer)
 
 ## Key Data Structures
 
@@ -124,7 +129,7 @@ rtc_state_t {
   bool tempSpikeDetected;         // >2°C change
   uint8_t anchorDriftCounter;     // Consecutive drifts
   char lastUnsentJson[1024];      // Failed upload buffer
-  uint16_t lastSleepMinutes;      // Sleep context (minutes)
+  uint32_t lastSleepMinutes;      // Sleep context (minutes)
 }
 ```
 
@@ -134,7 +139,7 @@ rtc_state_t {
 - **Cellular**: Telenor Norway, LTE-M preferred (AT+CNMP=38)
 - **API**: `playbuoyapi.no:80` HTTP POST to `/upload`
 - **NTP**: `no.pool.ntp.org` (AT+CNTP)
-- **XTRA**: `http://trondve.ddns.net/xtra3grc.bin` (≥7 days)
+- **XTRA**: `http://trondve.ddns.net/xtra3grc.bin` (≥3 days; `XTRA_STALE_DAYS = 3`)
 - **OTA**: `trondve.ddns.net` HTTP (no HTTPS)
 
 ### Deployments
@@ -161,7 +166,7 @@ rtc_state_t {
 - Binary OTA over cellular (bandwidth-critical)
 - Removed redundant libraries (Mahony filter is now diagnostic-only)
 - Cleaned up dead code (always-true flags, unused functions)
-- Efficient RTC buffer (512 bytes for JSON storage)
+- Efficient RTC buffer (1024 bytes for JSON storage)
 
 ## Future Improvements
 1. **Wave direction**: Magnetometer non-functional in sealed enclosure
