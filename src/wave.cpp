@@ -35,6 +35,10 @@ static const uint32_t FFT_N = 1024;          // Power of 2, ~102.4s at 10 Hz
 static const float WAVE_FREQ_MIN = 0.05f;    // Min wave frequency (20s period)
 static const float WAVE_FREQ_MAX = 1.0f;     // Max wave frequency (1s period)
 
+#ifndef WAVE_TP_MAX_S
+#define WAVE_TP_MAX_S 8.0f
+#endif
+
 // IMU registers (MPU6500/9250)
 #define MPU6500_ADDR           0x68
 #define MPU6500_WHO_AM_I       0x75
@@ -248,20 +252,13 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
 
   if (nSamples < FFT_N) return result;
 
-  // Use last FFT_N samples (skip initial transients)
+  // Use last FFT_N samples (skip initial transients).
+  // re aliases accel (same buffer), so the memset that was here WOULD zero the
+  // source data for any offset > 0. Use memmove instead; it handles overlap correctly.
   uint32_t offset = nSamples - FFT_N;
-  float* re = accel; // Will work in-place on accelBuf
-
-  // Explicitly zero buffers for defensive programming
-  // (re is overwritten immediately below; fftIm zeroed later, but do it here too)
-  memset(re, 0, sizeof(float) * FFT_N);
-  memset(fftIm, 0, sizeof(float) * FFT_N);
-
-  // Copy the segment we want to the beginning of the buffer
+  float* re = accel;
   if (offset > 0) {
-    for (uint32_t i = 0; i < FFT_N; i++) {
-      re[i] = accel[offset + i];
-    }
+    memmove(re, accel + offset, FFT_N * sizeof(float));
   }
 
   // Remove mean (DC offset)
@@ -354,10 +351,10 @@ static SpectralWaveStats spectralAnalysis(float* accel, uint32_t nSamples, float
   result.P = 0.49f * result.Hs * result.Hs * result.Tp; // deep-water power proxy
 
   // Sanity caps (configurable per deployment in config.h)
-  if (result.Hs > WAVE_HS_MAX_M) result.Hs = 0.0f; // Exceeds deployment threshold (lake: 2m, ocean: higher)
-#ifndef WAVE_TP_MAX_S
-#define WAVE_TP_MAX_S 8.0f
-#endif
+  if (result.Hs > WAVE_HS_MAX_M) {
+    result.Hs = 0.0f;
+    result.Tp = 0.0f;  // Clear Tp too — reporting a period without height is inconsistent
+  }
   if (result.Tp < 0.5f || result.Tp > WAVE_TP_MAX_S) result.Tp = 0.0f;
 
   return result;

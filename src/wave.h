@@ -4,7 +4,7 @@
 
 //
 // Wave spectral analysis via FFT (1024-point, 10Hz IMU sampling).
-// Pipeline: acquire 100s accel samples → IIR bandpass filter → FFT → spectral integration.
+// Pipeline: acquire 160s accel samples → IIR bandpass filter → FFT → spectral integration.
 // Computes significant wave height (Hs) and peak period (Tp) from displacement spectrum.
 // Replaces legacy time-domain double-integration approach (eliminates drift).
 //
@@ -12,7 +12,7 @@
 // 1. Raw acceleration measured at 10Hz on MPU6500 Z-axis (vertical)
 // 2. Low-pass filter (highpass + lowpass) to isolate wave motion (0.05-2 Hz passband)
 // 3. Gravity tracking via slow low-pass filter (0.02 Hz) to remove DC offset
-// 4. 1024-point FFT on 100-second window (yielding ~1024 bins, df ≈ 0.01 Hz)
+// 4. 1024-point FFT on 102.4s window (last 1024 of 1600 samples; first 57.6s = gravity settling)
 // 5. Convert acceleration spectrum to displacement via ω⁴ division (frequency domain)
 // 6. Zero bins below WAVE_FREQ_MIN (0.05 Hz) to prevent low-freq blowup (H-08 fix)
 // 7. Integrate spectrum: m₀ = ∫ PSD df → Hs = 4√m₀ (oceanographic standard)
@@ -26,11 +26,12 @@
 //
 
 //
-// Acquires 100 seconds of heave acceleration samples at 10Hz from IMU.
+// Acquires 160 seconds of heave acceleration samples at 10Hz from IMU.
+// First ~57s discarded (gravity tracker settling); last 1024 samples (102.4s) used for FFT.
 // Performs gravity removal, IIR filtering, and prepares for FFT analysis.
 // Updates global s_lastHs, s_lastTp, s_tiltSum, s_accelRms for getter functions.
 // Must be called while 3.3V rail is powered (sensors depend on GPIO 25).
-// Duration: ~100 seconds of active I2C sampling + FFT (~2 seconds).
+// Duration: ~160 seconds of active I2C sampling + FFT (<1 second).
 //
 void recordWaveData();
 
@@ -73,7 +74,7 @@ float computeWavePower(float height, float period);
 
 //
 // Returns mean buoy tilt angle (degrees from vertical) during sampling window.
-// Computed as arctan(sqrt(ax²+ay²) / az) averaged over 100s window.
+// Computed as arctan(sqrt(ax²+ay²) / az) averaged over 160s window.
 // Indicates buoy platform orientation (0° = vertical, 90° = horizontal).
 // Used in diagnostics to detect tilt sensor failure or physical damage.
 // Returns: 0-90 degrees, or 0.0 if not computed.
@@ -81,9 +82,8 @@ float computeWavePower(float height, float period);
 float computeMeanTilt();
 
 //
-// Returns RMS acceleration (m/s²) during sampling window.
+// Returns RMS acceleration (m/s²) during 160s sampling window.
 // Proxy for overall wave energy magnitude independent of frequency content.
-// Sqrt of mean of (ax² + ay² + az²) over entire window.
 // Used for diagnostics and buoy health assessment.
 // Returns: 0-50 m/s² typical for ocean waves, ~0.5 m/s² for lakes.
 //
