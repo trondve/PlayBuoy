@@ -142,16 +142,15 @@ bool connectToNetwork(const char* apn, bool skipPreCycle) {
     SerialMon.println("Signal quality: " + String(csq));
     SerialMon.println("Operator: " + modem.getOperator());
 
-    // RAT check: print AT+CPSI? so we can verify LTE-M vs NB-IoT in logs
-    SerialMon.println("RAT check (AT+CPSI?):");
+    // RAT check: print AT+CPSI? to verify LTE-M vs NB-IoT in logs
+    SerialMon.print("RAT: ");
     modem.sendAT("+CPSI?");
     {
+      // TinyGsm is idle here; only the +CPSI: reply is in the buffer.
+      // Read directly from SerialAT so the response appears in Serial logs.
       unsigned long t0 = millis();
-      String line;
       while (millis() - t0 < 500) {
-        // Use TinyGsm-aware drain instead of direct Serial1.read()
-        // Direct reads can interfere with TinyGsm's internal buffering
-        modem.streamClear();
+        while (Serial1.available()) SerialMon.write(Serial1.read());
         delay(10);
       }
     }
