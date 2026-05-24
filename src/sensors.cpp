@@ -13,13 +13,17 @@ DallasTemperature waterTempSensor(&oneWire);
 
 bool beginSensors() {
   Serial.println("Initializing sensors...");
-  // If you want to use GY-91 IMU, initialize I2C here:
   Wire.begin(21, 22); // SDA = GPIO 21, SCL = GPIO 22
-  // IMU initialization moved to wave.cpp to match working wave pipeline
+  // IMU initialization is in wave.cpp (direct I2C to MPU6500)
   waterTempSensor.begin();
   waterTempSensor.setResolution(12);             // Explicit 12-bit (0.0625°C)
   waterTempSensor.setWaitForConversion(true);     // Block until conversion complete
-  Serial.println("Sensors initialized");
+  uint8_t nSensors = waterTempSensor.getDeviceCount();
+  if (nSensors == 0) {
+    Serial.println("WARNING: No DS18B20 found on OneWire bus");
+    return false;
+  }
+  Serial.printf("Sensors initialized (%u DS18B20 found)\n", nSensors);
   return true;
 }
 
