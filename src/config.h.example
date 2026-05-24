@@ -29,8 +29,12 @@
 #define DNS_SECONDARY "8.8.8.8"
 
 // Time Configuration
-#define NTP_SERVER "pool.ntp.org"
-#define TIMEZONE "UTC0"
+// NTP_SERVER: used by configTzTime() (SNTP baseline; cellular NTP is in gps.cpp).
+// TIMEZONE: POSIX TZ string used by localtime_r() for CET/CEST (Europe/Oslo).
+//   Europe/Oslo = CET-1CEST,M3.5.0,M10.5.0/3
+//   Change if deploying outside Norway.
+#define NTP_SERVER "no.pool.ntp.org"
+#define TIMEZONE "CET-1CEST,M3.5.0,M10.5.0/3"
 
 // Power/ADC calibration
 // Scalar correction for hardware voltage divider tolerance.

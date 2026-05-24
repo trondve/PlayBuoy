@@ -6,3 +6,6 @@
 
 # Configuration files with sensitive data
 src/config.h
+
+# Serial monitor log created by platformio monitor --log2file
+monitor.log
