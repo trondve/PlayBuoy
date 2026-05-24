@@ -37,18 +37,19 @@ bool checkForFirmwareUpdate(const char* baseUrl);
 String getServerFirmwareVersion(const char* versionUrl);
 
 //
-// Low-level helper — downloads and installs firmware image.
-// Validates HTTP response headers, optionally verifies SHA-256, writes to flash.
+// Low-level helper — downloads and installs firmware image to flash.
+// Validates HTTP response headers, verifies SHA-256 (pass nullptr to skip — not recommended).
 // CRITICAL: Pre-check battery gate before calling this function.
-// Returns: true if install successful and restart triggered, false on any error.
-// NOTE: Device will NOT return on success (esp_restart called internally).
+// Returns: true if image written successfully, false on any error.
+// NOTE: Does NOT restart the device — caller is responsible for esp_restart().
 //
 bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expectedSha256 = nullptr);
 
 //
 // Internal helper — checks version string and initiates download if needed.
 // Parses version from endpoint, compares against current, calls downloadAndInstallFirmware.
-// Used internally by checkForFirmwareUpdate().
+// Used internally by checkForFirmwareUpdate(). Does NOT enforce battery gate or SHA-256.
+// Do not call directly; use checkForFirmwareUpdate() as the safe entry point.
 //
 bool downloadAndCheckVersion(const char* versionUrl);
 

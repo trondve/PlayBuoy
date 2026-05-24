@@ -229,11 +229,10 @@ static bool parseHttpResponseHeaders(TinyGsmClient& client, int& statusCode, siz
 //
 // PUBLIC FUNCTION: downloadAndInstallFirmware
 // Downloads and installs firmware image from URL via HTTP.
-// Validates battery (H-04: minimum 3.85V + 50% SoC), handles 3xx redirects (H-07).
-// Verifies SHA-256 hash if provided (graceful degradation if not).
-// Writes image to flash partition, initiates reboot on success.
-// CRITICAL: Device will NOT return on success (esp_restart() called internally).
-// Returns: true if install initiated and restart triggered, false on any error.
+// Handles 3xx redirects (H-07). Verifies SHA-256 hash if provided.
+// Writes image to flash partition and returns — does NOT call esp_restart().
+// Caller must call esp_restart() after this returns true.
+// Returns: true if image written to flash successfully, false on any error.
 //
 bool downloadAndInstallFirmware(const char* firmwareUrl, const uint8_t* expectedSha256) {
   SerialMon.printf("Downloading firmware from: %s\n", firmwareUrl);
@@ -457,5 +456,3 @@ bool checkForFirmwareUpdate(const char* baseUrl) {
   SerialMon.println("OTA update failed.");
   return false;
 }
-
-
