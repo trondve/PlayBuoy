@@ -88,7 +88,8 @@ void logRtcState() {
   SerialMon.printf("- Over temp detected: %s\n", rtcState.overTempDetected ? "YES" : "NO");
   SerialMon.printf("- Last upload failed: %s\n", rtcState.lastUploadFailed ? "YES" : "NO");
   SerialMon.printf("- FW update attempted: %s\n", rtcState.firmwareUpdateAttempted ? "YES" : "NO");
-
+  SerialMon.printf("- Modem fail count: %d\n", rtcState.modemFailCount);
+  SerialMon.printf("- Modem overvoltage: %s\n", rtcState.modemOvervoltageDetected ? "YES" : "NO");
 }
 
 void updateLastGpsFix(float lat, float lon, uint32_t epochSec) {
@@ -328,7 +329,7 @@ bool restoreStateFromNvs() {
 
   // Validate restored data; treat corrupted NVS as cold-boot fallback
   bool validRestore = true;
-  if (rtcState.bootCounter > 1e6) validRestore = false;  // Unreasonable boot count
+  if (rtcState.bootCounter > 1000000U) validRestore = false;  // Unreasonable boot count
   if (!isnan(rtcState.lastWaterTemp) && (rtcState.lastWaterTemp < -50.0f || rtcState.lastWaterTemp > 100.0f)) validRestore = false;  // Out-of-range temp (NAN = no reading yet, valid)
   if (rtcState.lastGpsLat < -90.0f || rtcState.lastGpsLat > 90.0f) validRestore = false;  // Invalid latitude
   if (rtcState.lastGpsLon < -180.0f || rtcState.lastGpsLon > 180.0f) validRestore = false;  // Invalid longitude
