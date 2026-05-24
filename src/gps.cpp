@@ -320,7 +320,7 @@ static bool downloadAndApplyXTRA() {
   sendAT("AT+CGNSXTRA=1");
   // Configure GNSS mode and NMEA *before* CGNSCOLD starts the engine,
   // so the cold start runs with correct settings from the beginning.
-  sendAT("AT+CGNSMOD=1,1,0,1");  // GPS + GLONASS + BeiDou, no Galileo
+  sendAT("AT+CGNSMOD=1,1,0,1");  // GPS + GLONASS + Galileo (no BeiDou); Galileo best for Norway
   sendAT("AT+CGNSCFG=1");
   if (!sendAT("AT+CGNSCOLD", nullptr, 5000)) return false;
   // CGNSCOLD starts the GNSS engine with XTRA injected — do NOT power cycle after this.
@@ -384,7 +384,7 @@ static bool gnssStart() {
 
   // Normal start: configure, power on, use appropriate start mode
   sendAT("AT+CGNSPWR=0");
-  sendAT("AT+CGNSMOD=1,1,0,1");  // GPS + GLONASS + BeiDou
+  sendAT("AT+CGNSMOD=1,1,0,1");  // GPS + GLONASS + Galileo (no BeiDou)
   sendAT("AT+CGNSCFG=1");
   sendAT("AT+CGPIO=0,48,1,1");
   sendAT("AT+SGPIO=0,4,1,1");
