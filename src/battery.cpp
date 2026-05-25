@@ -198,65 +198,35 @@ int getCurrentMonth(bool fastPath) {
   }
 }
 
-// Three-season model: winter (Nov-Mar), shoulder (Apr-May, Sep-Oct), summer (Jun-Aug)
-enum Season { SEASON_WINTER, SEASON_SHOULDER, SEASON_SUMMER };
-
-static Season getSeason(int month) {
-  // Winter: November through March (darkest months at 59°N)
-  if (month >= 11 || month <= 3) return SEASON_WINTER;
-  // Shoulder: April-May (spring transition) and September-October (autumn transition)
-  if (month == 4 || month == 5 || month == 9 || month == 10) return SEASON_SHOULDER;
-  // Summer: June-August (peak solar at 59°N)
-  return SEASON_SUMMER;
-}
-
-static const char* seasonName(Season s) {
-  switch (s) {
-    case SEASON_WINTER:   return "winter";
-    case SEASON_SHOULDER: return "shoulder";
-    case SEASON_SUMMER:   return "summer";
-  }
-  return "unknown";
-}
-
 struct SleepAnchor { int soc; int minutes; };
 
-static const SleepAnchor SUMMER_ANCHORS[] = {
-  {100,    120},  // 2h  — actively discharge; frequent reports while solar abundant
-  { 80,    180},  // 3h
-  { 70,    240},  // 4h
-  { 60,    360},  // 6h
-  { 50,    720},  // 12h — entering optimal storage range
-  { 40,   4320},  // 3d  — more conservative below 50%
-  { 30,  10080},  // 1w
-  { 25,  20160},  // 2w  — near critical; hibernate and let solar recover
-  {  0,  40320},  // 4w
-};
-
-static const SleepAnchor SHOULDER_ANCHORS[] = {
-  {100,   2880},  // 2d
-  { 80,   2880},  // 2d  — flat plateau; solar inconsistent at 59°N
-  { 60,   5040},  // 3.5d
-  { 50,  10080},  // 1w
-  { 40,  20160},  // 2w
-  { 35,  30240},  // 3w
-  { 30,  43200},  // 1mo
-  { 25,  86400},  // 2mo
-  {  0, 129600},  // 3mo
-};
-
-static const SleepAnchor WINTER_ANCHORS[] = {
-  {100,   2880},  // 2d
-  { 90,   2880},  // 2d  — flat plateau; minimal solar at 59°N Nov-Mar
-  { 80,   5760},  // 4d
-  { 70,   7200},  // 5d
-  { 60,  10080},  // 1w
-  { 50,  15120},  // 1.5w
-  { 40,  20160},  // 2w
-  { 35,  30240},  // 3w
-  { 30,  43200},  // 1mo
-  { 25,  86400},  // 2mo
-  {  0, 129600},  // 3mo — hibernate; critical guard at 25% handles true emergency
+// Unified season-agnostic anchor table. Target operating window: 50–80% SoC.
+// Dump tiers (≥80%) fire before this table — anchors cover 0–79% only.
+//
+// Feature cutoffs enforced in main.cpp (not here):
+//   ≤65%  → no OTA firmware update
+//   ≤55%  → no GPS/XTRA (NTP-only time sync)
+//   ≤50%  → no wave collection (NTP + temp + upload only)
+//   ≤47%  → critical guard: power-only mode, no modem/sensors (via 3.70V voltage check)
+//
+// Annual equilibrium at Haugesund (59.4°N): battery stays 65–80% year-round.
+// Sub-50% range exists for genuine emergencies (panel covered, charging failure).
+static const SleepAnchor ANCHORS[] = {
+  { 79,   120 },  // 2h  — just below DUMP_TIER1; normal full cycle
+  { 75,   240 },  // 4h
+  { 70,   360 },  // 6h
+  { 65,   480 },  // 8h  — OTA skipped at or below this SoC
+  { 60,   720 },  // 12h
+  { 55,   960 },  // 16h — GPS/XTRA skipped at or below this SoC
+  { 50,  1200 },  // 20h — wave collection skipped; NTP + temp + upload only
+  { 47,  1440 },  // 1d  — power-only below here (critical guard fires via 3.70V)
+  { 40,  2880 },  // 2d  — power-only zone
+  { 35,  4320 },  // 3d
+  { 30,  5760 },  // 4d
+  { 25,  7200 },  // 5d  — SoC-based critical guard fires at 25%
+  { 20,  8640 },  // 6d
+  { 15, 10080 },  // 1w  — floor; stays at 1 week below 15%
+  {  0, 10080 },  // 1w  — identical to 15% entry; no further increase
 };
 
 static int interpolateSleep(int soc, const SleepAnchor* a, size_t n) {
@@ -276,39 +246,41 @@ DumpMode getDumpMode(int rawSoc) {
   if (rawSoc >= 95) return DUMP_TIER4;
   if (rawSoc >= 90) return DUMP_TIER3;
   if (rawSoc >= 85) return DUMP_TIER2;
-  if (rawSoc >= 75) return DUMP_TIER1;
+  if (rawSoc >= 80) return DUMP_TIER1;  // target ceiling: 80%
   return DUMP_NONE;
 }
 
 int determineSleepDuration(int batteryPercent, bool fastPath) {
-  int month = getCurrentMonth(fastPath); // 1=Jan, ..., 12=Dec
-  Season season = getSeason(month);
+  int month = getCurrentMonth(fastPath); // 1=Jan, ..., 12=Dec — kept for logging
 
-  // Dump mode check — must run on raw SoC before hysteresis skews the value.
-  // Returns immediately with the dump interval, bypassing the seasonal schedule.
+  // Dump mode: fires on raw SoC before hysteresis skews the value.
+  // TIER1 (≥80%): 60 min — enforce 80% ceiling, bypass quiet hours
+  // TIER2 (≥85%): 60 min — forced GPS every cycle for maximum energy discharge
+  // TIER3 (≥90%): linear (100-SoC)*3 min — 18 min at 94%, 30 min at 90%
+  // TIER4 (≥95%): linear (100-SoC)*3 min — 3 min at 99%, 15 min at 95%
   DumpMode dump = getDumpMode(batteryPercent);
   if (dump != DUMP_NONE) {
     int sleepMin;
     switch (dump) {
-      case DUMP_TIER1: sleepMin = (season == SEASON_SUMMER) ? 60 : 360; break;
-      case DUMP_TIER2: sleepMin = 60;  break;
-      case DUMP_TIER3: sleepMin = 30;  break;
-      default:         sleepMin = 15;  break;  // DUMP_TIER4 (≥95%)
+      case DUMP_TIER4:
+      case DUMP_TIER3:
+        sleepMin = (100 - batteryPercent) * 3;
+        if (sleepMin < 3) sleepMin = 3;
+        break;
+      case DUMP_TIER2: sleepMin = 60; break;
+      case DUMP_TIER1: sleepMin = 60; break;
+      default:         sleepMin = 60; break;
     }
-    SerialMon.printf("HIGH BATTERY DUMP MODE TIER%d: SoC=%d%%, sleep=%d min (%s season)\n",
-                     (int)dump, batteryPercent, sleepMin, seasonName(season));
+    SerialMon.printf("HIGH BATTERY DUMP MODE TIER%d: SoC=%d%%, sleep=%d min\n",
+                     (int)dump, batteryPercent, sleepMin);
     return sleepMin;
   }
 
-  // SoC hysteresis: offset batteryPercent by ±2% based on voltage trend
-  // to prevent schedule oscillation when sitting near a threshold boundary.
-  // Uses the already-persisted lastBatteryVoltage from previous cycle.
+  // SoC hysteresis: offset batteryPercent by ±5% based on voltage trend to prevent
+  // schedule oscillation near anchor boundaries (especially in the flat 25–50% OCV plateau).
   float currentV = getStableBatteryVoltage();
   float prevV = rtcState.lastBatteryVoltage;
   if (prevV > 0.1f && fabsf(currentV - prevV) > 0.005f) {
-    // Voltage rising → bias SoC up (stay in shorter sleep)
-    // Voltage falling → bias SoC down (stay in longer sleep)
-    // Widened to ±5% (from ±2%) to prevent oscillation in 25-50% SoC plateau
     int hysteresis = (currentV > prevV) ? 5 : -5;
     batteryPercent += hysteresis;
     if (batteryPercent < 0) batteryPercent = 0;
@@ -317,34 +289,15 @@ int determineSleepDuration(int batteryPercent, bool fastPath) {
                      prevV, currentV, hysteresis, batteryPercent);
   }
 
-  // Get timezone info for debug output
   time_t now;
   struct tm timeinfo;
   time(&now);
   localtime_r(&now, &timeinfo);
   bool isDST = timeinfo.tm_isdst > 0;
-  const char* tzName = isDST ? "CEST" : "CET";
+  SerialMon.printf("Sleep calculation: month=%d, battery=%d%%, timezone=%s\n",
+                   month, batteryPercent, isDST ? "CEST" : "CET");
 
-  SerialMon.printf("Sleep calculation: month=%d (%s), battery=%d%%, timezone=%s\n",
-                   month, seasonName(season), batteryPercent, tzName);
-
-  // Sleep schedule designed around 18650 lithium-ion battery health:
-  // - Optimal storage range: 40-60% (preserve this range when possible)
-  // - Daily charge should not exceed 80% (discharge actively above 80%)
-  // - Never discharge below 20% to prevent battery damage
-  // - Critical guard at 25% provides safety margin for aged cells
-  //
-  // Returns minutes for finer-grained control.
-  // Portable: works in sunny southern Europe AND far-north long winters.
-
-  const SleepAnchor* anchors;
-  size_t n;
-  switch (season) {
-    case SEASON_WINTER:   anchors = WINTER_ANCHORS;   n = sizeof(WINTER_ANCHORS)   / sizeof(WINTER_ANCHORS[0]);   break;
-    case SEASON_SHOULDER: anchors = SHOULDER_ANCHORS; n = sizeof(SHOULDER_ANCHORS) / sizeof(SHOULDER_ANCHORS[0]); break;
-    default:              anchors = SUMMER_ANCHORS;   n = sizeof(SUMMER_ANCHORS)   / sizeof(SUMMER_ANCHORS[0]);   break;
-  }
-  return interpolateSleep(batteryPercent, anchors, n);
+  return interpolateSleep(batteryPercent, ANCHORS, sizeof(ANCHORS) / sizeof(ANCHORS[0]));
 }
 
 // Function to log battery voltage and estimated percentage

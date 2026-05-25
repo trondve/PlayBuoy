@@ -595,8 +595,8 @@ void loop() {
   if (shouldGetNewGpsFix) {
     float gpsGuardV = getStableBatteryVoltage();
     int gpsGuardPct = estimateBatteryPercent(gpsGuardV);
-    if (gpsGuardPct <= 40) {
-      SerialMon.printf("GPS fix skipped (battery %d%% / %.2fV <= 40%%) — NTP-only sync this cycle\n",
+    if (gpsGuardPct <= 55) {
+      SerialMon.printf("GPS fix skipped (battery %d%% / %.2fV <= 55%%) — NTP-only sync this cycle\n",
                        gpsGuardPct, gpsGuardV);
       shouldGetNewGpsFix = false;
     }
@@ -606,7 +606,7 @@ void loop() {
   // because the full modem+GNSS sequence is the most effective energy dump available.
   if (!shouldGetNewGpsFix) {
     int earlyPct = estimateBatteryPercent(getStableBatteryVoltage());
-    if (getDumpMode(earlyPct) >= DUMP_TIER2 && earlyPct > 40) {
+    if (getDumpMode(earlyPct) >= DUMP_TIER2 && earlyPct > 55) {
       SerialMon.printf("Dump mode TIER%d: forcing GPS fix this cycle (SoC=%d%%)\n",
                        (int)getDumpMode(earlyPct), earlyPct);
       shouldGetNewGpsFix = true;
@@ -615,7 +615,10 @@ void loop() {
 
   // 1) Collect wave data first (modem is still off for lower power)
   SerialMon.println("\n--- PHASE 2: WAVE DATA COLLECTION ---");
-  SerialMon.println("Starting IMU sampling for wave spectral analysis...");
+  int phase2BattPct = estimateBatteryPercent(getStableBatteryVoltage());
+  bool skipWaves = (phase2BattPct <= 50);
+  SerialMon.printf("Starting wave phase (SoC=%d%%, skipWaves=%s)...\n",
+                   phase2BattPct, skipWaves ? "yes" : "no");
 
   SerialMon.println("  Powering on 3.3V rail (sensors)...");
   // Power on 3.3V rail, wait for stabilization, then power on sensors
@@ -641,13 +644,16 @@ void loop() {
     }
   }
 
-  SerialMon.println("  Collecting wave data (10Hz IMU for 160s)...");
-  esp_task_wdt_reset();
-  recordWaveData();
-  SerialMon.println("  ✓ Wave data collection complete");
-
-  esp_task_wdt_reset();
-  logWaveStats();
+  if (skipWaves) {
+    SerialMon.printf("  Wave collection skipped (battery %d%% <= 50%%) — temp + upload only\n", phase2BattPct);
+  } else {
+    SerialMon.println("  Collecting wave data (10Hz IMU for 160s)...");
+    esp_task_wdt_reset();
+    recordWaveData();
+    SerialMon.println("  ✓ Wave data collection complete");
+    esp_task_wdt_reset();
+    logWaveStats();
+  }
 
   SerialMon.println("  Powering down sensors and 3.3V rail...");
   delay(100);  // brief settle before rail off (no datasheet requirement)
@@ -888,8 +894,8 @@ void loop() {
 #endif
   uint32_t nowUtc = (uint32_t)time(NULL);
   uint32_t candidateWakeUtc = (currentTimestamp >= SECONDS_PER_DAY ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
-  // Dump mode TIER2+: bypass quiet-hour deferral — draining at 3am matters more than the schedule
-  uint32_t nextWakeUtc = (dumpMode >= DUMP_TIER2)
+  // Dump mode TIER1+: bypass quiet-hour deferral — draining at 3am matters more than the schedule
+  uint32_t nextWakeUtc = (dumpMode >= DUMP_TIER1)
     ? candidateWakeUtc
     : adjustNextWakeUtcForQuietHours(candidateWakeUtc);
   float batteryDelta = getStableBatteryVoltage() - (g_prevBatteryVoltage > 0.1f ? g_prevBatteryVoltage : getStableBatteryVoltage());
@@ -973,8 +979,8 @@ void loop() {
     SerialMon.println("Checking for firmware updates (OTA)...");
     {
       int otaBattPct = estimateBatteryPercent(getStableBatteryVoltage());
-      if (otaBattPct < 40) {
-        SerialMon.printf("  OTA skipped: battery %d%% below 40%% minimum\n", otaBattPct);
+      if (otaBattPct <= 65) {
+        SerialMon.printf("  OTA skipped: battery %d%% at or below 65%%\n", otaBattPct);
       } else if (networkConnected && modem.isGprsConnected()) {
         SerialMon.printf("  OTA server: %s\n", OTA_SERVER);
         SerialMon.printf("  Node ID: %s\n", NODE_ID);
@@ -1015,16 +1021,18 @@ void loop() {
     // Refresh next wake after potential time update
     nowUtc = (uint32_t)time(NULL);
     candidateWakeUtc = (currentTimestamp >= SECONDS_PER_DAY ? currentTimestamp : nowUtc) + (uint32_t)sleepMinutes * 60UL;
-    nextWakeUtc = (dumpMode >= DUMP_TIER2)
+    nextWakeUtc = (dumpMode >= DUMP_TIER1)
       ? candidateWakeUtc
       : adjustNextWakeUtcForQuietHours(candidateWakeUtc);
+    float waveHeight = skipWaves ? 0.0f : computeWaveHeight();
+    float wavePeriod = skipWaves ? 0.0f : computeWavePeriod();
     json = buildJsonPayload(
       fix.latitude,
       fix.longitude,
-      computeWaveHeight(),
-      computeWavePeriod(),
+      waveHeight,
+      wavePeriod,
       computeWaveDirection(),
-      computeWavePower(computeWaveHeight(), computeWavePeriod()),
+      computeWavePower(waveHeight, wavePeriod),
       rtcState.lastWaterTemp,
       getStableBatteryVoltage(),
       currentTimestamp,
