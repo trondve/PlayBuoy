@@ -3,8 +3,12 @@
 // TinyGSM — must be defined before any TinyGsmClient.h include
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_RX_BUFFER 1024
+#ifndef NODE_ID
 #define NODE_ID "playbuoy_grinde"
+#endif
+#ifndef NAME
 #define NAME "Litla Grindevatnet"
+#endif
 #define FIRMWARE_VERSION "1.3.3"
 #define GPS_SYNC_INTERVAL_SECONDS       (7 * 24 * 3600)  // normal: fix every 7 days
 #define GPS_ANCHOR_DRIFT_INTERVAL_SECONDS (24 * 3600)    // daily fix while anchor drift is active

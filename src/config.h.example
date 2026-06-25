@@ -4,8 +4,15 @@
 #define TINY_GSM_MODEM_SIM7000
 #define TINY_GSM_RX_BUFFER 1024
 
+// NODE_ID and NAME are normally set via platformio.ini build_flags per environment.
+// These fallbacks apply only when building the legacy lilygo-t-sim7000g env or
+// if you override them here for a one-off single-buoy build.
+#ifndef NODE_ID
 #define NODE_ID "your-buoy-id"
+#endif
+#ifndef NAME
 #define NAME "Your Buoy Name"
+#endif
 #define FIRMWARE_VERSION "1.1.1"
 #define GPS_SYNC_INTERVAL_SECONDS       (7 * 24 * 3600)  // normal: fix every 7 days
 #define GPS_ANCHOR_DRIFT_INTERVAL_SECONDS (24 * 3600)    // daily fix while anchor drift is active

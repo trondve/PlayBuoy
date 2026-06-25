@@ -9,7 +9,31 @@
       "Bash(git commit -m ' *)",
       "Bash(git rm *)",
       "Bash(Get-ChildItem -File)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(pio --version)",
+      "Read(//home/labpc/.platformio/**)",
+      "Bash(~/.platformio/penv/bin/python --version)",
+      "Read(//usr/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(~/.platformio/penv/bin/python *)",
+      "Bash(pio system *)",
+      "Bash(~/.platformio/penv/bin/pip list *)",
+      "Read(//home/labpc/.local/share/pipx/venvs/platformio/bin/**)",
+      "Bash(~/.local/share/pipx/venvs/platformio/bin/python --version)",
+      "Bash(kill %1)",
+      "Bash(wait)",
+      "Bash(~/.platformio/penv/bin/platformio home *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d.get\\(k\\) for k in ['version','description','main','engines']}, indent=2\\)\\)\")",
+      "Bash(grep *)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(curl -s \"https://api.github.com/repos/platformio/platformio-vscode-ide/releases/latest\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['tag_name']\\); [print\\(a['browser_download_url']\\) for a in d.get\\('assets',[]\\) if a['name'].endswith\\('.vsix'\\)]\")",
+      "Bash(curl -L -o /tmp/platformio-ide-3.3.4.vsix \"https://github.com/platformio/platformio-vscode-ide/releases/download/v3.3.4/platformio-ide-3.3.4.vsix\")",
+      "Bash(cursor *)",
+      "Bash(python3 -c \"import shutil; print\\(shutil.which\\('platformio'\\)\\)\")",
+      "Bash(python3 -c \"import os, shutil; print\\('PATH:', os.environ.get\\('PATH'\\)\\); print\\('which:', shutil.which\\('platformio'\\)\\)\")",
+      "Bash(/home/labpc/.local/bin/platformio *)",
+      "Bash(python3 *)"
     ]
   }
 }

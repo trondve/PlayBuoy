@@ -74,4 +74,3 @@ references/                 Known-working reference implementations
 - GPIO 4 pin conflict (MODEM_PWRKEY and GPS_POWER share same pin)
 - Wave direction always "N/A" (magnetometer broken in sealed enclosure)
 - Charging issue detection flag exists but logic is incomplete
-- `build_all_buoys.py` has hardcoded Windows path (line 129)

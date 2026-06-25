@@ -99,7 +99,7 @@ Investigate immediately if:
 ```bash
 # If battery critical (≤3.70V), charge on bench
 # Flash firmware via USB:
-pio run --target upload -e lilygo-t-sim7000g
+pio run --target upload -e playbuoy_grinde   # or -e playbuoy_vatna
 ```
 
 ### Frequent Brownouts
